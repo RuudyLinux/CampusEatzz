@@ -9,7 +9,14 @@ using UniversityCanteen.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.WebHost.UseUrls("http://0.0.0.0:5266");
+const string defaultLocalPort = "5266";
+var requestedPort = Environment.GetEnvironmentVariable("PORT");
+var resolvedPort = int.TryParse(requestedPort, out var parsedPort) && parsedPort > 0
+    ? parsedPort.ToString()
+    : defaultLocalPort;
+var bindingUrl = $"http://0.0.0.0:{resolvedPort}";
+
+builder.WebHost.UseUrls(bindingUrl);
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
@@ -145,7 +152,7 @@ app.MapControllers();
 
 app.Lifetime.ApplicationStarted.Register(() =>
 {
-    var addresses = app.Urls.Count > 0 ? string.Join(", ", app.Urls) : "http://0.0.0.0:5266";
+    var addresses = app.Urls.Count > 0 ? string.Join(", ", app.Urls) : bindingUrl;
     app.Logger.LogInformation("Backend API started successfully. Listening on: {Addresses}", addresses);
 });
 
@@ -161,7 +168,8 @@ try
 catch (IOException ex) when (ex.Message.Contains("address already in use", StringComparison.OrdinalIgnoreCase))
 {
     app.Logger.LogCritical(ex,
-        "Address already in use on backend port 5266. Check with 'netstat -ano | findstr :5266' and stop the conflicting process using 'taskkill /PID <PID> /F'.");
+        "Address already in use on configured backend port {Port}. Check port usage and ensure only one API instance is running.",
+        resolvedPort);
     throw;
 }
 catch (Exception ex)
