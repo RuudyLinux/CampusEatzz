@@ -512,7 +512,10 @@ static string? ResolveConnectionStringFromEnvironment(bool isDevelopment)
     {
         "DATABASE_URL",
         "MYSQL_URL",
+        "MYSQL_PUBLIC_URL",
         "MYSQL_INTERNAL_URL",
+        "DATABASE_PUBLIC_URL",
+        "RAILWAY_DATABASE_URL",
         "MYSQLDATABASE_URL"
     };
 
@@ -531,11 +534,19 @@ static string? ResolveConnectionStringFromEnvironment(bool isDevelopment)
         }
     }
 
-    var host = GetFirstEnvironmentValue("MYSQLHOST", "DB_HOST", "DATABASE_HOST");
+    var host = GetFirstEnvironmentValue(
+        "MYSQL_PUBLIC_HOST",
+        "MYSQLHOST",
+        "DB_HOST",
+        "DATABASE_HOST");
     var database = GetFirstEnvironmentValue("MYSQLDATABASE", "DB_NAME", "DATABASE_NAME");
     var user = GetFirstEnvironmentValue("MYSQLUSER", "DB_USER", "DATABASE_USER");
     var password = GetFirstEnvironmentValue("MYSQLPASSWORD", "DB_PASSWORD", "DATABASE_PASSWORD");
-    var portText = GetFirstEnvironmentValue("MYSQLPORT", "DB_PORT", "DATABASE_PORT") ?? "3306";
+    var portText = GetFirstEnvironmentValue(
+        "MYSQL_PUBLIC_PORT",
+        "MYSQLPORT",
+        "DB_PORT",
+        "DATABASE_PORT") ?? "3306";
 
     if (string.IsNullOrWhiteSpace(host)
         || string.IsNullOrWhiteSpace(database)

@@ -219,6 +219,15 @@ As an alternative, the API can also resolve common MySQL env variables if `Conne
 - `MYSQLHOST`, `MYSQLPORT`, `MYSQLDATABASE`, `MYSQLUSER`, `MYSQLPASSWORD`
 - `DATABASE_URL` / `MYSQL_URL` style MySQL URLs
 
+### Railway + Render note
+
+If your MySQL provider is Railway and your app is running on Render, prefer Railway public connection values:
+
+- `MYSQL_PUBLIC_URL` (recommended single variable)
+- or `MYSQL_PUBLIC_HOST` + `MYSQL_PUBLIC_PORT` + `MYSQLDATABASE` + `MYSQLUSER` + `MYSQLPASSWORD`
+
+Do not use Railway internal/private host values from another platform, because they are not reachable from Render.
+
 4. Set your health check path to:
 
 - `/api/health`
