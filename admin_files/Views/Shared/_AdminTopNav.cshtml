@@ -1,0 +1,80 @@
+@{
+    var activePage = string.IsNullOrWhiteSpace(ViewData["AdminActivePage"] as string)
+        ? string.Empty
+        : (ViewData["AdminActivePage"] as string)!;
+
+    string DesktopClass(string key)
+    {
+        return string.Equals(activePage, key, StringComparison.OrdinalIgnoreCase)
+            ? "px-2 py-2 text-sm xl:px-3 xl:py-3 xl:text-base bg-blue-600 hover:bg-blue-700 transition rounded-t-lg border-b-2 border-white whitespace-nowrap"
+            : "px-2 py-2 text-sm xl:px-3 xl:py-3 xl:text-base hover:bg-blue-600 transition rounded-t-lg whitespace-nowrap";
+    }
+
+    string MobileClass(string key)
+    {
+        return string.Equals(activePage, key, StringComparison.OrdinalIgnoreCase)
+            ? "block px-4 py-2 bg-blue-600 rounded transition"
+            : "block px-4 py-2 hover:bg-blue-600 rounded transition";
+    }
+}
+
+<style>
+    .hide-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+    .hide-scrollbar {
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
+    }
+</style>
+
+<nav class="gradient-bg text-white shadow-lg sticky top-0 z-50">
+    <div class="container mx-auto px-4 xl:px-6">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2 xl:space-x-4 py-2 xl:py-3">
+                <img src="~/assets/img/logo.png?v=2" alt="Logo" class="app-logo h-8 w-8 xl:h-10 xl:w-10 rounded-full object-cover shadow-sm bg-white" />
+                <span class="text-lg xl:text-xl font-bold app-name whitespace-nowrap">CampusEatzz</span>
+            </div>
+
+            <div class="hidden lg:flex items-center space-x-1 overflow-x-auto hide-scrollbar max-w-[60vw]">
+                <a href='@Url.Action("AdminDashboard", "Home")' class="@DesktopClass("Dashboard")">Dashboard</a>
+                <a href='@Url.Action("AdminAllOrders", "Home")' class="@DesktopClass("Orders")">Orders</a>
+                <a href='@Url.Action("AdminManageUsers", "Home")' class="@DesktopClass("Users")">Users</a>
+                <a href='@Url.Action("AdminWallets", "Home")' class="@DesktopClass("Wallets")">Wallets</a>
+                <a href='@Url.Action("AdminManageCanteens", "Home")' class="@DesktopClass("Canteens")">Canteens</a>
+                <a href='@Url.Action("AdminManageCanteenAdmins", "Home")' class="@DesktopClass("CanteenAdmins")">Canteen Admins</a>
+                <a href='@Url.Action("AdminContactMessages", "Home")' class="@DesktopClass("Messages")">Messages</a>
+                <a href='@Url.Action("AdminReviews", "Home")' class="@DesktopClass("Reviews")">Reviews</a>
+                <a href='@Url.Action("AdminReports", "Home")' class="@DesktopClass("Reports")">Reports</a>
+                <a href='@Url.Action("AdminSettings", "Home")' class="@DesktopClass("Settings")">Settings</a>
+            </div>
+
+            <div class="hidden lg:flex items-center pl-2">
+                <button onclick="logout(); return false;" class="px-4 py-2 xl:px-6 xl:py-3 bg-red-500 hover:bg-red-600 transition rounded-xl font-semibold flex items-center space-x-2 whitespace-nowrap">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </button>
+            </div>
+
+            <div class="lg:hidden">
+                <button onclick="toggleMobileMenu()" class="p-2 hover:bg-blue-600 rounded transition">
+                    <i class="fas fa-bars text-2xl"></i>
+                </button>
+            </div>
+        </div>
+
+        <div id="mobileMenu" class="hidden lg:hidden pb-4 space-y-2">
+            <a href='@Url.Action("AdminDashboard", "Home")' class="@MobileClass("Dashboard")">Dashboard</a>
+            <a href='@Url.Action("AdminAllOrders", "Home")' class="@MobileClass("Orders")">Orders</a>
+            <a href='@Url.Action("AdminManageUsers", "Home")' class="@MobileClass("Users")">Users</a>
+            <a href='@Url.Action("AdminWallets", "Home")' class="@MobileClass("Wallets")">Wallets</a>
+            <a href='@Url.Action("AdminManageCanteens", "Home")' class="@MobileClass("Canteens")">Canteens</a>
+            <a href='@Url.Action("AdminManageCanteenAdmins", "Home")' class="@MobileClass("CanteenAdmins")">Canteen Admins</a>
+            <a href='@Url.Action("AdminContactMessages", "Home")' class="@MobileClass("Messages")">Messages</a>
+            <a href='@Url.Action("AdminReviews", "Home")' class="@MobileClass("Reviews")">Reviews</a>
+            <a href='@Url.Action("AdminReports", "Home")' class="@MobileClass("Reports")">Reports</a>
+            <a href='@Url.Action("AdminSettings", "Home")' class="@MobileClass("Settings")">Settings</a>
+            <a href="#" onclick="logout(); return false;" class="block px-4 py-2 hover:bg-red-600 rounded transition text-red-200">Logout</a>
+        </div>
+    </div>
+</nav>
