@@ -212,6 +212,7 @@ Use this checklist for reliable production deployment:
 - `ASPNETCORE_ENVIRONMENT=Production`
 - `ConnectionStrings__DefaultConnection=Server=<cloud-mysql-host>;Port=3306;Database=<db-name>;User ID=<user>;Password=<password>;SslMode=Required;TreatTinyAsBoolean=true;`
 - `Startup__FailOnSchemaInitError=false`
+- `Notifications__Scheduler__Enabled=false` (optional temporary setting while DB connectivity is being fixed)
 
 4. Set your health check path to:
 

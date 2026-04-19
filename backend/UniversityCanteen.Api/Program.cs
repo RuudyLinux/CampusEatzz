@@ -60,7 +60,12 @@ builder.Services.AddScoped<UniversityCanteenDbContext>();
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddSingleton<IFcmPushSender, FirebaseFcmPushSender>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
-builder.Services.AddHostedService<NotificationSchedulerHostedService>();
+var notificationSchedulerEnabled = builder.Configuration
+    .GetValue<bool?>("Notifications:Scheduler:Enabled") ?? true;
+if (notificationSchedulerEnabled)
+{
+    builder.Services.AddHostedService<NotificationSchedulerHostedService>();
+}
 
 var allowedOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
