@@ -66,6 +66,8 @@ var allowedOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
     .Get<string[]>() ?? [];
 var isDevelopment = builder.Environment.IsDevelopment();
+var failOnSchemaInitError = builder.Configuration
+    .GetValue<bool?>("Startup:FailOnSchemaInitError") ?? isDevelopment;
 
 builder.Services.AddCors(options =>
 {
@@ -90,7 +92,8 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-await EnsureCoreSchemaAsync(app.Services, app.Logger, builder.Configuration);
+WarnIfLikelyInvalidProductionDatabaseHost(app.Configuration, app.Logger, app.Environment.IsDevelopment());
+await EnsureCoreSchemaAsync(app.Services, app.Logger, app.Configuration, failOnSchemaInitError);
 
 if (app.Environment.IsDevelopment())
 {
@@ -238,7 +241,11 @@ static bool IsOriginAllowed(string origin, string[] configuredOrigins)
     return false;
 }
 
-static async Task EnsureCoreSchemaAsync(IServiceProvider services, ILogger logger, IConfiguration configuration)
+static async Task EnsureCoreSchemaAsync(
+    IServiceProvider services,
+    ILogger logger,
+    IConfiguration configuration,
+    bool failOnSchemaInitError)
 {
     using var scope = services.CreateScope();
     var dbConnectionFactory = scope.ServiceProvider.GetRequiredService<IDbConnectionFactory>();
@@ -432,17 +439,74 @@ static async Task EnsureCoreSchemaAsync(IServiceProvider services, ILogger logge
         }
         catch (MySqlException ex)
         {
-            logger.LogError(
+            if (failOnSchemaInitError)
+            {
+                logger.LogError(
+                    ex,
+                    "Failed to verify startup schema requirements after retries. Ensure MySQL is running and reachable via ConnectionStrings:DefaultConnection.");
+                throw;
+            }
+
+            logger.LogWarning(
                 ex,
-                "Failed to verify startup schema requirements after retries. Ensure MySQL is running and reachable via ConnectionStrings:DefaultConnection.");
-            throw;
+                "Startup schema verification failed after retries, but the API will continue because Startup:FailOnSchemaInitError is disabled.");
+            return;
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to verify startup schema requirements.");
-            throw;
+            if (failOnSchemaInitError)
+            {
+                logger.LogError(ex, "Failed to verify startup schema requirements.");
+                throw;
+            }
+
+            logger.LogWarning(
+                ex,
+                "Unexpected startup schema verification failure, but the API will continue because Startup:FailOnSchemaInitError is disabled.");
+            return;
         }
     }
+}
+
+static void WarnIfLikelyInvalidProductionDatabaseHost(IConfiguration configuration, ILogger logger, bool isDevelopment)
+{
+    if (isDevelopment)
+    {
+        return;
+    }
+
+    var connectionString = configuration.GetConnectionString("DefaultConnection");
+    if (string.IsNullOrWhiteSpace(connectionString))
+    {
+        logger.LogWarning(
+            "ConnectionStrings:DefaultConnection is not configured. Configure a cloud MySQL connection in environment variables before using database-backed endpoints.");
+        return;
+    }
+
+    try
+    {
+        var connectionStringBuilder = new MySqlConnectionStringBuilder(connectionString);
+        var server = (connectionStringBuilder.Server ?? string.Empty).Trim();
+        if (IsLocalDatabaseHost(server))
+        {
+            logger.LogWarning(
+                "Detected local MySQL host '{Server}' in a non-development environment. On Render, set ConnectionStrings__DefaultConnection to your managed MySQL host.",
+                server);
+        }
+    }
+    catch (Exception ex)
+    {
+        logger.LogWarning(ex, "Unable to parse ConnectionStrings:DefaultConnection for deployment diagnostics.");
+    }
+}
+
+static bool IsLocalDatabaseHost(string host)
+{
+    return string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(host, "127.0.0.1", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(host, "0.0.0.0", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(host, "::1", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(host, "host.docker.internal", StringComparison.OrdinalIgnoreCase);
 }
 
 file sealed class SystemMaintenanceState
