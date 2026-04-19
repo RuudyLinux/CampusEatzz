@@ -1,0 +1,20 @@
+# Build outputs
+**/bin/
+**/obj/
+
+# IDE folders
+.vs/
+.vscode/
+
+# User/local settings
+*.user
+*.suo
+
+# Local development secrets
+backend/UniversityCanteen.Api/appsettings.Development.json
+backend/UniversityCanteen.Api/secrets/
+backend/UniversityCanteen.Api/.build-temp/
+backend/UniversityCanteen.Api/wwwroot/uploads/
+
+# Flutter generated output
+flutter_app/build/

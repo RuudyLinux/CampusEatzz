@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CampusEatzz Feedback</title>
+  <style>
+    :root {
+      --bg: #f3f7ff;
+      --panel: #ffffff;
+      --text: #14233f;
+      --muted: #5f6f8e;
+      --brand: #1f4ea3;
+      --brand2: #153a7e;
+      --warn: #f59e0b;
+      --ok: #15803d;
+      --err: #b91c1c;
+      --border: #d8e3f8;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Segoe UI, Arial, sans-serif;
+      background: radial-gradient(circle at top right, #dce9ff 0%, var(--bg) 42%, #edf3ff 100%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+    }
+
+    .card {
+      width: min(560px, 96vw);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(15, 39, 79, 0.16);
+    }
+
+    .head {
+      padding: 18px 20px;
+      background: linear-gradient(135deg, var(--brand2), var(--brand));
+      color: #fff;
+    }
+
+    .head h1 {
+      margin: 0;
+      font-size: 26px;
+      font-weight: 800;
+    }
+
+    .head p {
+      margin: 8px 0 0 0;
+      opacity: 0.95;
+    }
+
+    .body {
+      padding: 18px 20px 20px;
+    }
+
+    .meta {
+      margin-bottom: 14px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .label {
+      display: block;
+      font-weight: 700;
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+
+    .stars {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+
+    .star {
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 34px;
+      line-height: 1;
+      color: #b8c6e7;
+      padding: 2px;
+    }
+
+    .star.active {
+      color: var(--warn);
+    }
+
+    .hint {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    textarea {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      padding: 12px;
+      min-height: 130px;
+      resize: vertical;
+      outline: none;
+      font-size: 15px;
+      color: var(--text);
+      font-family: inherit;
+      margin-bottom: 14px;
+    }
+
+    textarea:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3px rgba(31, 78, 163, 0.18);
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--brand), #2b62c6);
+      color: #fff;
+      font-weight: 700;
+      padding: 10px 16px;
+      cursor: pointer;
+      font-size: 14px;
+      min-width: 140px;
+    }
+
+    .btn[disabled] {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+
+    .msg {
+      font-size: 14px;
+      font-weight: 600;
+      min-height: 20px;
+    }
+
+    .msg.ok {
+      color: var(--ok);
+    }
+
+    .msg.err {
+      color: var(--err);
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <header class="head">
+      <h1>Share Your Feedback</h1>
+      <p>Rate your order and write one message.</p>
+    </header>
+
+    <section class="body">
+      <div id="meta" class="meta"></div>
+
+      <label class="label" for="review">Select 5-star rating</label>
+      <div id="stars" class="stars" aria-label="Rating"></div>
+      <div id="ratingHint" class="hint">Tap stars to select your rating.</div>
+
+      <label class="label" for="review">Write your feedback</label>
+      <textarea id="review" placeholder="Write your experience here..."></textarea>
+
+      <div class="row">
+        <button id="sendBtn" class="btn" type="button">Send Feedback</button>
+        <div id="msg" class="msg"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var email = (params.get('email') || '').trim();
+      var orderRef = (params.get('orderRef') || '').trim();
+      var rating = 0;
+
+      var starsEl = document.getElementById('stars');
+      var reviewEl = document.getElementById('review');
+      var btnEl = document.getElementById('sendBtn');
+      var msgEl = document.getElementById('msg');
+      var metaEl = document.getElementById('meta');
+      var ratingHintEl = document.getElementById('ratingHint');
+
+      if (!email || !orderRef) {
+        msgEl.textContent = 'Invalid feedback link. Missing email or order reference.';
+        msgEl.className = 'msg err';
+        btnEl.disabled = true;
+      }
+
+      metaEl.textContent = 'Order: ' + orderRef + ' | Email: ' + (email || 'N/A');
+
+      function renderStars() {
+        starsEl.innerHTML = '';
+        for (var i = 1; i <= 5; i += 1) {
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'star' + (i <= rating ? ' active' : '');
+          b.textContent = i <= rating ? '\u2605' : '\u2606';
+          b.setAttribute('aria-label', i + ' star');
+          (function (value) {
+            b.addEventListener('click', function () {
+              rating = value;
+              ratingHintEl.textContent = 'You selected ' + rating + ' out of 5 stars.';
+              renderStars();
+            });
+          }(i));
+          starsEl.appendChild(b);
+        }
+      }
+
+      renderStars();
+
+      btnEl.addEventListener('click', async function () {
+        var text = (reviewEl.value || '').trim();
+
+        if (rating < 1) {
+          msgEl.textContent = 'Please select a star rating.';
+          msgEl.className = 'msg err';
+          return;
+        }
+
+        if (!text) {
+          msgEl.textContent = 'Please write your feedback.';
+          msgEl.className = 'msg err';
+          return;
+        }
+
+        btnEl.disabled = true;
+        btnEl.textContent = 'Sending...';
+        msgEl.textContent = '';
+
+        try {
+          var response = await fetch('/api/customer/reviews', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              identifier: email,
+              orderRef: orderRef,
+              rating: rating,
+              reviewText: text
+            })
+          });
+
+          var body = {};
+          try {
+            body = await response.json();
+          } catch (_) {
+            body = {};
+          }
+
+          if (!response.ok || body.success !== true) {
+            var err = body.message || 'Failed to send feedback.';
+            msgEl.textContent = err;
+            msgEl.className = 'msg err';
+            return;
+          }
+
+          msgEl.textContent = 'Thanks! Feedback sent successfully.';
+          msgEl.className = 'msg ok';
+          reviewEl.value = '';
+          btnEl.disabled = true;
+          btnEl.textContent = 'Sent';
+        } catch (e) {
+          msgEl.textContent = 'Network error while sending feedback.';
+          msgEl.className = 'msg err';
+          btnEl.disabled = false;
+          btnEl.textContent = 'Send Feedback';
+        }
+      });
+    }());
+  </script>
+</body>
+</html>
