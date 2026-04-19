@@ -2,6 +2,7 @@ using Dapper;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using MySqlConnector;
+using System.Net;
 using System.Text;
 using UniversityCanteen.Api.Configuration;
 using UniversityCanteen.Api.Data;
@@ -48,11 +49,13 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
+var resolvedDatabaseConnectionString = ResolveDatabaseConnectionString(
+    builder.Configuration,
+    builder.Environment.IsDevelopment());
+
 builder.Services.AddScoped<IDbConnectionFactory>(_ =>
 {
-    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-        ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is not configured.");
-    return new MySqlConnectionFactory(connectionString);
+    return new MySqlConnectionFactory(resolvedDatabaseConnectionString);
 });
 
 builder.Services.AddScoped<IOtpEmailSender, SmtpOtpEmailSender>();
@@ -97,7 +100,7 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-WarnIfLikelyInvalidProductionDatabaseHost(app.Configuration, app.Logger, app.Environment.IsDevelopment());
+WarnIfLikelyInvalidProductionDatabaseHost(resolvedDatabaseConnectionString, app.Logger, app.Environment.IsDevelopment());
 await EnsureCoreSchemaAsync(app.Services, app.Logger, app.Configuration, failOnSchemaInitError);
 
 if (app.Environment.IsDevelopment())
@@ -473,14 +476,199 @@ static async Task EnsureCoreSchemaAsync(
     }
 }
 
-static void WarnIfLikelyInvalidProductionDatabaseHost(IConfiguration configuration, ILogger logger, bool isDevelopment)
+static string ResolveDatabaseConnectionString(IConfiguration configuration, bool isDevelopment)
+{
+    var configuredConnectionString = configuration.GetConnectionString("DefaultConnection");
+    var hasConfiguredConnection = !string.IsNullOrWhiteSpace(configuredConnectionString);
+    var configuredLocalHost = hasConfiguredConnection && IsLocalDatabaseHostInConnectionString(configuredConnectionString!);
+
+    if (!isDevelopment && configuredLocalHost)
+    {
+        var environmentConnectionString = ResolveConnectionStringFromEnvironment(isDevelopment);
+        if (!string.IsNullOrWhiteSpace(environmentConnectionString))
+        {
+            return environmentConnectionString;
+        }
+    }
+
+    if (hasConfiguredConnection)
+    {
+        return configuredConnectionString!;
+    }
+
+    var fallbackConnectionString = ResolveConnectionStringFromEnvironment(isDevelopment);
+    if (!string.IsNullOrWhiteSpace(fallbackConnectionString))
+    {
+        return fallbackConnectionString;
+    }
+
+    throw new InvalidOperationException(
+        "ConnectionStrings:DefaultConnection is not configured and no supported MySQL environment variables were found.");
+}
+
+static string? ResolveConnectionStringFromEnvironment(bool isDevelopment)
+{
+    var urlVariables = new[]
+    {
+        "DATABASE_URL",
+        "MYSQL_URL",
+        "MYSQL_INTERNAL_URL",
+        "MYSQLDATABASE_URL"
+    };
+
+    foreach (var variableName in urlVariables)
+    {
+        var value = Environment.GetEnvironmentVariable(variableName);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            continue;
+        }
+
+        var parsed = TryBuildConnectionStringFromMySqlUrl(value, isDevelopment);
+        if (!string.IsNullOrWhiteSpace(parsed))
+        {
+            return parsed;
+        }
+    }
+
+    var host = GetFirstEnvironmentValue("MYSQLHOST", "DB_HOST", "DATABASE_HOST");
+    var database = GetFirstEnvironmentValue("MYSQLDATABASE", "DB_NAME", "DATABASE_NAME");
+    var user = GetFirstEnvironmentValue("MYSQLUSER", "DB_USER", "DATABASE_USER");
+    var password = GetFirstEnvironmentValue("MYSQLPASSWORD", "DB_PASSWORD", "DATABASE_PASSWORD");
+    var portText = GetFirstEnvironmentValue("MYSQLPORT", "DB_PORT", "DATABASE_PORT") ?? "3306";
+
+    if (string.IsNullOrWhiteSpace(host)
+        || string.IsNullOrWhiteSpace(database)
+        || string.IsNullOrWhiteSpace(user))
+    {
+        return null;
+    }
+
+    var builder = new MySqlConnectionStringBuilder
+    {
+        Server = host.Trim(),
+        Database = database.Trim(),
+        UserID = user.Trim(),
+        Password = password ?? string.Empty,
+        Port = uint.TryParse(portText, out var parsedPort) ? parsedPort : 3306,
+        TreatTinyAsBoolean = true
+    };
+
+    var sslModeText = GetFirstEnvironmentValue("MYSQL_SSLMODE", "MYSQL_SSL_MODE", "DB_SSLMODE", "SSLMODE");
+    builder.SslMode = ResolveSslMode(sslModeText, builder.Server, isDevelopment);
+
+    return builder.ConnectionString;
+}
+
+static string? TryBuildConnectionStringFromMySqlUrl(string url, bool isDevelopment)
+{
+    if (!Uri.TryCreate(url.Trim(), UriKind.Absolute, out var uri)
+        || !string.Equals(uri.Scheme, "mysql", StringComparison.OrdinalIgnoreCase))
+    {
+        return null;
+    }
+
+    var userInfo = (uri.UserInfo ?? string.Empty).Split(':', 2);
+    var user = userInfo.Length > 0 ? WebUtility.UrlDecode(userInfo[0]) : string.Empty;
+    var password = userInfo.Length > 1 ? WebUtility.UrlDecode(userInfo[1]) : string.Empty;
+    var database = uri.AbsolutePath.Trim('/');
+
+    if (string.IsNullOrWhiteSpace(uri.Host)
+        || string.IsNullOrWhiteSpace(user)
+        || string.IsNullOrWhiteSpace(database))
+    {
+        return null;
+    }
+
+    var builder = new MySqlConnectionStringBuilder
+    {
+        Server = uri.Host,
+        Port = uri.Port > 0 ? (uint)uri.Port : 3306,
+        Database = WebUtility.UrlDecode(database),
+        UserID = user,
+        Password = password,
+        TreatTinyAsBoolean = true
+    };
+
+    var sslModeFromQuery = GetQueryStringValue(uri.Query, "sslmode")
+        ?? GetQueryStringValue(uri.Query, "ssl-mode");
+    builder.SslMode = ResolveSslMode(sslModeFromQuery, builder.Server, isDevelopment);
+
+    return builder.ConnectionString;
+}
+
+static string? GetFirstEnvironmentValue(params string[] keys)
+{
+    foreach (var key in keys)
+    {
+        var value = Environment.GetEnvironmentVariable(key);
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            return value;
+        }
+    }
+
+    return null;
+}
+
+static string? GetQueryStringValue(string query, string key)
+{
+    if (string.IsNullOrWhiteSpace(query) || string.IsNullOrWhiteSpace(key))
+    {
+        return null;
+    }
+
+    var trimmed = query.TrimStart('?');
+    var pairs = trimmed.Split('&', StringSplitOptions.RemoveEmptyEntries);
+    foreach (var pair in pairs)
+    {
+        var parts = pair.Split('=', 2);
+        var currentKey = WebUtility.UrlDecode(parts[0] ?? string.Empty);
+        if (!string.Equals(currentKey, key, StringComparison.OrdinalIgnoreCase))
+        {
+            continue;
+        }
+
+        var rawValue = parts.Length > 1 ? parts[1] : string.Empty;
+        return WebUtility.UrlDecode(rawValue);
+    }
+
+    return null;
+}
+
+static MySqlSslMode ResolveSslMode(string? sslModeText, string host, bool isDevelopment)
+{
+    if (!string.IsNullOrWhiteSpace(sslModeText)
+        && Enum.TryParse<MySqlSslMode>(sslModeText, ignoreCase: true, out var parsedMode))
+    {
+        return parsedMode;
+    }
+
+    return IsLocalDatabaseHost(host)
+        ? MySqlSslMode.None
+        : (isDevelopment ? MySqlSslMode.Preferred : MySqlSslMode.Required);
+}
+
+static bool IsLocalDatabaseHostInConnectionString(string connectionString)
+{
+    try
+    {
+        var builder = new MySqlConnectionStringBuilder(connectionString);
+        return IsLocalDatabaseHost(builder.Server ?? string.Empty);
+    }
+    catch
+    {
+        return false;
+    }
+}
+
+static void WarnIfLikelyInvalidProductionDatabaseHost(string connectionString, ILogger logger, bool isDevelopment)
 {
     if (isDevelopment)
     {
         return;
     }
 
-    var connectionString = configuration.GetConnectionString("DefaultConnection");
     if (string.IsNullOrWhiteSpace(connectionString))
     {
         logger.LogWarning(

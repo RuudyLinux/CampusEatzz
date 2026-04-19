@@ -214,6 +214,11 @@ Use this checklist for reliable production deployment:
 - `Startup__FailOnSchemaInitError=false`
 - `Notifications__Scheduler__Enabled=false` (optional temporary setting while DB connectivity is being fixed)
 
+As an alternative, the API can also resolve common MySQL env variables if `ConnectionStrings__DefaultConnection` is not set, including:
+
+- `MYSQLHOST`, `MYSQLPORT`, `MYSQLDATABASE`, `MYSQLUSER`, `MYSQLPASSWORD`
+- `DATABASE_URL` / `MYSQL_URL` style MySQL URLs
+
 4. Set your health check path to:
 
 - `/api/health`
