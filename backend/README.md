@@ -198,3 +198,42 @@ Admin and canteen-admin credentials are currently configured in:
 - `backend/UniversityCanteen.Api/appsettings.json`
 
 You can replace these values with your production credentials or move them to secure secrets.
+
+## Render deployment checklist (Docker)
+
+If your Render logs show `Unable to connect to any of the specified MySQL hosts`, the app is usually still pointing to a local host such as `127.0.0.1`.
+
+Use this checklist for reliable production deployment:
+
+1. Deploy from the repository root so Render can use the root `Dockerfile`.
+2. Ensure the service is using the latest commit that includes dynamic `PORT` binding.
+3. In Render Environment Variables, set:
+
+- `ASPNETCORE_ENVIRONMENT=Production`
+- `ConnectionStrings__DefaultConnection=Server=<cloud-mysql-host>;Port=3306;Database=<db-name>;User ID=<user>;Password=<password>;SslMode=Required;TreatTinyAsBoolean=true;`
+- `Startup__FailOnSchemaInitError=false`
+
+4. Set your health check path to:
+
+- `/api/health`
+
+5. Verify database reachability after deploy:
+
+- `GET /api/health` should return API running.
+- `GET /api/health/db` should return database connection successful.
+
+### CORS for production clients
+
+Set allowed frontend domains as environment variables in Render:
+
+- `Cors__AllowedOrigins__0=https://<your-frontend-domain>`
+- `Cors__AllowedOrigins__1=https://<your-other-domain>`
+
+Avoid broad wildcard origins in production.
+
+### Common MySQL connectivity causes on Render
+
+1. Connection string still uses `localhost` or `127.0.0.1`.
+2. Cloud MySQL firewall or network policy blocks Render egress.
+3. SSL is required by provider but missing in connection string.
+4. Wrong host, user, password, or database name.
