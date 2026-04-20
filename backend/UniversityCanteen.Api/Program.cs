@@ -101,6 +101,7 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 WarnIfLikelyInvalidProductionDatabaseHost(resolvedDatabaseConnectionString, app.Logger, app.Environment.IsDevelopment());
+WarnIfLocalDatabasePasswordLooksMissing(resolvedDatabaseConnectionString, app.Logger, app.Environment.IsDevelopment());
 await EnsureCoreSchemaAsync(app.Services, app.Logger, app.Configuration, failOnSchemaInitError);
 
 if (app.Environment.IsDevelopment())
@@ -487,31 +488,121 @@ static async Task EnsureCoreSchemaAsync(
 static string ResolveDatabaseConnectionString(IConfiguration configuration, bool isDevelopment)
 {
     var configuredConnectionString = configuration.GetConnectionString("DefaultConnection");
+    var environmentConnectionString = ResolveConnectionStringFromEnvironment(isDevelopment);
     var hasConfiguredConnection = !string.IsNullOrWhiteSpace(configuredConnectionString);
     var configuredLocalHost = hasConfiguredConnection && IsLocalDatabaseHostInConnectionString(configuredConnectionString!);
 
-    if (!isDevelopment && configuredLocalHost)
+    if (hasConfiguredConnection)
     {
-        var environmentConnectionString = ResolveConnectionStringFromEnvironment(isDevelopment);
-        if (!string.IsNullOrWhiteSpace(environmentConnectionString))
+        if (!isDevelopment
+            && configuredLocalHost
+            && !string.IsNullOrWhiteSpace(environmentConnectionString))
         {
             return environmentConnectionString;
         }
+
+        if (IsConnectionStringPasswordMissing(configuredConnectionString!)
+            && !string.IsNullOrWhiteSpace(environmentConnectionString))
+        {
+            return environmentConnectionString;
+        }
+
+        return ApplyMissingConnectionStringPartsFromEnvironment(configuredConnectionString!, isDevelopment);
     }
 
-    if (hasConfiguredConnection)
+    if (!string.IsNullOrWhiteSpace(environmentConnectionString))
     {
-        return configuredConnectionString!;
-    }
-
-    var fallbackConnectionString = ResolveConnectionStringFromEnvironment(isDevelopment);
-    if (!string.IsNullOrWhiteSpace(fallbackConnectionString))
-    {
-        return fallbackConnectionString;
+        return environmentConnectionString;
     }
 
     throw new InvalidOperationException(
         "ConnectionStrings:DefaultConnection is not configured and no supported MySQL environment variables were found.");
+}
+
+static string ApplyMissingConnectionStringPartsFromEnvironment(string connectionString, bool isDevelopment)
+{
+    try
+    {
+        var builder = new MySqlConnectionStringBuilder(connectionString);
+        var hasChanges = false;
+
+        var host = GetFirstEnvironmentValue(
+            "MYSQL_PUBLIC_HOST",
+            "MYSQLHOST",
+            "DB_HOST",
+            "DATABASE_HOST");
+        var database = GetFirstEnvironmentValue("MYSQLDATABASE", "DB_NAME", "DATABASE_NAME");
+        var user = GetFirstEnvironmentValue("MYSQLUSER", "DB_USER", "DATABASE_USER");
+        var password = GetFirstEnvironmentValue(
+            "MYSQL_LOCAL_PASSWORD",
+            "MYSQL_ROOT_PASSWORD",
+            "MYSQLPASSWORD",
+            "DB_PASSWORD",
+            "DATABASE_PASSWORD");
+        var portText = GetFirstEnvironmentValue(
+            "MYSQL_PUBLIC_PORT",
+            "MYSQLPORT",
+            "DB_PORT",
+            "DATABASE_PORT");
+        var sslModeText = GetFirstEnvironmentValue("MYSQL_SSLMODE", "MYSQL_SSL_MODE", "DB_SSLMODE", "SSLMODE");
+
+        if (string.IsNullOrWhiteSpace(builder.Server) && !string.IsNullOrWhiteSpace(host))
+        {
+            builder.Server = host.Trim();
+            hasChanges = true;
+        }
+
+        if (string.IsNullOrWhiteSpace(builder.Database) && !string.IsNullOrWhiteSpace(database))
+        {
+            builder.Database = database.Trim();
+            hasChanges = true;
+        }
+
+        if (string.IsNullOrWhiteSpace(builder.UserID) && !string.IsNullOrWhiteSpace(user))
+        {
+            builder.UserID = user.Trim();
+            hasChanges = true;
+        }
+
+        if (string.IsNullOrWhiteSpace(builder.Password) && !string.IsNullOrWhiteSpace(password))
+        {
+            builder.Password = password;
+            hasChanges = true;
+        }
+
+        if ((builder.Port == 0 || builder.Port == 3306)
+            && uint.TryParse(portText, out var parsedPort)
+            && parsedPort > 0)
+        {
+            builder.Port = parsedPort;
+            hasChanges = true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(sslModeText))
+        {
+            builder.SslMode = ResolveSslMode(sslModeText, builder.Server, isDevelopment);
+            hasChanges = true;
+        }
+
+        return hasChanges ? builder.ConnectionString : connectionString;
+    }
+    catch
+    {
+        return connectionString;
+    }
+}
+
+static bool IsConnectionStringPasswordMissing(string connectionString)
+{
+    try
+    {
+        var builder = new MySqlConnectionStringBuilder(connectionString);
+        return string.IsNullOrWhiteSpace(builder.Password);
+    }
+    catch
+    {
+        return false;
+    }
 }
 
 static string? ResolveConnectionStringFromEnvironment(bool isDevelopment)
@@ -549,7 +640,12 @@ static string? ResolveConnectionStringFromEnvironment(bool isDevelopment)
         "DATABASE_HOST");
     var database = GetFirstEnvironmentValue("MYSQLDATABASE", "DB_NAME", "DATABASE_NAME");
     var user = GetFirstEnvironmentValue("MYSQLUSER", "DB_USER", "DATABASE_USER");
-    var password = GetFirstEnvironmentValue("MYSQLPASSWORD", "DB_PASSWORD", "DATABASE_PASSWORD");
+    var password = GetFirstEnvironmentValue(
+        "MYSQL_LOCAL_PASSWORD",
+        "MYSQL_ROOT_PASSWORD",
+        "MYSQLPASSWORD",
+        "DB_PASSWORD",
+        "DATABASE_PASSWORD");
     var portText = GetFirstEnvironmentValue(
         "MYSQL_PUBLIC_PORT",
         "MYSQLPORT",
@@ -709,6 +805,29 @@ static void WarnIfLikelyInvalidProductionDatabaseHost(string connectionString, I
     catch (Exception ex)
     {
         logger.LogWarning(ex, "Unable to parse ConnectionStrings:DefaultConnection for deployment diagnostics.");
+    }
+}
+
+static void WarnIfLocalDatabasePasswordLooksMissing(string connectionString, ILogger logger, bool isDevelopment)
+{
+    if (!isDevelopment || string.IsNullOrWhiteSpace(connectionString))
+    {
+        return;
+    }
+
+    try
+    {
+        var connectionStringBuilder = new MySqlConnectionStringBuilder(connectionString);
+        if (IsLocalDatabaseHost(connectionStringBuilder.Server ?? string.Empty)
+            && string.IsNullOrWhiteSpace(connectionStringBuilder.Password))
+        {
+            logger.LogWarning(
+                "Local MySQL connection string has an empty password. If your MySQL user requires a password, set MYSQL_LOCAL_PASSWORD or ConnectionStrings__DefaultConnection before running the API.");
+        }
+    }
+    catch
+    {
+        // Ignore diagnostics parsing errors to avoid startup interruption.
     }
 }
 
