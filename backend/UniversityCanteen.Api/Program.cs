@@ -75,7 +75,7 @@ var allowedOrigins = builder.Configuration
     .Get<string[]>() ?? [];
 var isDevelopment = builder.Environment.IsDevelopment();
 var failOnSchemaInitError = builder.Configuration
-    .GetValue<bool?>("Startup:FailOnSchemaInitError") ?? isDevelopment;
+    .GetValue<bool?>("Startup:FailOnSchemaInitError") ?? false;
 
 builder.Services.AddCors(options =>
 {
@@ -436,7 +436,7 @@ static async Task EnsureCoreSchemaAsync(
             logger.LogInformation("Verified startup schema for auth/login support tables and columns.");
             return;
         }
-        catch (MySqlException ex) when (attempt < maxAttempts)
+        catch (MySqlException ex) when (attempt < maxAttempts && ex.Number != 1045)
         {
             logger.LogWarning(
                 ex,
@@ -453,6 +453,14 @@ static async Task EnsureCoreSchemaAsync(
                     ex,
                     "Failed to verify startup schema requirements after retries. Ensure MySQL is running and reachable via ConnectionStrings:DefaultConnection.");
                 throw;
+            }
+
+            if (ex.Number == 1045)
+            {
+                logger.LogWarning(
+                    ex,
+                    "Startup schema verification failed due to invalid MySQL credentials. Update ConnectionStrings:DefaultConnection or cloud DB environment variables, then restart.");
+                return;
             }
 
             logger.LogWarning(
