@@ -10,15 +10,6 @@ using UniversityCanteen.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-const string defaultLocalPort = "5266";
-var requestedPort = Environment.GetEnvironmentVariable("PORT");
-var resolvedPort = int.TryParse(requestedPort, out var parsedPort) && parsedPort > 0
-    ? parsedPort.ToString()
-    : defaultLocalPort;
-var bindingUrl = $"http://0.0.0.0:{resolvedPort}";
-
-builder.WebHost.UseUrls(bindingUrl);
-
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOptions.SectionName));
@@ -70,33 +61,10 @@ if (notificationSchedulerEnabled)
     builder.Services.AddHostedService<NotificationSchedulerHostedService>();
 }
 
-var allowedOrigins = builder.Configuration
-    .GetSection("Cors:AllowedOrigins")
-    .Get<string[]>() ?? [];
-var isDevelopment = builder.Environment.IsDevelopment();
 var failOnSchemaInitError = builder.Configuration
     .GetValue<bool?>("Startup:FailOnSchemaInitError") ?? false;
 
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("HybridAppCors", policy =>
-    {
-        if (isDevelopment)
-        {
-            policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
-            return;
-        }
-
-        var configuredOrigins = allowedOrigins.Length == 0
-            ? new[] { "https://appassets.androidplatform.net" }
-            : allowedOrigins;
-
-        policy
-            .SetIsOriginAllowed(origin => IsOriginAllowed(origin, configuredOrigins))
-            .AllowAnyHeader()
-            .AllowAnyMethod();
-    });
-});
+builder.Services.AddCors();
 
 var app = builder.Build();
 
@@ -109,7 +77,10 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseCors("HybridAppCors");
+app.UseCors(policy =>
+    policy.AllowAnyOrigin()
+          .AllowAnyMethod()
+          .AllowAnyHeader());
 app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -164,7 +135,7 @@ app.MapControllers();
 
 app.Lifetime.ApplicationStarted.Register(() =>
 {
-    var addresses = app.Urls.Count > 0 ? string.Join(", ", app.Urls) : bindingUrl;
+    var addresses = app.Urls.Count > 0 ? string.Join(", ", app.Urls) : "Kestrel default URLs";
     app.Logger.LogInformation("Backend API started successfully. Listening on: {Addresses}", addresses);
 });
 
@@ -180,8 +151,7 @@ try
 catch (IOException ex) when (ex.Message.Contains("address already in use", StringComparison.OrdinalIgnoreCase))
 {
     app.Logger.LogCritical(ex,
-        "Address already in use on configured backend port {Port}. Check port usage and ensure only one API instance is running.",
-        resolvedPort);
+        "Address already in use on the configured backend listener. Check port usage and ensure only one API instance is running.");
     throw;
 }
 catch (Exception ex)
@@ -197,57 +167,6 @@ static bool IsMaintenanceBypassPath(PathString path)
         || path.StartsWithSegments("/api/health", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/api/canteen-admin/login", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/api/auth", StringComparison.OrdinalIgnoreCase);
-}
-
-static bool IsOriginAllowed(string origin, string[] configuredOrigins)
-{
-    if (string.IsNullOrWhiteSpace(origin) || configuredOrigins.Length == 0)
-    {
-        return false;
-    }
-
-    if (!Uri.TryCreate(origin, UriKind.Absolute, out var requestOrigin))
-    {
-        return false;
-    }
-
-    foreach (var configured in configuredOrigins)
-    {
-        var candidate = (configured ?? string.Empty).Trim();
-        if (string.IsNullOrWhiteSpace(candidate))
-        {
-            continue;
-        }
-
-        if (string.Equals(origin, candidate, StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        if (!candidate.Contains("*", StringComparison.Ordinal))
-        {
-            continue;
-        }
-
-        if (!Uri.TryCreate(candidate.Replace("*.", "placeholder."), UriKind.Absolute, out var patternUri))
-        {
-            continue;
-        }
-
-        if (!string.Equals(requestOrigin.Scheme, patternUri.Scheme, StringComparison.OrdinalIgnoreCase))
-        {
-            continue;
-        }
-
-        var wildcardHost = patternUri.Host.Replace("placeholder.", string.Empty, StringComparison.OrdinalIgnoreCase);
-        if (requestOrigin.Host.Equals(wildcardHost, StringComparison.OrdinalIgnoreCase)
-            || requestOrigin.Host.EndsWith("." + wildcardHost, StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-    }
-
-    return false;
 }
 
 static async Task EnsureCoreSchemaAsync(
@@ -487,32 +406,18 @@ static async Task EnsureCoreSchemaAsync(
 
 static string ResolveDatabaseConnectionString(IConfiguration configuration, bool isDevelopment)
 {
-    var configuredConnectionString = configuration.GetConnectionString("DefaultConnection");
     var environmentConnectionString = ResolveConnectionStringFromEnvironment(isDevelopment);
-    var hasConfiguredConnection = !string.IsNullOrWhiteSpace(configuredConnectionString);
-    var configuredLocalHost = hasConfiguredConnection && IsLocalDatabaseHostInConnectionString(configuredConnectionString!);
-
-    if (hasConfiguredConnection)
-    {
-        if (!isDevelopment
-            && configuredLocalHost
-            && !string.IsNullOrWhiteSpace(environmentConnectionString))
-        {
-            return environmentConnectionString;
-        }
-
-        if (IsConnectionStringPasswordMissing(configuredConnectionString!)
-            && !string.IsNullOrWhiteSpace(environmentConnectionString))
-        {
-            return environmentConnectionString;
-        }
-
-        return ApplyMissingConnectionStringPartsFromEnvironment(configuredConnectionString!, isDevelopment);
-    }
-
     if (!string.IsNullOrWhiteSpace(environmentConnectionString))
     {
         return environmentConnectionString;
+    }
+
+    var configuredConnectionString = configuration.GetConnectionString("DefaultConnection");
+    var hasConfiguredConnection = !string.IsNullOrWhiteSpace(configuredConnectionString);
+
+    if (hasConfiguredConnection)
+    {
+        return ApplyMissingConnectionStringPartsFromEnvironment(configuredConnectionString!, isDevelopment);
     }
 
     throw new InvalidOperationException(
@@ -592,21 +497,19 @@ static string ApplyMissingConnectionStringPartsFromEnvironment(string connection
     }
 }
 
-static bool IsConnectionStringPasswordMissing(string connectionString)
-{
-    try
-    {
-        var builder = new MySqlConnectionStringBuilder(connectionString);
-        return string.IsNullOrWhiteSpace(builder.Password);
-    }
-    catch
-    {
-        return false;
-    }
-}
-
 static string? ResolveConnectionStringFromEnvironment(bool isDevelopment)
 {
+    var directConnection = GetFirstEnvironmentValue(
+        "DB_CONNECTION",
+        "ConnectionStrings__DefaultConnection",
+        "DEFAULT_CONNECTION_STRING");
+
+    if (!string.IsNullOrWhiteSpace(directConnection))
+    {
+        var parsedFromDirect = TryBuildConnectionStringFromMySqlUrl(directConnection, isDevelopment);
+        return !string.IsNullOrWhiteSpace(parsedFromDirect) ? parsedFromDirect : directConnection.Trim();
+    }
+
     var urlVariables = new[]
     {
         "DATABASE_URL",
@@ -764,19 +667,6 @@ static MySqlSslMode ResolveSslMode(string? sslModeText, string host, bool isDeve
         : (isDevelopment ? MySqlSslMode.Preferred : MySqlSslMode.Required);
 }
 
-static bool IsLocalDatabaseHostInConnectionString(string connectionString)
-{
-    try
-    {
-        var builder = new MySqlConnectionStringBuilder(connectionString);
-        return IsLocalDatabaseHost(builder.Server ?? string.Empty);
-    }
-    catch
-    {
-        return false;
-    }
-}
-
 static void WarnIfLikelyInvalidProductionDatabaseHost(string connectionString, ILogger logger, bool isDevelopment)
 {
     if (isDevelopment)
@@ -798,7 +688,7 @@ static void WarnIfLikelyInvalidProductionDatabaseHost(string connectionString, I
         if (IsLocalDatabaseHost(server))
         {
             logger.LogWarning(
-                "Detected local MySQL host '{Server}' in a non-development environment. On Render, set ConnectionStrings__DefaultConnection to your managed MySQL host.",
+                "Detected local MySQL host '{Server}' in a non-development environment. On Render, set DB_CONNECTION (or ConnectionStrings__DefaultConnection) to your managed MySQL host.",
                 server);
         }
     }
