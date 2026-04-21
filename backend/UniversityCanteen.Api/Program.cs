@@ -193,11 +193,11 @@ static async Task EnsureCoreSchemaAsync(
     using var connection = dbConnectionFactory.CreateConnection();
     var schemaSql = new[]
     {
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS OtpCode VARCHAR(255) NULL;",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS OtpExpiry DATETIME NULL;",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS IsLoggedIn TINYINT(1) NOT NULL DEFAULT 0;",
+        "ALTER TABLE users ADD COLUMN OtpCode VARCHAR(255) NULL;",
+        "ALTER TABLE users ADD COLUMN OtpExpiry DATETIME NULL;",
+        "ALTER TABLE users ADD COLUMN IsLoggedIn TINYINT(1) NOT NULL DEFAULT 0;",
         "ALTER TABLE users MODIFY COLUMN OtpCode VARCHAR(255) NULL;",
-        "ALTER TABLE canteen_admins ADD COLUMN IF NOT EXISTS image_url VARCHAR(500) NULL;",
+        "ALTER TABLE canteen_admins ADD COLUMN image_url VARCHAR(500) NULL;",
         """
         CREATE TABLE IF NOT EXISTS system_settings (
             id INT NOT NULL AUTO_INCREMENT,
@@ -316,7 +316,8 @@ static async Task EnsureCoreSchemaAsync(
         {
             foreach (var sql in schemaSql)
             {
-                await connection.ExecuteAsync(sql);
+                try { await connection.ExecuteAsync(sql); }
+                catch (MySqlException ex) when (ex.Number == 1060) { } // column already exists
             }
 
             foreach (var setting in settingsSeed)
