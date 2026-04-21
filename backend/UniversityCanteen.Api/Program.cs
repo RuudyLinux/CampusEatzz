@@ -144,6 +144,8 @@ app.Lifetime.ApplicationStopping.Register(() =>
     app.Logger.LogInformation("Backend API is stopping.");
 });
 
+app.MapGet("/", () => "CampusEatzz API is running 🚀");
+
 try
 {
     app.Run();
