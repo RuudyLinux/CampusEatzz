@@ -191,6 +191,25 @@ static async Task EnsureCoreSchemaAsync(
         : configuredAdmin.Password;
 
     using var connection = dbConnectionFactory.CreateConnection();
+
+    // Drop system_settings if it exists without AUTO_INCREMENT on id (broken legacy schema).
+    // All rows are re-seeded below, so dropping is safe.
+    var settingsHasAutoInc = await connection.ExecuteScalarAsync<int>(
+        """
+        SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME   = 'system_settings'
+          AND COLUMN_NAME  = 'id'
+          AND EXTRA LIKE '%auto_increment%'
+        """) > 0;
+    if (!settingsHasAutoInc)
+    {
+        var settingsExists = await connection.ExecuteScalarAsync<int>(
+            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='system_settings'") > 0;
+        if (settingsExists)
+            await connection.ExecuteAsync("DROP TABLE system_settings;");
+    }
+
     var schemaSql = new[]
     {
         "ALTER TABLE users ADD COLUMN OtpCode VARCHAR(255) NULL;",
@@ -209,7 +228,6 @@ static async Task EnsureCoreSchemaAsync(
             UNIQUE KEY uq_system_settings_setting_key (setting_key)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
         """,
-        "ALTER TABLE system_settings MODIFY COLUMN id INT NOT NULL AUTO_INCREMENT;",
         """
         CREATE TABLE IF NOT EXISTS admin_users (
             id INT NOT NULL AUTO_INCREMENT,
