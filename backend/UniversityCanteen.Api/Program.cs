@@ -1,4 +1,5 @@
 using Dapper;
+using Scalar.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using MySqlConnector;
@@ -11,8 +12,7 @@ using UniversityCanteen.Api.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddOpenApi();
 builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOptions.SectionName));
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.Configure<OtpOptions>(builder.Configuration.GetSection(OtpOptions.SectionName));
@@ -73,8 +73,8 @@ WarnIfLikelyInvalidProductionDatabaseHost(resolvedDatabaseConnectionString, app.
 WarnIfLocalDatabasePasswordLooksMissing(resolvedDatabaseConnectionString, app.Logger, app.Environment.IsDevelopment());
 await EnsureCoreSchemaAsync(app.Services, app.Logger, app.Configuration, failOnSchemaInitError);
 
-app.UseSwagger();
-app.UseSwaggerUI();
+app.MapOpenApi();
+app.MapScalarApiReference();
 
 app.UseCors(policy =>
     policy.AllowAnyOrigin()
