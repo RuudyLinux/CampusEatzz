@@ -855,7 +855,8 @@ public sealed class CustomerController(
         {
             HasEnrollmentNo = await ColumnExistsByProbe(connection, "enrollment_no", cancellationToken, transaction),
             HasUniversityId = await ColumnExistsByProbe(connection, "UniversityId", cancellationToken, transaction),
-            HasNameColumns = hasFirstName || hasLastName
+            HasFirstName = hasFirstName,
+            HasLastName = hasLastName
         };
     }
 
@@ -884,9 +885,16 @@ public sealed class CustomerController(
 
     private static string BuildUserLookupSql(UsersSchemaInfo schema)
     {
-        var fullNameExpression = schema.HasNameColumns
-            ? "COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''), u.email)"
+        var firstNameExpression = schema.HasFirstName ? "COALESCE(u.first_name, '')" : "''";
+        var lastNameExpression = schema.HasLastName ? "COALESCE(u.last_name, '')" : "''";
+
+        var fullNameExpression = schema.HasFirstName || schema.HasLastName
+            ? $"COALESCE(NULLIF(TRIM(CONCAT({firstNameExpression}, ' ', {lastNameExpression})), ''), u.email)"
             : "u.email";
+
+        var universityIdExpression = schema.HasUniversityId
+            ? "COALESCE(u.UniversityId, CAST(u.id AS CHAR))"
+            : "CAST(u.id AS CHAR)";
 
         var enrollmentCondition = schema.HasEnrollmentNo
             ? "\n               OR COALESCE(u.enrollment_no, '') = @identifier"
@@ -899,7 +907,7 @@ public sealed class CustomerController(
         return $"""
             SELECT
                 u.id AS Id,
-                COALESCE(u.UniversityId, CAST(u.id AS CHAR)) AS UniversityId,
+                {universityIdExpression} AS UniversityId,
                 COALESCE(u.email, '') AS Email,
                 {fullNameExpression} AS Name
             FROM users u
@@ -970,7 +978,8 @@ public sealed class CustomerController(
     {
         public bool HasEnrollmentNo { get; init; }
         public bool HasUniversityId { get; init; }
-        public bool HasNameColumns { get; init; }
+        public bool HasFirstName { get; init; }
+        public bool HasLastName { get; init; }
     }
 
     private sealed class UserLookupRow
