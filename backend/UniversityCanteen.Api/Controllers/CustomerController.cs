@@ -25,6 +25,8 @@ public sealed class CustomerController(
         try
         {
             using var connection = dbConnectionFactory.CreateConnection();
+            await EnsureWalletInfrastructureExists(connection, cancellationToken);
+
             var user = await FindUserByIdentifier(connection, identifier.Trim(), cancellationToken);
             if (user is null)
             {
@@ -67,6 +69,8 @@ public sealed class CustomerController(
         try
         {
             using var connection = dbConnectionFactory.CreateConnection();
+            await EnsureWalletInfrastructureExists(connection, cancellationToken);
+
             var user = await FindUserByIdentifier(connection, identifier.Trim(), cancellationToken);
             if (user is null)
             {
@@ -151,6 +155,7 @@ public sealed class CustomerController(
             }
 
             await dbConnection.OpenAsync(cancellationToken);
+            await EnsureWalletInfrastructureExists(dbConnection, cancellationToken);
             await using var transaction = await dbConnection.BeginTransactionAsync(cancellationToken);
 
             var user = await FindUserByIdentifier(dbConnection, identifier, cancellationToken, transaction);
@@ -477,6 +482,7 @@ public sealed class CustomerController(
             }
 
             await dbConnection.OpenAsync(cancellationToken);
+            await EnsureWalletInfrastructureExists(dbConnection, cancellationToken);
             await using var transaction = await dbConnection.BeginTransactionAsync(cancellationToken);
 
             var user = await FindUserByIdentifier(dbConnection, identifier, cancellationToken, transaction);
@@ -816,6 +822,49 @@ public sealed class CustomerController(
             """,
             new { userId },
             transaction: transaction,
+            cancellationToken: cancellationToken));
+    }
+
+    private static async Task EnsureWalletInfrastructureExists(
+        IDbConnection connection,
+        CancellationToken cancellationToken)
+    {
+        await connection.ExecuteAsync(new CommandDefinition(
+            """
+            CREATE TABLE IF NOT EXISTS wallets (
+                id INT NOT NULL AUTO_INCREMENT,
+                user_id INT NOT NULL,
+                balance DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                UNIQUE KEY uq_wallets_user_id (user_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+            """,
+            cancellationToken: cancellationToken));
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            """
+            CREATE TABLE IF NOT EXISTS wallet_transactions (
+                id BIGINT NOT NULL AUTO_INCREMENT,
+                user_id INT NOT NULL,
+                transaction_id VARCHAR(100) NOT NULL,
+                amount DECIMAL(10,2) NOT NULL,
+                type ENUM('credit','debit') NOT NULL,
+                status ENUM('pending','completed','failed','refunded') NOT NULL DEFAULT 'pending',
+                payment_gateway VARCHAR(50) NULL,
+                gateway_order_id VARCHAR(100) NULL,
+                gateway_payment_id VARCHAR(100) NULL,
+                gateway_signature VARCHAR(255) NULL,
+                description TEXT NULL,
+                order_id INT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                UNIQUE KEY uq_wallet_transactions_txn_id (transaction_id),
+                KEY ix_wallet_transactions_user (user_id),
+                KEY ix_wallet_transactions_created (created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+            """,
             cancellationToken: cancellationToken));
     }
 
