@@ -829,43 +829,56 @@ public sealed class CustomerController(
         IDbConnection connection,
         CancellationToken cancellationToken)
     {
-        await connection.ExecuteAsync(new CommandDefinition(
-            """
-            CREATE TABLE IF NOT EXISTS wallets (
-                id INT NOT NULL AUTO_INCREMENT,
-                user_id INT NOT NULL,
-                balance DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                PRIMARY KEY (id),
-                UNIQUE KEY uq_wallets_user_id (user_id)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-            """,
-            cancellationToken: cancellationToken));
+        // CREATE TABLE requires CREATE privilege. If the DB user only has DML privileges,
+        // MySQL throws error 1142 even when IF NOT EXISTS would be a no-op.
+        // The startup migration in Program.cs already creates these tables; this is a safety net.
+        // Swallow the privilege error so wallet requests don't fail when tables already exist.
+        try
+        {
+            await connection.ExecuteAsync(new CommandDefinition(
+                """
+                CREATE TABLE IF NOT EXISTS wallets (
+                    id INT NOT NULL AUTO_INCREMENT,
+                    user_id INT NOT NULL,
+                    balance DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uq_wallets_user_id (user_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+                """,
+                cancellationToken: cancellationToken));
 
-        await connection.ExecuteAsync(new CommandDefinition(
-            """
-            CREATE TABLE IF NOT EXISTS wallet_transactions (
-                id BIGINT NOT NULL AUTO_INCREMENT,
-                user_id INT NOT NULL,
-                transaction_id VARCHAR(100) NOT NULL,
-                amount DECIMAL(10,2) NOT NULL,
-                type ENUM('credit','debit') NOT NULL,
-                status ENUM('pending','completed','failed','refunded') NOT NULL DEFAULT 'pending',
-                payment_gateway VARCHAR(50) NULL,
-                gateway_order_id VARCHAR(100) NULL,
-                gateway_payment_id VARCHAR(100) NULL,
-                gateway_signature VARCHAR(255) NULL,
-                description TEXT NULL,
-                order_id INT NULL,
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (id),
-                UNIQUE KEY uq_wallet_transactions_txn_id (transaction_id),
-                KEY ix_wallet_transactions_user (user_id),
-                KEY ix_wallet_transactions_created (created_at)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-            """,
-            cancellationToken: cancellationToken));
+            await connection.ExecuteAsync(new CommandDefinition(
+                """
+                CREATE TABLE IF NOT EXISTS wallet_transactions (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    user_id INT NOT NULL,
+                    transaction_id VARCHAR(100) NOT NULL,
+                    amount DECIMAL(10,2) NOT NULL,
+                    type ENUM('credit','debit') NOT NULL,
+                    status ENUM('pending','completed','failed','refunded') NOT NULL DEFAULT 'pending',
+                    payment_gateway VARCHAR(50) NULL,
+                    gateway_order_id VARCHAR(100) NULL,
+                    gateway_payment_id VARCHAR(100) NULL,
+                    gateway_signature VARCHAR(255) NULL,
+                    description TEXT NULL,
+                    order_id INT NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uq_wallet_transactions_txn_id (transaction_id),
+                    KEY ix_wallet_transactions_user (user_id),
+                    KEY ix_wallet_transactions_created (created_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+                """,
+                cancellationToken: cancellationToken));
+        }
+        catch (MySqlConnector.MySqlException)
+        {
+            // Best-effort safety net. Startup migration (Program.cs) owns table creation.
+            // Any MySQL failure here (privilege denied, table exists, connection blip) is
+            // ignored; subsequent wallet queries will surface the real error if tables are missing.
+        }
     }
 
     private static async Task<UserLookupRow?> FindUserByIdentifier(
