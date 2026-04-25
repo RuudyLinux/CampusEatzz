@@ -400,37 +400,24 @@ static async Task EnsureCoreSchemaAsync(
             }
 
             var adminPasswordHash = BCrypt.Net.BCrypt.HashPassword(seedAdminPassword);
-            var existingAdmin = await connection.QuerySingleOrDefaultAsync<dynamic>(
-                "SELECT id FROM admin_users WHERE email = @email LIMIT 1;",
+
+            // Delete any existing admin with the configured email (migration/cleanup)
+            await connection.ExecuteAsync(
+                "DELETE FROM admin_users WHERE email = @email;",
                 new { email = seedAdminEmail });
 
-            if (existingAdmin is null)
-            {
-                await connection.ExecuteAsync(
-                    """
-                    INSERT INTO admin_users (name, email, password, created_at)
-                    VALUES (@name, @email, @password, UTC_TIMESTAMP());
-                    """,
-                    new
-                    {
-                        name = seedAdminName,
-                        email = seedAdminEmail,
-                        password = adminPasswordHash
-                    });
-            }
-            else
-            {
-                await connection.ExecuteAsync(
-                    """
-                    UPDATE admin_users SET name = @name, password = @password WHERE email = @email;
-                    """,
-                    new
-                    {
-                        name = seedAdminName,
-                        email = seedAdminEmail,
-                        password = adminPasswordHash
-                    });
-            }
+            // Create the configured admin user
+            await connection.ExecuteAsync(
+                """
+                INSERT INTO admin_users (name, email, password, created_at)
+                VALUES (@name, @email, @password, UTC_TIMESTAMP());
+                """,
+                new
+                {
+                    name = seedAdminName,
+                    email = seedAdminEmail,
+                    password = adminPasswordHash
+                });
 
             var maintenanceCount = await connection.ExecuteScalarAsync<int>("SELECT COUNT(1) FROM website_maintenance;");
             if (maintenanceCount == 0)
