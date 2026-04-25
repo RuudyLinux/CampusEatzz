@@ -10,10 +10,10 @@ import '../../core/widgets/app_empty_state.dart';
 import '../../core/widgets/gradient_header.dart';
 import '../../core/widgets/network_food_image.dart';
 import '../../core/widgets/shimmer_loader.dart';
-import '../../data/models/canteen.dart';
 import '../../data/models/menu_item.dart';
 import '../../state/canteen_provider.dart';
 import '../../state/cart_provider.dart';
+import '../cart/cart_screen.dart';
 
 class MenuScreen extends StatefulWidget {
   const MenuScreen({
@@ -30,7 +30,6 @@ class MenuScreen extends StatefulWidget {
 }
 
 class _MenuScreenState extends State<MenuScreen> {
-  int? _selectedCanteenId;
   String _selectedCategory = 'All Categories';
 
   @override
@@ -48,7 +47,6 @@ class _MenuScreenState extends State<MenuScreen> {
               ? canteenProvider.canteens.first.id
               : null);
       if (canteenId != null) {
-        setState(() => _selectedCanteenId = canteenId);
         await canteenProvider.loadMenu(canteenId);
       }
     });
@@ -57,10 +55,12 @@ class _MenuScreenState extends State<MenuScreen> {
   @override
   Widget build(BuildContext context) {
     final canteenState = context.watch<CanteenProvider>();
+    final cartState = context.watch<CartProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final selectedId = _selectedCanteenId;
-    final menuRows =
-        selectedId == null ? const <MenuItem>[] : canteenState.menuFor(selectedId);
+
+    final menuRows = widget.canteenId == null
+        ? const <MenuItem>[]
+        : canteenState.menuFor(widget.canteenId!);
 
     final categories = <String>{'All Categories'};
     for (final item in menuRows) {
@@ -72,6 +72,8 @@ class _MenuScreenState extends State<MenuScreen> {
         : menuRows
             .where((item) => item.category == _selectedCategory)
             .toList(growable: false);
+
+    final cartCount = cartState.totalItems;
 
     return Scaffold(
       body: Column(
@@ -89,32 +91,23 @@ class _MenuScreenState extends State<MenuScreen> {
             child: AppAsyncView(
               isLoading: canteenState.loadingMenu,
               error: canteenState.error,
-              onRetry: selectedId == null
+              onRetry: widget.canteenId == null
                   ? null
                   : () => context
                       .read<CanteenProvider>()
-                      .loadMenu(selectedId, force: true),
+                      .loadMenu(widget.canteenId!, force: true),
               skeleton: const _MenuSkeleton(),
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                padding: EdgeInsets.fromLTRB(
+                    16, 16, 16, cartCount > 0 ? 90 : 24),
                 children: <Widget>[
-                  // Canteen selector + category chips
+                  // Category chips
                   AnimatedReveal(
                     delayMs: 60,
-                    child: _FilterCard(
+                    child: _CategoryBar(
                       isDark: isDark,
-                      canteens: canteenState.canteens,
-                      selectedCanteenId: selectedId,
                       categories: categories,
                       selectedCategory: _selectedCategory,
-                      onCanteenChanged: (value) async {
-                        if (value == null) return;
-                        setState(() {
-                          _selectedCanteenId = value;
-                          _selectedCategory = 'All Categories';
-                        });
-                        await context.read<CanteenProvider>().loadMenu(value);
-                      },
                       onCategoryChanged: (cat) =>
                           setState(() => _selectedCategory = cat),
                     ),
@@ -144,96 +137,106 @@ class _MenuScreenState extends State<MenuScreen> {
           ),
         ],
       ),
+      floatingActionButton: cartCount > 0
+          ? _CartFab(count: cartCount, isDark: isDark)
+          : null,
     );
   }
 }
 
-// ── Filter Card ───────────────────────────────────────────────────────────────
+// ── Cart FAB ──────────────────────────────────────────────────────────────────
 
-class _FilterCard extends StatelessWidget {
-  const _FilterCard({
+class _CartFab extends StatelessWidget {
+  const _CartFab({required this.count, required this.isDark});
+
+  final int count;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return FloatingActionButton.extended(
+      onPressed: () => Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => const CartScreen()),
+      ),
+      backgroundColor: isDark ? AppColors.primaryOnDark : AppColors.primary,
+      icon: Stack(
+        clipBehavior: Clip.none,
+        children: <Widget>[
+          const Icon(Icons.shopping_cart_rounded, color: Colors.white, size: 22),
+          Positioned(
+            top: -6,
+            right: -8,
+            child: Container(
+              padding: const EdgeInsets.all(3),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+              child: Text(
+                count > 99 ? '99+' : '$count',
+                style: TextStyle(
+                  color: isDark ? AppColors.primaryOnDark : AppColors.primary,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ],
+      ),
+      label: Text(
+        'View Cart',
+        style: AppTypography.label.copyWith(color: Colors.white),
+      ),
+    );
+  }
+}
+
+// ── Category Bar ──────────────────────────────────────────────────────────────
+
+class _CategoryBar extends StatelessWidget {
+  const _CategoryBar({
     required this.isDark,
-    required this.canteens,
-    required this.selectedCanteenId,
     required this.categories,
     required this.selectedCategory,
-    required this.onCanteenChanged,
     required this.onCategoryChanged,
   });
 
   final bool isDark;
-  final List<Canteen> canteens;
-  final int? selectedCanteenId;
   final Set<String> categories;
   final String selectedCategory;
-  final ValueChanged<int?> onCanteenChanged;
   final ValueChanged<String> onCategoryChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            if (canteens.isNotEmpty) ...<Widget>[
-              DropdownButtonFormField<int>(
-                initialValue: selectedCanteenId,
-                decoration: const InputDecoration(
-                  labelText: 'Select Canteen',
-                  prefixIcon: Icon(Icons.storefront_outlined),
-                ),
-                items: canteens
-                    .map((c) => DropdownMenuItem<int>(
-                          value: c.id,
-                          child: Text(c.name),
-                        ))
-                    .toList(),
-                onChanged: onCanteenChanged,
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: categories.map((category) {
+          final isActive = category == selectedCategory;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: FilterChip(
+              label: Text(category),
+              selected: isActive,
+              selectedColor:
+                  isDark ? AppColors.primaryOnDark : AppColors.primary,
+              checkmarkColor: Colors.white,
+              labelStyle: TextStyle(
+                color: isActive
+                    ? Colors.white
+                    : (isDark
+                        ? AppColors.darkTextPrimary
+                        : AppColors.textPrimary),
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                fontSize: 12,
               ),
-              const SizedBox(height: 14),
-            ],
-            Text(
-              'Filter by Category',
-              style: AppTypography.label.copyWith(
-                color: isDark
-                    ? AppColors.darkTextPrimary
-                    : AppColors.textPrimary,
-              ),
+              onSelected: (_) => onCategoryChanged(category),
             ),
-            const SizedBox(height: 10),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: categories.map((category) {
-                  final isActive = category == selectedCategory;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: FilterChip(
-                      label: Text(category),
-                      selected: isActive,
-                      selectedColor:
-                          isDark ? AppColors.primaryOnDark : AppColors.primary,
-                      checkmarkColor: Colors.white,
-                      labelStyle: TextStyle(
-                        color: isActive
-                            ? Colors.white
-                            : (isDark
-                                ? AppColors.darkTextPrimary
-                                : AppColors.textPrimary),
-                        fontWeight:
-                            isActive ? FontWeight.w700 : FontWeight.w500,
-                        fontSize: 12,
-                      ),
-                      onSelected: (_) => onCategoryChanged(category),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-          ],
-        ),
+          );
+        }).toList(),
       ),
     );
   }
@@ -256,7 +259,6 @@ class _MenuCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            // Image
             if (item.imageUrl.isNotEmpty)
               Stack(
                 children: <Widget>[
@@ -314,7 +316,6 @@ class _MenuCard extends StatelessWidget {
                     ),
                 ],
               ),
-            // Info
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
               child: Column(
@@ -362,14 +363,16 @@ class _MenuCard extends StatelessWidget {
                                 if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                      content:
-                                          Text('${item.name} added to cart')),
+                                    content:
+                                        Text('${item.name} added to cart'),
+                                    duration: const Duration(seconds: 1),
+                                  ),
                                 );
                               }
                             : null,
                         icon: const Icon(Icons.add_rounded, size: 16),
-                        label:
-                            Text(item.isAvailable ? 'Add to Cart' : 'Sold Out'),
+                        label: Text(
+                            item.isAvailable ? 'Add to Cart' : 'Sold Out'),
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 14, vertical: 10),
@@ -399,7 +402,7 @@ class _MenuSkeleton extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: <Widget>[
-          ShimmerBox(width: double.infinity, height: 100, radius: 16),
+          ShimmerBox(width: double.infinity, height: 50, radius: 16),
           const SizedBox(height: 16),
           const SkeletonMenuCard(),
           const SizedBox(height: 14),
