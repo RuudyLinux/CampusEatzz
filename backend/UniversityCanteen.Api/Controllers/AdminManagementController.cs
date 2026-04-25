@@ -5,6 +5,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using UniversityCanteen.Api.Data;
 using UniversityCanteen.Api.Services;
+using UniversityCanteen.Api.Utils;
 
 namespace UniversityCanteen.Api.Controllers;
 
@@ -2055,5 +2056,42 @@ public sealed class AdminManagementController(
         public string? CurrentPassword { get; init; }
         public string? NewPassword { get; init; }
         public string? ConfirmPassword { get; init; }
+    }
+
+    [HttpPost("reorganize-food-items")]
+    public async Task<IActionResult> ReorganizeFoodItems(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var connection = dbConnectionFactory.CreateConnection();
+            if (!await EnsureAdminAccessAsync(connection, cancellationToken))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, Failure("Admin access required."));
+            }
+
+            var reorganizer = new Utils.FoodItemReorganizer(dbConnectionFactory, logger);
+            var result = await reorganizer.ReorganizeFoodItemsAsync(cancellationToken);
+
+            if (result.Success)
+            {
+                return Ok(Success("Food items reorganized successfully.", new
+                {
+                    deletedItemsCount = result.DeletedItemsCount,
+                    chiragTeaCenterCount = result.ChiragTeaCenterCount,
+                    foodiesCount = result.FoodiesCount,
+                    teaPostCount = result.TeaPostCount,
+                    totalNewItems = result.TotalNewItems
+                }));
+            }
+            else
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, Failure(result.Message));
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Food item reorganization failed.");
+            return StatusCode(StatusCodes.Status500InternalServerError, Failure("Internal server error while reorganizing food items."));
+        }
     }
 }
