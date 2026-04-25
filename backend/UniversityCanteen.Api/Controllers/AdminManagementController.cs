@@ -2126,14 +2126,34 @@ public sealed class AdminManagementController(
     [HttpGet("deploy-test")]
     public IActionResult DeployTest() => Ok(new { status = "deployed_v2" });
 
-    [HttpGet("check-schema")]
-    public async Task<IActionResult> CheckSchema()
+    [HttpPost("insert-food-v3")]
+    public async Task<IActionResult> InsertFoodV3()
     {
         using var connection = dbConnectionFactory.CreateConnection();
-        var categories = await connection.QueryAsync<dynamic>("SELECT id, name FROM menu_categories;");
-        var canteens = await connection.QueryAsync<dynamic>("SELECT id, name FROM canteens;");
-        var menuCount = await connection.QuerySingleAsync<int>("SELECT COUNT(*) FROM menu_items;");
-        return Ok(new { categories = categories.ToList(), canteens = canteens.ToList(), menuItemsCount = menuCount });
+        try {
+            await connection.ExecuteAsync("DELETE FROM menu_items");
+            int n = 0;
+            var items = new(string name, string desc, int cat, int canteen)[]
+            {
+                ("Caesar Salad", "Fresh crisp romaine", 3, 1), ("Continental Breakfast", "Eggs, toast, bacon", 3, 1), ("Fish & Chips", "Crispy fish", 3, 1),
+                ("Gulab Jamun", "Sweet milk solids", 5, 1), ("Iced Latte", "Cold espresso", 4, 1), ("Margherita Pizza", "Classic pizza", 2, 1),
+                ("Mushroom Stroganoff", "Creamy sauce", 3, 3), ("Nachos Supreme", "Crispy nachos", 3, 3), ("New York Cheesecake", "Creamy cheesecake", 5, 3),
+                ("Pancakes Stack", "Fluffy pancakes", 3, 3), ("Paneer Tikka Masala", "Soft paneer", 3, 3), ("Pasta Alfredo", "Creamy Alfredo", 3, 3),
+                ("Penne Arrabiata", "Spicy pasta", 3, 3), ("Pepperoni Pizza", "Pizza with pepperoni", 2, 2), ("Restaurants", "Partner menus", 3, 2),
+                ("Scrambled Eggs", "Fluffy eggs", 3, 2), ("Spring Rolls", "Crispy rolls", 3, 2), ("Tropical Smoothie", "Mango pineapple", 4, 2),
+                ("Vegetable Biryani", "Aromatic rice", 3, 2), ("Virgin Mojito", "Mint mocktail", 4, 2)
+            };
+            foreach(var i in items) {
+                await connection.ExecuteAsync(
+                    "INSERT INTO menu_items (category_id, canteen_id, name, description, price, is_available, is_vegetarian, created_at, updated_at) VALUES (@c, @ca, @n, @d, @p, 1, 1, NOW(), NOW())",
+                    new { c = i.cat, ca = i.canteen, n = i.name, d = i.desc, p = 100m });
+                n++;
+            }
+            var total = await connection.QuerySingleAsync<int>("SELECT COUNT(*) FROM menu_items");
+            return Ok(new { success = true, inserted = n, total = total });
+        } catch (Exception ex) {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpPost("reset-menu")]
