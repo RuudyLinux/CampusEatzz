@@ -2072,13 +2072,28 @@ public sealed class AdminManagementController(
             var canteens = await connection.QueryAsync<dynamic>(
                 "SELECT id, name, status FROM canteens WHERE status = 'active' ORDER BY id;");
 
-            var menuItems = await connection.QueryAsync<dynamic>(
-                "SELECT COUNT(*) as total, SUM(CASE WHEN is_deleted = 0 THEN 1 ELSE 0 END) as active FROM menu_items;");
+            var menuStats = await connection.QueryAsync<dynamic>(
+                "SELECT COUNT(*) as total, SUM(CASE WHEN is_deleted = 0 THEN 1 ELSE 0 END) as active, SUM(CASE WHEN is_deleted = 1 THEN 1 ELSE 0 END) as deleted FROM menu_items;");
 
-            return Ok(Success("Canteen information.", new
+            var itemsByCanteen = await connection.QueryAsync<dynamic>(
+                """
+                SELECT
+                  c.id,
+                  c.name,
+                  SUM(CASE WHEN COALESCE(m.is_deleted,0)=0 THEN 1 ELSE 0 END) as active_items,
+                  SUM(CASE WHEN COALESCE(m.is_deleted,0)=1 THEN 1 ELSE 0 END) as deleted_items
+                FROM canteens c
+                LEFT JOIN menu_items m ON m.canteen_id = c.id
+                WHERE c.status = 'active'
+                GROUP BY c.id, c.name
+                ORDER BY c.id;
+                """);
+
+            return Ok(Success("Canteen and menu information.", new
             {
                 canteens = canteens.ToList(),
-                menuItemStats = menuItems.FirstOrDefault()
+                menuItemStats = menuStats.FirstOrDefault(),
+                itemsByCanteen = itemsByCanteen.ToList()
             }));
         }
         catch (Exception ex)
@@ -2099,13 +2114,23 @@ public sealed class AdminManagementController(
                 return StatusCode(StatusCodes.Status403Forbidden, Failure("Admin access required."));
             }
 
+            // Get counts before
+            var countBefore = await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM menu_items WHERE COALESCE(is_deleted,0)=0;");
+
             var reorganizer = new Utils.FoodItemReorganizer(dbConnectionFactory);
             var result = await reorganizer.ReorganizeFoodItemsAsync(cancellationToken);
+
+            // Get counts after
+            var countAfter = await connection.QuerySingleAsync<int>(
+                "SELECT COUNT(*) FROM menu_items WHERE COALESCE(is_deleted,0)=0;");
 
             if (result.Success)
             {
                 return Ok(Success("Food items reorganized successfully.", new
                 {
+                    itemsBeforeReorganization = countBefore,
+                    itemsAfterReorganization = countAfter,
                     deletedItemsCount = result.DeletedItemsCount,
                     chiragTeaCenterCount = result.ChiragTeaCenterCount,
                     foodiesCount = result.FoodiesCount,
