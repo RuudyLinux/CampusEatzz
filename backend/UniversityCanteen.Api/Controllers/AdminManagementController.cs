@@ -2107,15 +2107,20 @@ public sealed class AdminManagementController(
     public async Task<IActionResult> ReorganizeFoodItems()
     {
         using var connection = dbConnectionFactory.CreateConnection();
-        await connection.ExecuteAsync("TRUNCATE TABLE menu_items;");
-        var sql = "INSERT INTO menu_items (category_id, canteen_id, name, description, price, is_available, is_vegetarian, created_at, updated_at) VALUES (@c, @cn, @n, @d, @p, 1, 1, NOW(), NOW());";
+        await connection.ExecuteAsync("DELETE FROM menu_items;");
         var n = 0;
-        foreach(var item in new[]{("Caesar Salad","Fresh crisp romaine lettuce with parmesan and Caesar dressing",150m, 3, 1),("Continental Breakfast","Eggs, toast, bacon, and fresh juice",200m, 3, 1),("Fish & Chips","Crispy battered fish with golden fries",220m, 3, 1),("Gulab Jamun","Sweet milk solids soaked in sugar syrup",80m, 5, 1),("Iced Latte","Cold espresso with steamed milk and ice",120m, 4, 1),("Margherita Pizza","Classic pizza with mozzarella, tomato, and basil",250m, 2, 1),("Mushroom Stroganoff","Creamy mushroom sauce with tender pasta",280m, 3, 3),("Nachos Supreme","Crispy nachos with cheese, jalapeños, and sour cream",200m, 3, 3),("New York Cheesecake","Classic creamy cheesecake with graham cracker crust",150m, 5, 3),("Pancakes Stack","Fluffy pancakes with butter and maple syrup",180m, 3, 3),("Paneer Tikka Masala","Soft paneer in creamy tomato sauce",240m, 3, 3),("Pasta Alfredo","Creamy Alfredo sauce with fresh parmesan",220m, 3, 3),("Penne Arrabiata","Spicy tomato and garlic pasta",210m, 3, 3),("Pepperoni Pizza","Pizza with pepperoni and mozzarella cheese",260m, 2, 2),("Restaurants","Our partner restaurants menu",0m, 3, 2),("Scrambled Eggs","Fluffy scrambled eggs with toast",120m, 3, 2),("Spring Rolls","Crispy vegetable spring rolls with dipping sauce",100m, 3, 2),("Tropical Smoothie","Fresh mango and pineapple smoothie",110m, 4, 2),("Vegetable Biryani","Aromatic basmati rice with mixed vegetables",180m, 3, 2),("Virgin Mojito","Refreshing mint and lime mocktail",100m, 4, 2)})
-        {
-            try { await connection.ExecuteAsync(sql, new{c = item.Item4, cn = item.Item5, n = item.Item1, d = item.Item2, p = item.Item3}); n++; } catch { }
+        var errors = new List<string>();
+        var items = new[]{("Caesar Salad","Fresh crisp romaine lettuce with parmesan and Caesar dressing",150m, 3, 1),("Continental Breakfast","Eggs, toast, bacon, and fresh juice",200m, 3, 1),("Fish & Chips","Crispy battered fish with golden fries",220m, 3, 1),("Gulab Jamun","Sweet milk solids soaked in sugar syrup",80m, 5, 1),("Iced Latte","Cold espresso with steamed milk and ice",120m, 4, 1),("Margherita Pizza","Classic pizza with mozzarella, tomato, and basil",250m, 2, 1),("Mushroom Stroganoff","Creamy mushroom sauce with tender pasta",280m, 3, 3),("Nachos Supreme","Crispy nachos with cheese, jalapeños, and sour cream",200m, 3, 3),("New York Cheesecake","Classic creamy cheesecake with graham cracker crust",150m, 5, 3),("Pancakes Stack","Fluffy pancakes with butter and maple syrup",180m, 3, 3),("Paneer Tikka Masala","Soft paneer in creamy tomato sauce",240m, 3, 3),("Pasta Alfredo","Creamy Alfredo sauce with fresh parmesan",220m, 3, 3),("Penne Arrabiata","Spicy tomato and garlic pasta",210m, 3, 3),("Pepperoni Pizza","Pizza with pepperoni and mozzarella cheese",260m, 2, 2),("Restaurants","Our partner restaurants menu",0m, 3, 2),("Scrambled Eggs","Fluffy scrambled eggs with toast",120m, 3, 2),("Spring Rolls","Crispy vegetable spring rolls with dipping sauce",100m, 3, 2),("Tropical Smoothie","Fresh mango and pineapple smoothie",110m, 4, 2),("Vegetable Biryani","Aromatic basmati rice with mixed vegetables",180m, 3, 2),("Virgin Mojito","Refreshing mint and lime mocktail",100m, 4, 2)};
+        foreach(var item in items) {
+            try {
+                var result = await connection.ExecuteAsync("INSERT INTO menu_items (category_id, canteen_id, name, description, price, is_available, is_vegetarian, created_at, updated_at) VALUES (@c, @cn, @n, @d, @p, 1, 1, NOW(), NOW());", new{c = item.Item4, cn = item.Item5, n = item.Item1, d = item.Item2, p = item.Item3});
+                if (result > 0) n++;
+            } catch (Exception ex) {
+                errors.Add($"{item.Item1}: {ex.Message}");
+            }
         }
-        var c = await connection.QuerySingleAsync<int>("SELECT COUNT(*) FROM menu_items;");
-        return Ok(Success("Done", new{inserted = n, total = c}));
+        var total = await connection.QuerySingleAsync<int>("SELECT COUNT(*) FROM menu_items;");
+        return Ok(Success("Food reorganized", new{inserted = n, total = total, errors = errors}));
     }
 
     [HttpGet("deploy-test")]
