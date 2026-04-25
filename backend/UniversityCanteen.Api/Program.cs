@@ -401,22 +401,20 @@ static async Task EnsureCoreSchemaAsync(
 
             var adminPasswordHash = BCrypt.Net.BCrypt.HashPassword(seedAdminPassword);
 
+            // Ensure configured admin exists in database
+            var adminHash = BCrypt.Net.BCrypt.HashPassword(seedAdminPassword);
             try
             {
-                // Delete all existing admins
-                await connection.ExecuteAsync("DELETE FROM admin_users WHERE email IS NOT NULL;");
-
-                // Insert the configured admin with explicit NULL handling
                 await connection.ExecuteAsync(
-                    "INSERT INTO admin_users (id, name, email, password, created_at) VALUES (1, @name, @email, @password, NOW());",
-                    new { name = seedAdminName, email = seedAdminEmail, password = adminPasswordHash });
-
-                logger.LogInformation("Admin user initialized: {Email}", seedAdminEmail);
+                    @"INSERT INTO admin_users (name, email, password, created_at)
+                      VALUES (@name, @email, @password, NOW())
+                      ON DUPLICATE KEY UPDATE password = @password, name = @name;",
+                    new { name = seedAdminName, email = seedAdminEmail, password = adminHash });
+                logger.LogInformation("Admin synced: {Email}", seedAdminEmail);
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Admin init failed: {Error}", ex.Message);
-                throw;
+                logger.LogError(ex, "Admin sync error: {Message}", ex.Message);
             }
 
             var maintenanceCount = await connection.ExecuteScalarAsync<int>("SELECT COUNT(1) FROM website_maintenance;");

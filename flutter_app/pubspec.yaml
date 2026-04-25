@@ -1,0 +1,32 @@
+name: campus_eatzz_flutter
+description: Native Flutter app for CampusEatzz customer flows.
+publish_to: "none"
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  dio: ^5.8.0+1
+  provider: ^6.1.2
+  shared_preferences: ^2.5.3
+  intl: ^0.20.2
+  image_picker: ^1.1.2
+  firebase_core: ^3.8.0
+  firebase_messaging: ^15.1.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/

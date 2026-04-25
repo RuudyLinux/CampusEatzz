@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet add:*)",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File \"d:\\\\#practicals\\\\tryy\\\\patch_anim.ps1\")",
+      "Bash(dotnet run:*)",
+      "Bash(netstat -ano)",
+      "Bash(findstr \":5266 \\\\|:5112 \")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5000/api/maintenance/status)",
+      "Bash(curl -s -X POST http://localhost:5000/api/canteen-admin/login -H \"Content-Type: application/json\" -d \"{\\\\\"email\\\\\":\\\\\"chirag@teatcenter.com\\\\\",\\\\\"password\\\\\":\\\\\"admin123\\\\\"}\")",
+      "Bash(git -C \"d:/#practicals/FCampusEatzz\" status)",
+      "Bash(git -C \"d:/#practicals/FCampusEatzz\" log --oneline -5)",
+      "Bash(git -C \"d:/#practicals/FCampusEatzz\" add backend/UniversityCanteen.Api/Program.cs)",
+      "Bash(git -C 'd:/#practicals/FCampusEatzz' commit -m ' *)",
+      "Bash(git -C \"d:/#practicals/FCampusEatzz\" push origin main)",
+      "Bash(git -C \"d:/#practicals/FCampusEatzz\" add backend/UniversityCanteen.Api/Program.cs backend/UniversityCanteen.Api/UniversityCanteen.Api.csproj)",
+      "Bash(git -C \"d:/#practicals/FCampusEatzz\" add backend/UniversityCanteen.Api/UniversityCanteen.Api.csproj)",
+      "Bash(git -C \"d:/#practicals/FCampusEatzz\" add flutter_app/lib/core/constants/api_config.dart)",
+      "Bash(dotnet build *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(git commit *)"
+    ]
+  }
+}
