@@ -96,8 +96,8 @@
     <partial name="_AdminFooter" />
 
     <script>
-        // Set the backend API base URL from configuration
-        window.__API_BASE = "@ViewBag.ApiBaseUrl" || "https://campuseatzz.onrender.com";
+        // Set the backend API base URL from configuration or use deployed backend URL
+        window.__API_BASE = "@(ViewBag.ApiBaseUrl ?? "https://campuseatzz.onrender.com")";
     </script>
 
     <script src="../JS/admin-common.js?v=20260413a"></script>

@@ -97,6 +97,10 @@
             candidates.push(deferredUiBase);
         }
 
+        // Add hardcoded fallback URLs for deployed environments
+        candidates.push("https://campuseatzz.onrender.com");
+        candidates.push("http://campuseatzz.onrender.com");
+
         candidates.push("");
 
         const unique = [];
