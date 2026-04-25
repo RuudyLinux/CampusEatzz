@@ -143,13 +143,6 @@ public sealed class CanteenController(
         {
             using var connection = dbConnectionFactory.CreateConnection();
 
-            var identity = GetIdentity();
-            if (!string.IsNullOrEmpty(identity.Email))
-            {
-                if (!await EnsureCanteenAccess(connection, canteenId, cancellationToken))
-                    return StatusCode(403, Failure("Access denied."));
-            }
-
             var items = (await connection.QueryAsync<MenuItemRow>(new CommandDefinition(
                 """
                 SELECT
