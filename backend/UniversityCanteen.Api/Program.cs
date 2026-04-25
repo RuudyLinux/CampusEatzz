@@ -401,20 +401,33 @@ static async Task EnsureCoreSchemaAsync(
 
             var adminPasswordHash = BCrypt.Net.BCrypt.HashPassword(seedAdminPassword);
 
-            // Ensure configured admin exists in database
+            // Create configured admin user
             var adminHash = BCrypt.Net.BCrypt.HashPassword(seedAdminPassword);
             try
             {
-                await connection.ExecuteAsync(
-                    @"INSERT INTO admin_users (name, email, password, created_at)
-                      VALUES (@name, @email, @password, NOW())
-                      ON DUPLICATE KEY UPDATE password = @password, name = @name;",
-                    new { name = seedAdminName, email = seedAdminEmail, password = adminHash });
-                logger.LogInformation("Admin synced: {Email}", seedAdminEmail);
+                // Check if admin exists, insert if not
+                var count = await connection.ExecuteScalarAsync<int>(
+                    "SELECT COUNT(*) FROM admin_users WHERE email = @email;",
+                    new { email = seedAdminEmail });
+
+                if (count == 0)
+                {
+                    await connection.ExecuteAsync(
+                        "INSERT INTO admin_users (name, email, password, created_at) VALUES (@name, @email, @password, NOW());",
+                        new { name = seedAdminName, email = seedAdminEmail, password = adminHash });
+                    logger.LogInformation("Admin created: {Email}", seedAdminEmail);
+                }
+                else
+                {
+                    await connection.ExecuteAsync(
+                        "UPDATE admin_users SET password = @password, name = @name WHERE email = @email;",
+                        new { name = seedAdminName, email = seedAdminEmail, password = adminHash });
+                    logger.LogInformation("Admin updated: {Email}", seedAdminEmail);
+                }
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Admin sync error: {Message}", ex.Message);
+                logger.LogError(ex, "Admin sync failed: {Message}", ex.Message);
             }
 
             var maintenanceCount = await connection.ExecuteScalarAsync<int>("SELECT COUNT(1) FROM website_maintenance;");
