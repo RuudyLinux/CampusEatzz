@@ -140,7 +140,7 @@
     async function attemptAdminLogin(email, password) {
         const candidates = getApiCandidates();
         let lastError = "Invalid credentials.";
-        const REQUEST_TIMEOUT_MS = 30000; // 30 second timeout for slow servers
+        const REQUEST_TIMEOUT_MS = 60000; // 60 second timeout for slow servers
 
         for (const candidate of candidates) {
             try {
@@ -174,7 +174,9 @@
                 }
             } catch (error) {
                 if (error.name === 'AbortError') {
-                    lastError = "Server is responding slowly. Please wait...";
+                    lastError = "Server timeout. The server took too long to respond. Please try again.";
+                } else if (error instanceof TypeError) {
+                    lastError = "Cannot reach server. Please check your internet connection.";
                 } else {
                     lastError = "Unable to reach server. Please try again.";
                 }
@@ -197,6 +199,7 @@
 
         const email = document.getElementById("email")?.value?.trim() || "";
         const password = document.getElementById("password")?.value || "";
+        const submitBtn = form.querySelector('button[type="submit"]');
 
         if (!email || !password) {
             const err = document.getElementById("error-message");
@@ -206,6 +209,13 @@
                 txt.textContent = "Email and password are required.";
             }
             return;
+        }
+
+        // Show loading state
+        const originalBtnText = submitBtn?.innerHTML;
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Logging in...';
         }
 
         try {
@@ -225,6 +235,12 @@
                 location.href = "admin_files/Home/AdminDashboard";
             }
         } catch (error) {
+            // Restore button state
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
+            }
+
             const err = document.getElementById("error-message");
             const txt = document.getElementById("error-text");
             if (err && txt) {
