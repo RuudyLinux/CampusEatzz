@@ -8,6 +8,7 @@ import '../../core/widgets/app_async_view.dart';
 import '../../core/widgets/app_empty_state.dart';
 import '../../core/widgets/customer_bottom_nav.dart';
 import '../../core/widgets/gradient_header.dart';
+import '../../core/widgets/network_food_image.dart';
 import '../../core/widgets/notification_bell_button.dart';
 import '../../core/widgets/shimmer_loader.dart';
 import '../../data/models/canteen.dart';
@@ -376,100 +377,118 @@ class _CanteenCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => onTap(canteen),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Row(
-                children: <Widget>[
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(
-                          alpha: isDark ? 0.18 : 0.12),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.storefront_rounded,
-                        size: 20, color: AppColors.primary),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          canteen.name,
-                          style: AppTypography.heading3.copyWith(
-                            color: isDark
-                                ? AppColors.darkTextPrimary
-                                : AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          canteen.description.isEmpty
-                              ? 'Fresh campus meals and snacks'
-                              : canteen.description,
-                          style: AppTypography.body.copyWith(
-                            color: isDark
-                                ? AppColors.darkTextMuted
-                                : AppColors.textMuted,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.success,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            // Image
+            if (canteen.imageUrl.isNotEmpty)
+              NetworkFoodImage(
+                imageUrl: canteen.imageUrl,
+                fallbackAsset: 'assets/images/Restaurants.jpg',
+                height: 190,
+                borderRadius: BorderRadius.zero,
+              )
+            else
+              Container(
+                width: double.infinity,
+                height: 190,
+                color: isDark
+                    ? AppColors.darkBg.withValues(alpha: 0.5)
+                    : AppColors.bg,
+                child: Icon(Icons.storefront_rounded,
+                    size: 60,
+                    color: isDark
+                        ? AppColors.darkTextMuted
+                        : AppColors.textMuted),
+              ),
+            // Status pill
+            Positioned(
+              top: 12,
+              right: 12,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.success,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    const Icon(Icons.circle, size: 6, color: Colors.white),
+                    const SizedBox(width: 4),
+                    Text(
                       'Open',
                       style: AppTypography.labelSm
                           .copyWith(color: Colors.white),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-              const SizedBox(height: 10),
-              Row(
+            ),
+            // Info
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Icon(
-                    Icons.restaurant_menu_rounded,
-                    size: 14,
-                    color: isDark
-                        ? AppColors.primaryOnDark
-                        : AppColors.primary,
-                  ),
-                  const SizedBox(width: 5),
                   Text(
-                    'View Menu',
-                    style: AppTypography.label.copyWith(
+                    canteen.name,
+                    style: AppTypography.heading3.copyWith(
                       color: isDark
-                          ? AppColors.primaryOnDark
-                          : AppColors.primary,
+                          ? AppColors.darkTextPrimary
+                          : AppColors.textPrimary,
                     ),
                   ),
-                  const Spacer(),
-                  Icon(
-                    Icons.arrow_forward_rounded,
-                    size: 16,
-                    color: isDark
-                        ? AppColors.primaryOnDark
-                        : AppColors.primary,
+                  const SizedBox(height: 4),
+                  Text(
+                    canteen.description.isEmpty
+                        ? 'Fresh campus meals and snacks'
+                        : canteen.description,
+                    style: AppTypography.body.copyWith(
+                      color: isDark
+                          ? AppColors.darkTextMuted
+                          : AppColors.textMuted,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: <Widget>[
+                      Icon(
+                        Icons.restaurant_menu_rounded,
+                        size: 14,
+                        color: isDark
+                            ? AppColors.primaryOnDark
+                            : AppColors.primary,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        'View Menu',
+                        style: AppTypography.label.copyWith(
+                          color: isDark
+                              ? AppColors.primaryOnDark
+                              : AppColors.primary,
+                        ),
+                      ),
+                      const Spacer(),
+                      Icon(
+                        Icons.arrow_forward_rounded,
+                        size: 16,
+                        color: isDark
+                            ? AppColors.primaryOnDark
+                            : AppColors.primary,
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
