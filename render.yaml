@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: campuseatzz-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    region: oregon
+    plan: free
+
+    envVars:
+      # Application environment
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+
+      # Database connection - Set these with Railway PUBLIC values only
+      # Format: Server=<HOST>;Port=<PORT>;Database=<DB>;User ID=<USER>;Password=<PASSWORD>;SslMode=Required;TreatTinyAsBoolean=true;
+      # NOTE: Use MYSQL_PUBLIC_HOST, not MYSQLHOST (internal host won't work from Render)
+      - key: ConnectionStrings__DefaultConnection
+        fromService: mysql
+        property: DATABASE_URL
+
+      # Optional: explicitly set MySQL public variables (alternative to above)
+      # Uncomment if CONNECTION_STRING doesn't work and use Railway public values:
+      # - key: MYSQL_PUBLIC_HOST
+      #   sync: false
+      # - key: MYSQL_PUBLIC_PORT
+      #   sync: false
+      # - key: MYSQLDATABASE
+      #   sync: false
+      # - key: MYSQLUSER
+      #   sync: false
+      # - key: MYSQLPASSWORD
+      #   sync: false
+
+      # Schema initialization
+      - key: Startup__FailOnSchemaInitError
+        value: "false"
+
+      # Notifications (disable during DB fixes)
+      - key: Notifications__Scheduler__Enabled
+        value: "false"
+
+    healthCheckPath: /api/health
+
+    # Auto-deploy on push to main
+    autoDeploy: true
