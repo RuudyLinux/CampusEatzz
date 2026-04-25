@@ -48,8 +48,15 @@ public sealed class CustomerController(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to fetch wallet for identifier {Identifier}", identifier);
-            return StatusCode(StatusCodes.Status500InternalServerError, Failure("Internal server error while fetching wallet."));
+            logger.LogError(ex, "Failed to fetch wallet for identifier {Identifier}: {ExceptionMessage}", identifier, ex.Message);
+            // For debugging: include error details in development
+            var errorMsg = "Internal server error while fetching wallet.";
+            if (ex.InnerException != null)
+            {
+                errorMsg += $" ({ex.InnerException.Message})";
+                logger.LogError(ex.InnerException, "Inner exception for wallet fetch");
+            }
+            return StatusCode(StatusCodes.Status500InternalServerError, Failure(errorMsg));
         }
     }
 
@@ -887,14 +894,22 @@ public sealed class CustomerController(
         CancellationToken cancellationToken,
         IDbTransaction? transaction = null)
     {
-        var schema = await ResolveUsersSchema(connection, cancellationToken, transaction);
-        var sql = BuildUserLookupSql(schema);
+        try
+        {
+            var schema = await ResolveUsersSchema(connection, cancellationToken, transaction);
+            var sql = BuildUserLookupSql(schema);
 
-        return await connection.QuerySingleOrDefaultAsync<UserLookupRow>(new CommandDefinition(
-            sql,
-            new { identifier },
-            transaction: transaction,
-            cancellationToken: cancellationToken));
+            return await connection.QuerySingleOrDefaultAsync<UserLookupRow>(new CommandDefinition(
+                sql,
+                new { identifier },
+                transaction: transaction,
+                cancellationToken: cancellationToken));
+        }
+        catch (Exception ex)
+        {
+            // Log the error but don't throw - let the caller handle the null return
+            throw new InvalidOperationException($"Failed to find user by identifier {identifier}: {ex.Message}", ex);
+        }
     }
 
     private static async Task<UsersSchemaInfo> ResolveUsersSchema(
