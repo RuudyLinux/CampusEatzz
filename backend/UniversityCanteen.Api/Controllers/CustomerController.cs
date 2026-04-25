@@ -816,9 +816,8 @@ public sealed class CustomerController(
     {
         await connection.ExecuteAsync(new CommandDefinition(
             """
-            INSERT INTO wallets (user_id, balance)
-            VALUES (@userId, 0.00)
-            ON DUPLICATE KEY UPDATE user_id = VALUES(user_id);
+            INSERT IGNORE INTO wallets (user_id, balance)
+            VALUES (@userId, 0.00);
             """,
             new { userId },
             transaction: transaction,
