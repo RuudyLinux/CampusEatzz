@@ -2204,12 +2204,33 @@ public sealed class AdminManagementController(
         return Ok(new { success = true, count = cnt, total = total });
     }
 
-    [HttpPost("clear-all-images")]
-    public async Task<IActionResult> ClearAllImages()
+    [HttpPost("rebuild-no-images")]
+    public async Task<IActionResult> RebuildNoImages()
     {
         using var connection = dbConnectionFactory.CreateConnection();
-        await connection.ExecuteAsync("UPDATE menu_items SET image_url = ''");
-        return Ok(new { success = true });
+        try {
+            await connection.ExecuteAsync("DELETE FROM menu_items");
+            var sql = "INSERT INTO menu_items (id, category_id, canteen_id, name, description, price, image_url, is_available, is_vegetarian, created_at, updated_at) VALUES (@id, @c, @ca, @n, @d, @p, '', 1, 1, NOW(), NOW())";
+            var items = new(int id, string name, string desc, int cat, int canteen)[]
+            {
+                (1, "Caesar Salad", "Fresh crisp romaine", 3, 1), (2, "Continental Breakfast", "Eggs, toast, bacon", 3, 1), (3, "Fish & Chips", "Crispy fish", 3, 1),
+                (4, "Gulab Jamun", "Sweet milk solids", 5, 1), (5, "Iced Latte", "Cold espresso", 4, 1), (6, "Margherita Pizza", "Classic pizza", 2, 1),
+                (7, "Mushroom Stroganoff", "Creamy sauce", 3, 3), (8, "Nachos Supreme", "Crispy nachos", 3, 3), (9, "New York Cheesecake", "Creamy cheesecake", 5, 3),
+                (10, "Pancakes Stack", "Fluffy pancakes", 3, 3), (11, "Paneer Tikka Masala", "Soft paneer", 3, 3), (12, "Pasta Alfredo", "Creamy Alfredo", 3, 3),
+                (13, "Penne Arrabiata", "Spicy pasta", 3, 3), (14, "Pepperoni Pizza", "Pizza with pepperoni", 2, 2), (15, "Restaurants", "Partner menus", 3, 2),
+                (16, "Scrambled Eggs", "Fluffy eggs", 3, 2), (17, "Spring Rolls", "Crispy rolls", 3, 2), (18, "Tropical Smoothie", "Mango pineapple", 4, 2),
+                (19, "Vegetable Biryani", "Aromatic rice", 3, 2), (20, "Virgin Mojito", "Mint mocktail", 4, 2)
+            };
+            int n = 0;
+            foreach(var i in items) {
+                await connection.ExecuteAsync(sql, new { id = i.id, c = i.cat, ca = i.canteen, n = i.name, d = i.desc, p = 100m });
+                n++;
+            }
+            var total = await connection.QuerySingleAsync<int>("SELECT COUNT(*) FROM menu_items");
+            return Ok(new { success = true, rebuilt = n, total = total });
+        } catch (Exception ex) {
+            return BadRequest(new { success = false, error = ex.Message });
+        }
     }
 
 }
