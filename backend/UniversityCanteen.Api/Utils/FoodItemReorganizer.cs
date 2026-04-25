@@ -3,9 +3,6 @@ using UniversityCanteen.Api.Data;
 
 namespace UniversityCanteen.Api.Utils;
 
-/// <summary>
-/// Reorganizes food items by canteen based on the latest structure
-/// </summary>
 public sealed class FoodItemReorganizer
 {
     private readonly IDbConnectionFactory _dbConnectionFactory;
@@ -39,7 +36,7 @@ public sealed class FoodItemReorganizer
                 ("Margherita Pizza", "Classic pizza with mozzarella, tomato, and basil", 250.00, "/uploads/menu_items/Margherita_Pizza.jpg", 1, 1),
             };
 
-            var chiragCount = await InsertMenuItemsAsync(connection, 1, chiragItems, cancellationToken);
+            var chiragCount = await InsertMenuItemsAsync(connection, 1, chiragItems);
             result.ChiragTeaCenterCount = chiragCount;
 
             // Step 3: Add items for Foodies (ID: 3)
@@ -54,7 +51,7 @@ public sealed class FoodItemReorganizer
                 ("Penne Arrabiata", "Spicy tomato and garlic pasta", 210.00, "/uploads/menu_items/Penne_Arrabiata.jpg", 1, 1),
             };
 
-            var foodiesCount = await InsertMenuItemsAsync(connection, 3, foodiesItems, cancellationToken);
+            var foodiesCount = await InsertMenuItemsAsync(connection, 3, foodiesItems);
             result.FoodiesCount = foodiesCount;
 
             // Step 4: Add items for Tea Post (ID: 2)
@@ -69,7 +66,7 @@ public sealed class FoodItemReorganizer
                 ("Virgin Mojito", "Refreshing mint and lime mocktail", 100.00, "/uploads/menu_items/Virgin_Mojito.jpg", 1, 1),
             };
 
-            var teaPostCount = await InsertMenuItemsAsync(connection, 2, teaPostItems, cancellationToken);
+            var teaPostCount = await InsertMenuItemsAsync(connection, 2, teaPostItems);
             result.TeaPostCount = teaPostCount;
 
             result.Success = true;
@@ -87,8 +84,7 @@ public sealed class FoodItemReorganizer
     private async Task<int> InsertMenuItemsAsync(
         System.Data.IDbConnection connection,
         int canteenId,
-        (string name, string description, double price, string imageUrl, int isAvailable, int isVegetarian)[] items,
-        CancellationToken cancellationToken = default)
+        (string name, string description, double price, string imageUrl, int isAvailable, int isVegetarian)[] items)
     {
         int count = 0;
         foreach (var item in items)
@@ -112,8 +108,9 @@ public sealed class FoodItemReorganizer
                     });
                 count++;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Console.WriteLine($"Failed to insert {item.name} for canteen {canteenId}: {ex.Message}");
                 // Continue with next item if insertion fails
             }
         }
