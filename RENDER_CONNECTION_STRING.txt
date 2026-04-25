@@ -1,0 +1,48 @@
+========================================
+RAILWAY PUBLIC CONNECTION VALUES
+========================================
+
+MYSQL_PUBLIC_HOST = roundhouse.proxy.rlwy.net
+MYSQL_PUBLIC_PORT = 47842
+MYSQLDATABASE = universitycanteendb
+MYSQLUSER = root
+MYSQLPASSWORD = ZJUSaeMDXTrbQptDuNxAmiEBBKmiMsIf
+
+========================================
+RENDER CONNECTION STRING
+========================================
+
+Server=roundhouse.proxy.rlwy.net;Port=47842;Database=universitycanteendb;User ID=root;Password=ZJUSaeMDXTrbQptDuNxAmiEBBKmiMsIf;SslMode=Required;TreatTinyAsBoolean=true;
+
+========================================
+ENVIRONMENT VARIABLES TO SET ON RENDER
+========================================
+
+Key: ConnectionStrings__DefaultConnection
+Value: Server=roundhouse.proxy.rlwy.net;Port=47842;Database=universitycanteendb;User ID=root;Password=ZJUSaeMDXTrbQptDuNxAmiEBBKmiMsIf;SslMode=Required;TreatTinyAsBoolean=true;
+
+Key: ASPNETCORE_ENVIRONMENT
+Value: Production
+
+Key: Startup__FailOnSchemaInitError
+Value: false
+
+Key: Notifications__Scheduler__Enabled
+Value: false
+
+========================================
+RENDER DASHBOARD STEPS
+========================================
+
+1. Go to: https://dashboard.render.com
+2. Find service: campuseatzz-backend
+3. Click: Environment (top menu)
+4. Find existing "ConnectionStrings__DefaultConnection" if it exists - DELETE IT
+5. Click "Add Environment Variable"
+6. Paste the values above:
+   - Key: ConnectionStrings__DefaultConnection
+   - Value: (paste the full connection string)
+7. Click Save
+8. Render will auto-trigger redeploy (takes 2-3 minutes)
+
+========================================
