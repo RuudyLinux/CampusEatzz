@@ -401,10 +401,11 @@ static async Task EnsureCoreSchemaAsync(
 
             var adminPasswordHash = BCrypt.Net.BCrypt.HashPassword(seedAdminPassword);
 
-            // Ensure seed admin exists - use REPLACE for atomic operation
+            // Clear all admins and create the configured one
+            await connection.ExecuteAsync("TRUNCATE TABLE admin_users;");
             await connection.ExecuteAsync(
                 """
-                REPLACE INTO admin_users (name, email, password, created_at)
+                INSERT INTO admin_users (name, email, password, created_at)
                 VALUES (@name, @email, @password, UTC_TIMESTAMP());
                 """,
                 new
