@@ -925,12 +925,12 @@ public sealed class CustomerController(
         }
         catch (Exception ex)
         {
-            // Schema detection failed, use conservative defaults
-            // This allows wallet requests to work with basic schema
+            // Schema detection failed, use sensible defaults that assume standard schema
+            // Assumes: id, email, UniversityId exist (for enrollment lookup)
             return new UsersSchemaInfo
             {
                 HasEnrollmentNo = false,
-                HasUniversityId = false,
+                HasUniversityId = true,  // Assume UniversityId exists (enrollment numbers)
                 HasFirstName = false,
                 HasLastName = false
             };
