@@ -19,7 +19,6 @@ COPY CSS ./CSS
 COPY assets ./assets
 
 ENV ASPNETCORE_ENVIRONMENT=Production
-ENV PORT=10000
-EXPOSE 10000
+EXPOSE 3000
 
 ENTRYPOINT ["dotnet", "admin_files.dll"]
