@@ -39,6 +39,7 @@ public sealed class AdminManagementController(
     };
 
     [HttpGet("dashboard")]
+    [ResponseCache(Duration = 30, Location = ResponseCacheLocation.Any)]
     public async Task<IActionResult> GetDashboard(CancellationToken cancellationToken)
     {
         try
@@ -52,16 +53,16 @@ public sealed class AdminManagementController(
             var stats = await connection.QuerySingleAsync<DashboardStats>(new CommandDefinition(
                 """
                 SELECT
-                    COALESCE((SELECT COUNT(1) FROM orders), 0) AS TotalOrders,
-                    COALESCE((SELECT COUNT(1) FROM orders WHERE order_status = 'pending'), 0) AS PendingOrders,
-                    COALESCE((SELECT COUNT(1) FROM orders WHERE DATE(created_at) = CURDATE()), 0) AS TodayOrders,
-                    COALESCE((SELECT SUM(COALESCE(NULLIF(final_amount,0.00), total_amount, 0.00)) FROM orders WHERE order_status = 'completed'), 0.00) AS TotalRevenue,
-                    COALESCE((SELECT COUNT(1) FROM users WHERE COALESCE(is_deleted,0)=0), 0) AS TotalUsers,
-                    COALESCE((SELECT COUNT(1) FROM canteens WHERE COALESCE(status,'active')='active'), 0) AS ActiveCanteens,
-                    COALESCE((SELECT COUNT(1) FROM contact_messages WHERE COALESCE(status,'unread')='unread'), 0) AS UnreadMessages,
-                    COALESCE((SELECT COUNT(1) FROM reviews), 0) AS TotalReviews,
-                    COALESCE((SELECT COUNT(1) FROM orders WHERE order_status = 'completed'), 0) AS CompletedOrders,
-                    COALESCE((SELECT COUNT(1) FROM orders WHERE order_status = 'cancelled'), 0) AS CancelledOrders;
+                    (SELECT COUNT(1) FROM orders) AS TotalOrders,
+                    (SELECT COUNT(1) FROM orders WHERE order_status = 'pending') AS PendingOrders,
+                    (SELECT COUNT(1) FROM orders WHERE DATE(created_at) = CURDATE()) AS TodayOrders,
+                    (SELECT COUNT(1) FROM users WHERE COALESCE(is_deleted,0)=0) AS TotalUsers,
+                    (SELECT COUNT(1) FROM canteens WHERE COALESCE(status,'active')='active') AS ActiveCanteens,
+                    (SELECT COUNT(1) FROM contact_messages WHERE COALESCE(status,'unread')='unread') AS UnreadMessages,
+                    (SELECT COUNT(1) FROM reviews) AS TotalReviews,
+                    (SELECT COUNT(1) FROM orders WHERE order_status = 'completed') AS CompletedOrders,
+                    (SELECT COUNT(1) FROM orders WHERE order_status = 'cancelled') AS CancelledOrders,
+                    COALESCE((SELECT SUM(COALESCE(NULLIF(final_amount,0.00), total_amount, 0.00)) FROM orders WHERE order_status = 'completed'), 0.00) AS TotalRevenue;
                 """,
                 cancellationToken: cancellationToken));
 
