@@ -2209,7 +2209,7 @@ public sealed class AdminManagementController(
     {
         using var connection = dbConnectionFactory.CreateConnection();
         try {
-            int updated = await connection.ExecuteAsync("UPDATE menu_items SET image_url = '' WHERE image_url IS NOT NULL OR image_url != ''");
+            int updated = await connection.ExecuteAsync("UPDATE menu_items SET image_url = NULL");
             return Ok(new { success = true, cleared = updated });
         } catch (Exception ex) {
             return BadRequest(new { success = false, error = ex.Message });
