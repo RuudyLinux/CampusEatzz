@@ -30,9 +30,12 @@ class CanteenService {
 
   Future<List<MenuItem>> fetchMenuItems(int canteenId) async {
     final response = await _apiClient.request(
-      'api/public/canteens/$canteenId/menu',
+      'api/canteen/menu-items',
       method: 'GET',
-      authenticated: false,
+      queryParameters: <String, dynamic>{
+        'canteenId': canteenId,
+      },
+      authenticated: true,
     );
 
     final body = _asMap(response.data);
