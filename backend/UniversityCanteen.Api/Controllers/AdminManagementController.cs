@@ -2114,34 +2114,49 @@ public sealed class AdminManagementController(
                 return StatusCode(StatusCodes.Status403Forbidden, Failure("Admin access required."));
             }
 
-            // Get counts before
             var countBefore = await connection.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM menu_items WHERE COALESCE(is_deleted,0)=0;");
 
-            var reorganizer = new Utils.FoodItemReorganizer(dbConnectionFactory);
-            var result = await reorganizer.ReorganizeFoodItemsAsync(cancellationToken);
+            await connection.ExecuteAsync(
+                "UPDATE menu_items SET is_deleted = 1 WHERE COALESCE(is_deleted, 0) = 0;");
 
-            // Get counts after
+            var insertSql = """
+                INSERT INTO menu_items (category_id, canteen_id, name, description, price, image_url, is_available, is_vegetarian, created_at, updated_at)
+                VALUES
+                (3, 1, 'Caesar Salad', 'Fresh crisp romaine lettuce with parmesan and Caesar dressing', 150.00, '', 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
+                (3, 1, 'Continental Breakfast', 'Eggs, toast, bacon, and fresh juice', 200.00, '', 1, 0, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
+                (3, 1, 'Fish & Chips', 'Crispy battered fish with golden fries', 220.00, '', 1, 0, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
+                (5, 1, 'Gulab Jamun', 'Sweet milk solids soaked in sugar syrup', 80.00, '', 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
+                (4, 1, 'Iced Latte', 'Cold espresso with steamed milk and ice', 120.00, '', 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
+                (2, 1, 'Margherita Pizza', 'Classic pizza with mozzarella, tomato, and basil', 250.00, '', 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
+                (3, 3, 'Mushroom Stroganoff', 'Creamy mushroom sauce with tender pasta', 280.00, '', 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
+                (3, 3, 'Nachos Supreme', 'Crispy nachos with cheese, jalapeños, and sour cream', 200.00, '', 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
+                (5, 3, 'New York Cheesecake', 'Classic creamy cheesecake with graham cracker crust', 150.00, '', 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
+                (3, 3, 'Pancakes Stack', 'Fluffy pancakes with butter and maple syrup', 180.00, '', 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
+                (3, 3, 'Paneer Tikka Masala', 'Soft paneer in creamy tomato sauce', 240.00, '', 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
+                (3, 3, 'Pasta Alfredo', 'Creamy Alfredo sauce with fresh parmesan', 220.00, '', 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
+                (3, 3, 'Penne Arrabiata', 'Spicy tomato and garlic pasta', 210.00, '', 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
+                (2, 2, 'Pepperoni Pizza', 'Pizza with pepperoni and mozzarella cheese', 260.00, '', 1, 0, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
+                (3, 2, 'Restaurants', 'Our partner restaurants menu', 0.00, '', 1, 0, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
+                (3, 2, 'Scrambled Eggs', 'Fluffy scrambled eggs with toast', 120.00, '', 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
+                (3, 2, 'Spring Rolls', 'Crispy vegetable spring rolls with dipping sauce', 100.00, '', 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
+                (4, 2, 'Tropical Smoothie', 'Fresh mango and pineapple smoothie', 110.00, '', 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
+                (3, 2, 'Vegetable Biryani', 'Aromatic basmati rice with mixed vegetables', 180.00, '', 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
+                (4, 2, 'Virgin Mojito', 'Refreshing mint and lime mocktail', 100.00, '', 1, 1, UTC_TIMESTAMP(), UTC_TIMESTAMP());
+                """;
+
+            var inserted = await connection.ExecuteAsync(insertSql);
+
             var countAfter = await connection.QuerySingleAsync<int>(
                 "SELECT COUNT(*) FROM menu_items WHERE COALESCE(is_deleted,0)=0;");
 
-            if (result.Success)
+            return Ok(Success("Food items reorganized successfully.", new
             {
-                return Ok(Success("Food items reorganized successfully.", new
-                {
-                    itemsBeforeReorganization = countBefore,
-                    itemsAfterReorganization = countAfter,
-                    deletedItemsCount = result.DeletedItemsCount,
-                    chiragTeaCenterCount = result.ChiragTeaCenterCount,
-                    foodiesCount = result.FoodiesCount,
-                    teaPostCount = result.TeaPostCount,
-                    totalNewItems = result.TotalNewItems
-                }));
-            }
-            else
-            {
-                return StatusCode(StatusCodes.Status500InternalServerError, Failure(result.Message));
-            }
+                itemsBeforeReorganization = countBefore,
+                itemsAfterReorganization = countAfter,
+                insertedCount = inserted,
+                deletedItems = countBefore
+            }));
         }
         catch (Exception ex)
         {
