@@ -140,29 +140,44 @@
     async function attemptAdminLogin(email, password) {
         const candidates = getApiCandidates();
         let lastError = "Invalid credentials.";
+        const REQUEST_TIMEOUT_MS = 30000; // 30 second timeout for slow servers
 
         for (const candidate of candidates) {
             try {
-                const response = await fetch(resolveApiUrl(candidate, "api/admin/login"), {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ email, password })
-                });
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-                const body = await parseJsonSafe(response);
-                if (response.ok && body && body.success) {
-                    persistWorkingApiBase(candidate, candidates);
-                    return body;
+                try {
+                    const response = await fetch(resolveApiUrl(candidate, "api/admin/login"), {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ email, password }),
+                        signal: controller.signal
+                    });
+
+                    clearTimeout(timeoutId);
+
+                    const body = await parseJsonSafe(response);
+                    if (response.ok && body && body.success) {
+                        persistWorkingApiBase(candidate, candidates);
+                        return body;
+                    }
+
+                    if (body && body.message) {
+                        lastError = body.message;
+                    }
+
+                    // Keep trying other candidates to recover from stale API base URLs.
+                    continue;
+                } finally {
+                    clearTimeout(timeoutId);
                 }
-
-                if (body && body.message) {
-                    lastError = body.message;
-                }
-
-                // Keep trying other candidates to recover from stale API base URLs.
-                continue;
             } catch (error) {
-                lastError = "Unable to reach server. Please try again.";
+                if (error.name === 'AbortError') {
+                    lastError = "Server is responding slowly. Please wait...";
+                } else {
+                    lastError = "Unable to reach server. Please try again.";
+                }
             }
         }
 
