@@ -80,8 +80,7 @@ builder.Services.Configure<GzipCompressionProviderOptions>(options =>
 builder.Services.AddOutputCache(options =>
 {
     options.AddBasePolicy(builder =>
-        builder.Expire(TimeSpan.FromSeconds(30))
-               .WithExcludeQueryKeys("token"));
+        builder.Expire(TimeSpan.FromSeconds(30)));
     options.AddPolicy("StaticContent", builder =>
         builder.Expire(TimeSpan.FromMinutes(10)));
 });
