@@ -28,7 +28,7 @@ public sealed class CustomerController(
             await EnsureWalletInfrastructureExists(connection, cancellationToken);
 
             // Simple direct lookup without schema detection
-            var user = await connection.QuerySingleOrDefaultAsync<dynamic>(new CommandDefinition(
+            var user = await connection.QuerySingleOrDefaultAsync<(int id, string email)>(new CommandDefinition(
                 """
                 SELECT id, email FROM users
                 WHERE email = @identifier
@@ -39,7 +39,7 @@ public sealed class CustomerController(
                 new { identifier = identifier.Trim() },
                 cancellationToken: cancellationToken));
 
-            if (user is null)
+            if (user.id == 0)
             {
                 return NotFound(Failure("User not found."));
             }
