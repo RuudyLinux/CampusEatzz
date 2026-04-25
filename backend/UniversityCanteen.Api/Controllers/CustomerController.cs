@@ -17,6 +17,14 @@ public sealed class CustomerController(
     [HttpGet("wallet")]
     public async Task<IActionResult> GetWallet([FromQuery] string identifier, CancellationToken cancellationToken)
     {
+        // Test: return success immediately
+        return Ok(Success("TEST - Wallet fetched successfully.", new WalletSummaryDto
+        {
+            Balance = 500.00m,
+            Currency = "INR"
+        }));
+
+        #pragma warning disable CS0162 // Unreachable code detected
         if (string.IsNullOrWhiteSpace(identifier))
         {
             return BadRequest(Failure("Identifier is required."));
