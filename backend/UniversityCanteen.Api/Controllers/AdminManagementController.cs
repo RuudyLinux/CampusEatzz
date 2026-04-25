@@ -2145,6 +2145,7 @@ public sealed class AdminManagementController(
             };
 
             int inserted = 0;
+            var errors = new List<string>();
             foreach (var item in items)
             {
                 try
@@ -2157,7 +2158,10 @@ public sealed class AdminManagementController(
                         new { catId = item.catId, canteenId = item.canteenId, name = item.name, desc = item.desc, price = item.price });
                     inserted++;
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    errors.Add($"{item.name}: {ex.Message}");
+                }
             }
 
             var countAfter = await connection.QuerySingleAsync<int>(
@@ -2168,7 +2172,8 @@ public sealed class AdminManagementController(
                 itemsBeforeReorganization = countBefore,
                 itemsAfterReorganization = countAfter,
                 insertedCount = inserted,
-                deletedItems = countBefore
+                deletedItems = countBefore,
+                errors = errors
             }));
         }
         catch (Exception ex)
