@@ -8,13 +8,12 @@ using UniversityCanteen.Api.Data;
 namespace UniversityCanteen.Api.Controllers;
 
 [ApiController]
-[Authorize]
 [Route("api/customer")]
 public sealed class CustomerController(
     IDbConnectionFactory dbConnectionFactory,
     ILogger<CustomerController> logger) : ControllerBase
 {
-    [AllowAnonymous]
+    [Authorize]
     [HttpGet("wallet")]
     public async Task<IActionResult> GetWallet([FromQuery] string identifier, CancellationToken cancellationToken)
     {
