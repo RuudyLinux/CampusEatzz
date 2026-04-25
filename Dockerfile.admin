@@ -1,0 +1,25 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+# Restore admin project first to maximize layer caching.
+COPY admin_files/admin_files.csproj admin_files/
+RUN dotnet restore admin_files/admin_files.csproj
+
+# Publish admin app.
+COPY admin_files/. admin_files/
+RUN dotnet publish admin_files/admin_files.csproj -c Release -o /app/out /p:UseAppHost=false
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+WORKDIR /app
+COPY --from=build /app/out ./
+
+# Admin views reference shared folders under /JS, /CSS and /assets.
+COPY JS ./JS
+COPY CSS ./CSS
+COPY assets ./assets
+
+ENV ASPNETCORE_ENVIRONMENT=Production
+ENV PORT=10000
+EXPOSE 10000
+
+ENTRYPOINT ["dotnet", "admin_files.dll"]

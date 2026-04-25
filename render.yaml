@@ -51,3 +51,22 @@ services:
 
     # Auto-deploy on push to main
     autoDeploy: true
+
+  - type: web
+    name: campuseatzz-admin
+    runtime: docker
+    dockerfilePath: ./Dockerfile.admin
+    region: oregon
+    plan: free
+
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      # Must point to your deployed backend API service URL.
+      - key: Frontend__ApiBaseUrl
+        value: https://campuseatzz.onrender.com
+
+    healthCheckPath: /Home/AdminLogin
+
+    # Auto-deploy on push to main
+    autoDeploy: true
