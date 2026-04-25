@@ -55,9 +55,17 @@
     function getApiCandidates() {
         const candidates = [];
 
+        // PRIORITY 1: Production backend URL (HTTPS only, no local ports)
+        const isProduction = window.location.hostname && !["localhost", "127.0.0.1", "::1"].includes(window.location.hostname.toLowerCase());
+        if (isProduction) {
+            candidates.push("https://campuseatzz.onrender.com");
+        }
+
         const protocol = String(window.location && window.location.protocol || "http:").toLowerCase();
         const hostname = String(window.location && window.location.hostname || "").trim();
-        if (hostname) {
+
+        // PRIORITY 2: Local development ports (only if not production)
+        if (!isProduction && hostname) {
             const formattedHost = hostname.includes(":") && !hostname.startsWith("[")
                 ? `[${hostname}]`
                 : hostname;
@@ -92,14 +100,12 @@
                 candidates.push(value);
             });
 
-        appendLocalBackendCandidates(candidates);
+        if (!isProduction) {
+            appendLocalBackendCandidates(candidates);
+        }
         if (deferredUiBase) {
             candidates.push(deferredUiBase);
         }
-
-        // Add hardcoded fallback URLs for deployed environments
-        candidates.push("https://campuseatzz.onrender.com");
-        candidates.push("http://campuseatzz.onrender.com");
 
         candidates.push("");
 
