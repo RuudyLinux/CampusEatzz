@@ -2058,6 +2058,38 @@ public sealed class AdminManagementController(
         public string? ConfirmPassword { get; init; }
     }
 
+    [HttpGet("check-canteens")]
+    public async Task<IActionResult> CheckCanteens(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var connection = dbConnectionFactory.CreateConnection();
+            if (!await EnsureAdminAccessAsync(connection, cancellationToken))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, Failure("Admin access required."));
+            }
+
+            var canteens = await connection.QueryAsync<dynamic>(
+                "SELECT id, name, status FROM canteens WHERE status = 'active' ORDER BY id;",
+                cancellationToken: cancellationToken);
+
+            var menuItems = await connection.QueryAsync<dynamic>(
+                "SELECT COUNT(*) as total, SUM(CASE WHEN is_deleted = 0 THEN 1 ELSE 0 END) as active FROM menu_items;",
+                cancellationToken: cancellationToken);
+
+            return Ok(Success("Canteen information.", new
+            {
+                canteens = canteens.ToList(),
+                menuItemStats = menuItems.FirstOrDefault()
+            }));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Check canteens failed.");
+            return StatusCode(StatusCodes.Status500InternalServerError, Failure("Internal server error."));
+        }
+    }
+
     [HttpPost("reorganize-food-items")]
     public async Task<IActionResult> ReorganizeFoodItems(CancellationToken cancellationToken = default)
     {
