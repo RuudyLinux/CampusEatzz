@@ -2118,6 +2118,9 @@ public sealed class AdminManagementController(
         return Ok(Success("Done", new{inserted = n, total = c}));
     }
 
+    [HttpGet("deploy-test")]
+    public IActionResult DeployTest() => Ok(new { status = "deployed_v2" });
+
     [HttpPost("reset-menu")]
     public async Task<IActionResult> ResetMenu()
     {
