@@ -23,15 +23,18 @@ public sealed class OperationsController(
     private readonly AuthOptions _authOptions = authOptions.Value;
 
     [HttpGet("admin/orders")]
+    [ResponseCache(Duration = 15, Location = ResponseCacheLocation.Any)]
     public async Task<IActionResult> GetAdminOrders(
         [FromQuery] string? status,
         [FromQuery] string? search,
-        [FromQuery] int limit = 100,
+        [FromQuery] int limit = 50,
+        [FromQuery] int offset = 0,
         CancellationToken cancellationToken = default)
     {
         var normalizedStatus = NormalizeOrderStatus(status);
         var normalizedSearch = (search ?? string.Empty).Trim();
-        var normalizedLimit = Math.Clamp(limit, 1, 500);
+        var normalizedLimit = Math.Clamp(limit, 1, 100);
+        var normalizedOffset = Math.Max(offset, 0);
 
         try
         {
@@ -76,13 +79,14 @@ public sealed class OperationsController(
                       OR COALESCE(c.name, '') LIKE CONCAT('%', @search, '%')
                   )
                 ORDER BY o.created_at DESC
-                LIMIT @limit;
+                LIMIT @limit OFFSET @offset;
                 """,
                 new
                 {
                     status = normalizedStatus,
                     search = normalizedSearch,
-                    limit = normalizedLimit
+                    limit = normalizedLimit,
+                    offset = normalizedOffset
                 },
                 cancellationToken: cancellationToken))).ToList();
 
@@ -120,7 +124,9 @@ public sealed class OperationsController(
             return Ok(Success("Orders fetched successfully.", new
             {
                 orders,
-                total = orders.Count
+                count = orders.Count,
+                limit = normalizedLimit,
+                offset = normalizedOffset
             }));
         }
         catch (Exception ex)

@@ -88,11 +88,13 @@ public sealed class AdminManagementController(
     }
 
     [HttpGet("users")]
-    public async Task<IActionResult> GetUsers([FromQuery] string? search, [FromQuery] string? status, [FromQuery] int limit = 300, CancellationToken cancellationToken = default)
+    [ResponseCache(Duration = 20, Location = ResponseCacheLocation.Any)]
+    public async Task<IActionResult> GetUsers([FromQuery] string? search, [FromQuery] string? status, [FromQuery] int limit = 100, [FromQuery] int offset = 0, CancellationToken cancellationToken = default)
     {
         var normalizedSearch = (search ?? string.Empty).Trim();
         var normalizedStatus = (status ?? string.Empty).Trim().ToLowerInvariant();
-        var normalizedLimit = Math.Clamp(limit, 1, 2000);
+        var normalizedLimit = Math.Clamp(limit, 1, 200);
+        var normalizedOffset = Math.Max(offset, 0);
 
         try
         {
@@ -115,8 +117,8 @@ public sealed class AdminManagementController(
                     u.canteen_id AS CanteenId,
                     COALESCE(u.status, 'active') AS Status,
                     COALESCE(u.created_at, UTC_TIMESTAMP()) AS CreatedAt,
-                    COALESCE((SELECT COUNT(1) FROM orders o WHERE o.user_id = u.id), 0) AS TotalOrders,
-                    COALESCE((SELECT SUM(COALESCE(NULLIF(o.final_amount,0.00), o.total_amount, 0.00)) FROM orders o WHERE o.user_id = u.id), 0.00) AS TotalSpent
+                    0 AS TotalOrders,
+                    0.00 AS TotalSpent
                 FROM users u
                 WHERE COALESCE(u.is_deleted, 0) = 0
                   AND (@status = '' OR LOWER(COALESCE(u.status, 'active')) = @status)
@@ -128,20 +130,44 @@ public sealed class AdminManagementController(
                       OR COALESCE(u.contact, '') LIKE CONCAT('%', @search, '%')
                   )
                 ORDER BY u.id DESC
-                LIMIT @limit;
+                LIMIT @limit OFFSET @offset;
                 """,
                 new
                 {
                     search = normalizedSearch,
                     status = normalizedStatus,
-                    limit = normalizedLimit
+                    limit = normalizedLimit,
+                    offset = normalizedOffset
                 },
                 cancellationToken: cancellationToken))).ToList();
+
+            var totalCount = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+                """
+                SELECT COUNT(1) FROM users u
+                WHERE COALESCE(u.is_deleted, 0) = 0
+                  AND (@status = '' OR LOWER(COALESCE(u.status, 'active')) = @status)
+                  AND (
+                      @search = ''
+                      OR COALESCE(u.first_name, '') LIKE CONCAT('%', @search, '%')
+                      OR COALESCE(u.last_name, '') LIKE CONCAT('%', @search, '%')
+                      OR COALESCE(u.email, '') LIKE CONCAT('%', @search, '%')
+                      OR COALESCE(u.contact, '') LIKE CONCAT('%', @search, '%')
+                  );
+                """,
+                new
+                {
+                    search = normalizedSearch,
+                    status = normalizedStatus
+                },
+                cancellationToken: cancellationToken));
 
             return Ok(Success("Users fetched.", new
             {
                 users = users.Select(MapUser),
-                total = users.Count,
+                total = totalCount,
+                count = users.Count,
+                limit = normalizedLimit,
+                offset = normalizedOffset,
                 active = users.Count(u => string.Equals(u.Status, "active", StringComparison.OrdinalIgnoreCase))
             }));
         }
@@ -334,6 +360,7 @@ public sealed class AdminManagementController(
     }
 
     [HttpGet("canteens")]
+    [ResponseCache(Duration = 30, Location = ResponseCacheLocation.Any)]
     public async Task<IActionResult> GetCanteens(CancellationToken cancellationToken)
     {
         try
@@ -354,8 +381,14 @@ public sealed class AdminManagementController(
                     COALESCE(c.status, 'active') AS Status,
                     COALESCE(c.display_order, 0) AS DisplayOrder,
                     COALESCE(c.created_at, UTC_TIMESTAMP()) AS CreatedAt,
-                    COALESCE((SELECT COUNT(1) FROM users u WHERE u.canteen_id = c.id AND u.role='canteen_admin' AND COALESCE(u.is_deleted,0)=0), 0) AS AdminCount
+                    COALESCE(ua.AdminCount, 0) AS AdminCount
                 FROM canteens c
+                LEFT JOIN (
+                    SELECT canteen_id, COUNT(1) AS AdminCount
+                    FROM users
+                    WHERE role='canteen_admin' AND COALESCE(is_deleted,0)=0
+                    GROUP BY canteen_id
+                ) ua ON c.id = ua.canteen_id
                 ORDER BY c.display_order ASC, c.id ASC;
                 """,
                 cancellationToken: cancellationToken));
