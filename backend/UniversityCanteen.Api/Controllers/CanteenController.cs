@@ -177,7 +177,7 @@ public sealed class CanteenController(
                     categoryId = i.CategoryId,
                     isAvailable = i.IsAvailable,
                     isVegetarian = i.IsVegetarian,
-                    imageUrl = i.ImageUrl,
+                    imageUrl = ToClientImageUrl(i.ImageUrl),
                     createdAt = i.CreatedAt
                 }),
                 total = items.Count
