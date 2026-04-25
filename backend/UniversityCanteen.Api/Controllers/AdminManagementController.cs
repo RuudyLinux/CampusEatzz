@@ -2204,53 +2204,12 @@ public sealed class AdminManagementController(
         return Ok(new { success = true, count = cnt, total = total });
     }
 
-    [HttpPost("clear-images")]
-    public async Task<IActionResult> ClearImages()
+    [HttpPost("clear-all-images")]
+    public async Task<IActionResult> ClearAllImages()
     {
         using var connection = dbConnectionFactory.CreateConnection();
-        try {
-            int updated = await connection.ExecuteAsync("UPDATE menu_items SET image_url = NULL");
-            return Ok(new { success = true, cleared = updated });
-        } catch (Exception ex) {
-            return BadRequest(new { success = false, error = ex.Message });
-        }
+        await connection.ExecuteAsync("UPDATE menu_items SET image_url = ''");
+        return Ok(new { success = true });
     }
 
-    [HttpPost("set-images")]
-    public async Task<IActionResult> SetImages()
-    {
-        using var connection = dbConnectionFactory.CreateConnection();
-        try {
-            var updates = new[] {
-                (1, "/uploads/menu_items/Caesar_Salad.jpg"),
-                (2, "/uploads/menu_items/Continental _Breakfast.jpg"),
-                (3, "/uploads/menu_items/Fish_&_Chips.jpg"),
-                (4, "/uploads/menu_items/Gulab_Jamun.jpg"),
-                (5, "/uploads/menu_items/Iced_Latte.jpg"),
-                (6, "/uploads/menu_items/Margherita_Pizza.jpg"),
-                (7, "/uploads/menu_items/Mushroom_Stroganoff.jpg"),
-                (8, "/uploads/menu_items/Nachos_Supreme.jpg"),
-                (9, "/uploads/menu_items/New_York_Cheesecake.jpg"),
-                (10, "/uploads/menu_items/Pancakes_Stack.jpg"),
-                (11, "/uploads/menu_items/Paneer_Tikka_Masala.jpg"),
-                (12, "/uploads/menu_items/Pasta_Alfredo.jpg"),
-                (13, "/uploads/menu_items/Penne_Arrabiata.jpg"),
-                (14, "/uploads/menu_items/Pepperoni_Pizza.jpg"),
-                (15, "/uploads/menu_items/Restaurants.jpg"),
-                (16, "/uploads/menu_items/Scrambled_Eggs.jpg"),
-                (17, "/uploads/menu_items/Spring_Rolls.jpg"),
-                (18, "/uploads/menu_items/Tropical_Smoothie.jpg"),
-                (19, "/uploads/menu_items/Vegetable_Biryani.jpg"),
-                (20, "/uploads/menu_items/Virgin_Mojito.jpg")
-            };
-            int count = 0;
-            foreach(var (id, url) in updates) {
-                await connection.ExecuteAsync("UPDATE menu_items SET image_url = @url WHERE id = @id", new { url, id });
-                count++;
-            }
-            return Ok(new { success = true, updated = count });
-        } catch (Exception ex) {
-            return BadRequest(new { success = false, error = ex.Message });
-        }
-    }
 }
