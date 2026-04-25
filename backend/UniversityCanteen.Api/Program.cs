@@ -401,16 +401,12 @@ static async Task EnsureCoreSchemaAsync(
 
             var adminPasswordHash = BCrypt.Net.BCrypt.HashPassword(seedAdminPassword);
 
-            // Delete any existing admin with the configured email (migration/cleanup)
-            await connection.ExecuteAsync(
-                "DELETE FROM admin_users WHERE email = @email;",
-                new { email = seedAdminEmail });
-
-            // Create the configured admin user
+            // Insert or replace admin user atomically
             await connection.ExecuteAsync(
                 """
                 INSERT INTO admin_users (name, email, password, created_at)
-                VALUES (@name, @email, @password, UTC_TIMESTAMP());
+                VALUES (@name, @email, @password, UTC_TIMESTAMP())
+                ON DUPLICATE KEY UPDATE name = @name, password = @password;
                 """,
                 new
                 {
