@@ -28,7 +28,7 @@ class MenuItem {
       description: (json['description'] ?? '').toString(),
       price: _asDouble(json['price']),
       category: (json['category'] ?? 'Uncategorized').toString(),
-      imageUrl: (json['imageUrl'] ?? '').toString(),
+      imageUrl: '',
       isAvailable: _asBool(json['isAvailable'], fallback: true),
       isVegetarian: _asBool(json['isVegetarian']),
       canteenId: canteenId,
