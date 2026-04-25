@@ -399,14 +399,30 @@ static async Task EnsureCoreSchemaAsync(
                     });
             }
 
-            var adminCount = await connection.ExecuteScalarAsync<int>("SELECT COUNT(1) FROM admin_users;");
-            if (adminCount == 0)
+            var adminPasswordHash = BCrypt.Net.BCrypt.HashPassword(seedAdminPassword);
+            var existingAdmin = await connection.QuerySingleOrDefaultAsync<dynamic>(
+                "SELECT id FROM admin_users WHERE email = @email LIMIT 1;",
+                new { email = seedAdminEmail });
+
+            if (existingAdmin is null)
             {
-                var adminPasswordHash = BCrypt.Net.BCrypt.HashPassword(seedAdminPassword);
                 await connection.ExecuteAsync(
                     """
                     INSERT INTO admin_users (name, email, password, created_at)
                     VALUES (@name, @email, @password, UTC_TIMESTAMP());
+                    """,
+                    new
+                    {
+                        name = seedAdminName,
+                        email = seedAdminEmail,
+                        password = adminPasswordHash
+                    });
+            }
+            else
+            {
+                await connection.ExecuteAsync(
+                    """
+                    UPDATE admin_users SET name = @name, password = @password WHERE email = @email;
                     """,
                     new
                     {
