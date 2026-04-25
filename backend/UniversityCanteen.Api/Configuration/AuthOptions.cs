@@ -11,9 +11,9 @@ public sealed class AuthOptions
 public sealed class AdminCredential
 {
     public int Id { get; set; } = 1;
-    public string Name { get; set; } = "Admin User";
-    public string Email { get; set; } = "admin@utu.ac.in";
-    public string Password { get; set; } = "admin123";
+    public string Name { get; set; } = "Platform Admin";
+    public string Email { get; set; } = "admin@campuseatzz.com";
+    public string Password { get; set; } = "Admin@123456";
 }
 
 public sealed class CanteenAdminCredential

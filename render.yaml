@@ -39,6 +39,14 @@ services:
       - key: Notifications__Scheduler__Enabled
         value: "false"
 
+      # Admin credentials for first-time setup
+      - key: Auth__Admin__Name
+        value: "Platform Admin"
+      - key: Auth__Admin__Email
+        value: "admin@campuseatzz.com"
+      - key: Auth__Admin__Password
+        value: "Admin@123456"
+
     healthCheckPath: /api/health
 
     # Auto-deploy on push to main
