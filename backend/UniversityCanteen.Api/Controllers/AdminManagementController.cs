@@ -2069,7 +2069,7 @@ public sealed class AdminManagementController(
                 return StatusCode(StatusCodes.Status403Forbidden, Failure("Admin access required."));
             }
 
-            var reorganizer = new Utils.FoodItemReorganizer(dbConnectionFactory, logger);
+            var reorganizer = new Utils.FoodItemReorganizer(dbConnectionFactory);
             var result = await reorganizer.ReorganizeFoodItemsAsync(cancellationToken);
 
             if (result.Success)

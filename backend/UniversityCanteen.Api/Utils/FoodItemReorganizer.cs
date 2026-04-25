@@ -9,12 +9,10 @@ namespace UniversityCanteen.Api.Utils;
 public sealed class FoodItemReorganizer
 {
     private readonly IDbConnectionFactory _dbConnectionFactory;
-    private readonly ILogger<FoodItemReorganizer> _logger;
 
-    public FoodItemReorganizer(IDbConnectionFactory dbConnectionFactory, ILogger<FoodItemReorganizer> logger)
+    public FoodItemReorganizer(IDbConnectionFactory dbConnectionFactory)
     {
         _dbConnectionFactory = dbConnectionFactory;
-        _logger = logger;
     }
 
     public async Task<ReorganizationResult> ReorganizeFoodItemsAsync(CancellationToken cancellationToken = default)
@@ -26,15 +24,11 @@ public sealed class FoodItemReorganizer
             using var connection = _dbConnectionFactory.CreateConnection();
 
             // Step 1: Soft delete all existing menu items
-            _logger.LogInformation("Step 1: Soft deleting existing menu items...");
             var deletedCount = await connection.ExecuteAsync(
-                "UPDATE menu_items SET is_deleted = 1 WHERE COALESCE(is_deleted, 0) = 0;",
-                cancellationToken: cancellationToken);
-            _logger.LogInformation("Deleted {Count} items", deletedCount);
+                "UPDATE menu_items SET is_deleted = 1 WHERE COALESCE(is_deleted, 0) = 0;");
             result.DeletedItemsCount = deletedCount;
 
             // Step 2: Add items for Chirag Tea Center (ID: 1)
-            _logger.LogInformation("Step 2: Adding items for Chirag Tea Center...");
             var chiragItems = new[]
             {
                 ("Caesar Salad", "Fresh crisp romaine lettuce with parmesan and Caesar dressing", 150.00, "/uploads/menu_items/Caesar_Salad.jpg", 1, 1),
@@ -49,7 +43,6 @@ public sealed class FoodItemReorganizer
             result.ChiragTeaCenterCount = chiragCount;
 
             // Step 3: Add items for Foodies (ID: 3)
-            _logger.LogInformation("Step 3: Adding items for Foodies...");
             var foodiesItems = new[]
             {
                 ("Mushroom Stroganoff", "Creamy mushroom sauce with tender pasta", 280.00, "/uploads/menu_items/Mushroom_Stroganoff.jpg", 1, 1),
@@ -65,7 +58,6 @@ public sealed class FoodItemReorganizer
             result.FoodiesCount = foodiesCount;
 
             // Step 4: Add items for Tea Post (ID: 2)
-            _logger.LogInformation("Step 4: Adding items for Tea Post...");
             var teaPostItems = new[]
             {
                 ("Pepperoni Pizza", "Pizza with pepperoni and mozzarella cheese", 260.00, "/uploads/menu_items/Pepperoni_Pizza.jpg", 1, 0),
@@ -82,14 +74,11 @@ public sealed class FoodItemReorganizer
 
             result.Success = true;
             result.Message = "Food items reorganized successfully";
-            _logger.LogInformation("Food reorganization completed: {DeletedCount} deleted, {ChiragCount} added to Chirag, {FoodiesCount} added to Foodies, {TeaPostCount} added to Tea Post",
-                result.DeletedItemsCount, result.ChiragTeaCenterCount, result.FoodiesCount, result.TeaPostCount);
         }
         catch (Exception ex)
         {
             result.Success = false;
             result.Message = $"Error during reorganization: {ex.Message}";
-            _logger.LogError(ex, "Food reorganization failed");
         }
 
         return result;
@@ -120,13 +109,12 @@ public sealed class FoodItemReorganizer
                         imageUrl = item.imageUrl,
                         isAvailable = item.isAvailable,
                         isVegetarian = item.isVegetarian
-                    },
-                    cancellationToken: cancellationToken);
+                    });
                 count++;
             }
-            catch (Exception ex)
+            catch
             {
-                _logger.LogError(ex, "Failed to insert item {Item} for canteen {CanteenId}", item.name, canteenId);
+                // Continue with next item if insertion fails
             }
         }
         return count;
