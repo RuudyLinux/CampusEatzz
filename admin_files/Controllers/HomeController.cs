@@ -6,6 +6,12 @@ namespace admin_files.Controllers;
 
 public class HomeController : Controller
 {
+    private readonly IConfiguration _configuration;
+
+    public HomeController(IConfiguration configuration)
+    {
+        _configuration = configuration;
+    }
     public IActionResult Index()
     {
         return View();
@@ -29,6 +35,8 @@ public class HomeController : Controller
     }
     public IActionResult AdminLogin()
     {
+        var apiBaseUrl = _configuration["Frontend:ApiBaseUrl"] ?? "https://campuseatzz.onrender.com";
+        ViewBag.ApiBaseUrl = apiBaseUrl;
         return View();
     }
     public IActionResult AdminManageCanteenAdmins()

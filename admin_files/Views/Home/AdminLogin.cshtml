@@ -95,6 +95,11 @@
     
     <partial name="_AdminFooter" />
 
+    <script>
+        // Set the backend API base URL from configuration
+        window.__API_BASE = "@ViewBag.ApiBaseUrl" || "https://campuseatzz.onrender.com";
+    </script>
+
     <script src="../JS/admin-common.js?v=20260413a"></script>
     <script src="../JS/admin-login.js?v=20260413a"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
