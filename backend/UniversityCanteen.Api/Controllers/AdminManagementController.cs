@@ -2070,12 +2070,10 @@ public sealed class AdminManagementController(
             }
 
             var canteens = await connection.QueryAsync<dynamic>(
-                "SELECT id, name, status FROM canteens WHERE status = 'active' ORDER BY id;",
-                cancellationToken: cancellationToken);
+                "SELECT id, name, status FROM canteens WHERE status = 'active' ORDER BY id;");
 
             var menuItems = await connection.QueryAsync<dynamic>(
-                "SELECT COUNT(*) as total, SUM(CASE WHEN is_deleted = 0 THEN 1 ELSE 0 END) as active FROM menu_items;",
-                cancellationToken: cancellationToken);
+                "SELECT COUNT(*) as total, SUM(CASE WHEN is_deleted = 0 THEN 1 ELSE 0 END) as active FROM menu_items;");
 
             return Ok(Success("Canteen information.", new
             {
