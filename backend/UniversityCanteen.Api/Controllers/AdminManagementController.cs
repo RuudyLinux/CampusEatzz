@@ -2204,26 +2204,39 @@ public sealed class AdminManagementController(
         return Ok(new { success = true, count = cnt, total = total });
     }
 
-    [HttpPost("rebuild-no-images")]
-    public async Task<IActionResult> RebuildNoImages()
+    [HttpPost("rebuild-with-images")]
+    public async Task<IActionResult> RebuildWithImages()
     {
         using var connection = dbConnectionFactory.CreateConnection();
         try {
             await connection.ExecuteAsync("DELETE FROM menu_items");
-            var sql = "INSERT INTO menu_items (id, category_id, canteen_id, name, description, price, image_url, is_available, is_vegetarian, created_at, updated_at) VALUES (@id, @c, @ca, @n, @d, @p, '', 1, 1, NOW(), NOW())";
-            var items = new(int id, string name, string desc, int cat, int canteen)[]
+            var sql = "INSERT INTO menu_items (id, category_id, canteen_id, name, description, price, image_url, is_available, is_vegetarian, created_at, updated_at) VALUES (@id, @c, @ca, @n, @d, @p, @img, 1, 1, NOW(), NOW())";
+            var items = new(int id, string name, string desc, int cat, int canteen, string img)[]
             {
-                (1, "Caesar Salad", "Fresh crisp romaine", 3, 1), (2, "Continental Breakfast", "Eggs, toast, bacon", 3, 1), (3, "Fish & Chips", "Crispy fish", 3, 1),
-                (4, "Gulab Jamun", "Sweet milk solids", 5, 1), (5, "Iced Latte", "Cold espresso", 4, 1), (6, "Margherita Pizza", "Classic pizza", 2, 1),
-                (7, "Mushroom Stroganoff", "Creamy sauce", 3, 3), (8, "Nachos Supreme", "Crispy nachos", 3, 3), (9, "New York Cheesecake", "Creamy cheesecake", 5, 3),
-                (10, "Pancakes Stack", "Fluffy pancakes", 3, 3), (11, "Paneer Tikka Masala", "Soft paneer", 3, 3), (12, "Pasta Alfredo", "Creamy Alfredo", 3, 3),
-                (13, "Penne Arrabiata", "Spicy pasta", 3, 3), (14, "Pepperoni Pizza", "Pizza with pepperoni", 2, 2), (15, "Restaurants", "Partner menus", 3, 2),
-                (16, "Scrambled Eggs", "Fluffy eggs", 3, 2), (17, "Spring Rolls", "Crispy rolls", 3, 2), (18, "Tropical Smoothie", "Mango pineapple", 4, 2),
-                (19, "Vegetable Biryani", "Aromatic rice", 3, 2), (20, "Virgin Mojito", "Mint mocktail", 4, 2)
+                (1, "Caesar Salad", "Fresh crisp romaine", 3, 1, "/uploads/menu_items/Caesar_Salad.jpg"),
+                (2, "Continental Breakfast", "Eggs, toast, bacon", 3, 1, "/uploads/menu_items/Continental _Breakfast.jpg"),
+                (3, "Fish & Chips", "Crispy fish", 3, 1, "/uploads/menu_items/Fish_&_Chips.jpg"),
+                (4, "Gulab Jamun", "Sweet milk solids", 5, 1, "/uploads/menu_items/Gulab_Jamun.jpg"),
+                (5, "Iced Latte", "Cold espresso", 4, 1, "/uploads/menu_items/Iced_Latte.jpg"),
+                (6, "Margherita Pizza", "Classic pizza", 2, 1, "/uploads/menu_items/Margherita_Pizza.jpg"),
+                (7, "Mushroom Stroganoff", "Creamy sauce", 3, 3, "/uploads/menu_items/Mushroom_Stroganoff.jpg"),
+                (8, "Nachos Supreme", "Crispy nachos", 3, 3, "/uploads/menu_items/Nachos_Supreme.jpg"),
+                (9, "New York Cheesecake", "Creamy cheesecake", 5, 3, "/uploads/menu_items/New_York_Cheesecake.jpg"),
+                (10, "Pancakes Stack", "Fluffy pancakes", 3, 3, "/uploads/menu_items/Pancakes_Stack.jpg"),
+                (11, "Paneer Tikka Masala", "Soft paneer", 3, 3, "/uploads/menu_items/Paneer_Tikka_Masala.jpg"),
+                (12, "Pasta Alfredo", "Creamy Alfredo", 3, 3, "/uploads/menu_items/Pasta_Alfredo.jpg"),
+                (13, "Penne Arrabiata", "Spicy pasta", 3, 3, "/uploads/menu_items/Penne_Arrabiata.jpg"),
+                (14, "Pepperoni Pizza", "Pizza with pepperoni", 2, 2, "/uploads/menu_items/Pepperoni_Pizza.jpg"),
+                (15, "Restaurants", "Partner menus", 3, 2, "/uploads/menu_items/Restaurants.jpg"),
+                (16, "Scrambled Eggs", "Fluffy eggs", 3, 2, "/uploads/menu_items/Scrambled_Eggs.jpg"),
+                (17, "Spring Rolls", "Crispy rolls", 3, 2, "/uploads/menu_items/Spring_Rolls.jpg"),
+                (18, "Tropical Smoothie", "Mango pineapple", 4, 2, "/uploads/menu_items/Tropical_Smoothie.jpg"),
+                (19, "Vegetable Biryani", "Aromatic rice", 3, 2, "/uploads/menu_items/Vegetable_Biryani.jpg"),
+                (20, "Virgin Mojito", "Mint mocktail", 4, 2, "/uploads/menu_items/Virgin_Mojito.jpg")
             };
             int n = 0;
             foreach(var i in items) {
-                await connection.ExecuteAsync(sql, new { id = i.id, c = i.cat, ca = i.canteen, n = i.name, d = i.desc, p = 100m });
+                await connection.ExecuteAsync(sql, new { id = i.id, c = i.cat, ca = i.canteen, n = i.name, d = i.desc, p = 100m, img = i.img });
                 n++;
             }
             var total = await connection.QuerySingleAsync<int>("SELECT COUNT(*) FROM menu_items");
