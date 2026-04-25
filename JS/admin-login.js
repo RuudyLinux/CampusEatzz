@@ -146,7 +146,7 @@
                 const response = await fetch(resolveApiUrl(candidate, "api/admin/login"), {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ identifier: email, password })
+                    body: JSON.stringify({ email, password })
                 });
 
                 const body = await parseJsonSafe(response);
