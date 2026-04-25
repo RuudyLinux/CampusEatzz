@@ -17,14 +17,6 @@ public sealed class CustomerController(
     [HttpGet("wallet")]
     public async Task<IActionResult> GetWallet([FromQuery] string identifier, CancellationToken cancellationToken)
     {
-        // Test: return success immediately
-        return Ok(Success("TEST - Wallet fetched successfully.", new WalletSummaryDto
-        {
-            Balance = 500.00m,
-            Currency = "INR"
-        }));
-
-        #pragma warning disable CS0162 // Unreachable code detected
         if (string.IsNullOrWhiteSpace(identifier))
         {
             return BadRequest(Failure("Identifier is required."));
@@ -33,48 +25,20 @@ public sealed class CustomerController(
         try
         {
             using var connection = dbConnectionFactory.CreateConnection();
-            logger.LogInformation("Wallet request for identifier: {Identifier}", identifier);
+            await EnsureWalletInfrastructureExists(connection, cancellationToken);
 
-            try
-            {
-                await EnsureWalletInfrastructureExists(connection, cancellationToken);
-                logger.LogInformation("Wallet tables ensured");
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Failed to ensure wallet infrastructure");
-            }
-
-            // Simple direct lookup without schema detection
-            logger.LogInformation("Looking up user");
-            var user = await connection.QuerySingleOrDefaultAsync<(int id, string email)>(new CommandDefinition(
-                """
-                SELECT id, email FROM users
-                WHERE email = @identifier
-                   OR CAST(id AS CHAR) = @identifier
-                   OR COALESCE(UniversityId, '') = @identifier
-                LIMIT 1;
-                """,
-                new { identifier = identifier.Trim() },
-                cancellationToken: cancellationToken));
-
-            logger.LogInformation("User lookup result - ID: {UserId}", user.id);
-
-            if (user.id == 0)
+            var user = await FindUserByIdentifier(connection, identifier.Trim(), cancellationToken);
+            if (user is null)
             {
                 return NotFound(Failure("User not found."));
             }
 
-            int userId = user.id;
-            await EnsureWalletExists(connection, userId, cancellationToken);
-            logger.LogInformation("Wallet exists for user {UserId}", userId);
+            await EnsureWalletExists(connection, user.Id, cancellationToken);
 
             var balance = await connection.ExecuteScalarAsync<decimal?>(new CommandDefinition(
                 "SELECT COALESCE(balance, 0.00) FROM wallets WHERE user_id = @userId LIMIT 1;",
-                new { userId },
+                new { userId = user.Id },
                 cancellationToken: cancellationToken)) ?? 0m;
-
-            logger.LogInformation("Balance fetched: {Balance}", balance);
 
             return Ok(Success("Wallet fetched successfully.", new WalletSummaryDto
             {
@@ -84,8 +48,8 @@ public sealed class CustomerController(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to fetch wallet for identifier {Identifier}: {ExceptionMessage} - {StackTrace}", identifier, ex.Message, ex.StackTrace);
-            return StatusCode(StatusCodes.Status500InternalServerError, Failure($"Internal server error: {ex.GetType().Name} - {ex.Message}"));
+            logger.LogError(ex, "Failed to fetch wallet for identifier {Identifier}", identifier);
+            return StatusCode(StatusCodes.Status500InternalServerError, Failure("Internal server error while fetching wallet."));
         }
     }
 
