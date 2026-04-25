@@ -2126,6 +2126,41 @@ public sealed class AdminManagementController(
     [HttpGet("deploy-test")]
     public IActionResult DeployTest() => Ok(new { status = "deployed_v2" });
 
+    [HttpPost("update-food-images")]
+    public async Task<IActionResult> UpdateFoodImages()
+    {
+        using var connection = dbConnectionFactory.CreateConnection();
+        var updates = new(int id, string img)[]
+        {
+            (1, "/uploads/menu_items/Caesar_Salad.jpg"),
+            (2, "/uploads/menu_items/Continental _Breakfast.jpg"),
+            (3, "/uploads/menu_items/Fish_&_Chips.jpg"),
+            (4, "/uploads/menu_items/Gulab_Jamun.jpg"),
+            (5, "/uploads/menu_items/Iced_Latte.jpg"),
+            (6, "/uploads/menu_items/Margherita_Pizza.jpg"),
+            (7, "/uploads/menu_items/Mushroom_Stroganoff.jpg"),
+            (8, "/uploads/menu_items/Nachos_Supreme.jpg"),
+            (9, "/uploads/menu_items/New_York_Cheesecake.jpg"),
+            (10, "/uploads/menu_items/Pancakes_Stack.jpg"),
+            (11, "/uploads/menu_items/Paneer_Tikka_Masala.jpg"),
+            (12, "/uploads/menu_items/Pasta_Alfredo.jpg"),
+            (13, "/uploads/menu_items/Penne_Arrabiata.jpg"),
+            (14, "/uploads/menu_items/Pepperoni_Pizza.jpg"),
+            (15, "/uploads/menu_items/Restaurants.jpg"),
+            (16, "/uploads/menu_items/Scrambled_Eggs.jpg"),
+            (17, "/uploads/menu_items/Spring_Rolls.jpg"),
+            (18, "/uploads/menu_items/Tropical_Smoothie.jpg"),
+            (19, "/uploads/menu_items/Vegetable_Biryani.jpg"),
+            (20, "/uploads/menu_items/Virgin_Mojito.jpg")
+        };
+        int n = 0;
+        foreach(var u in updates) {
+            await connection.ExecuteAsync("UPDATE menu_items SET image_url = @img WHERE id = @id", new { id = u.id, img = u.img });
+            n++;
+        }
+        return Ok(new { success = true, updated = n });
+    }
+
     [HttpPost("insert-food-v3")]
     public async Task<IActionResult> InsertFoodV3()
     {
