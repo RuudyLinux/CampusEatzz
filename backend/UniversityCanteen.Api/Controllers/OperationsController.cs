@@ -225,13 +225,16 @@ public sealed class OperationsController(
     }
 
     [HttpGet("admin/wallets")]
+    [ResponseCache(Duration = 20, Location = ResponseCacheLocation.Any)]
     public async Task<IActionResult> GetAdminWallets(
         [FromQuery] string? search,
-        [FromQuery] int limit = 500,
+        [FromQuery] int limit = 50,
+        [FromQuery] int offset = 0,
         CancellationToken cancellationToken = default)
     {
         var normalizedSearch = (search ?? string.Empty).Trim();
-        var normalizedLimit = Math.Clamp(limit, 1, 2000);
+        var normalizedLimit = Math.Clamp(limit, 1, 200);
+        var normalizedOffset = Math.Max(offset, 0);
 
         try
         {
@@ -261,12 +264,13 @@ public sealed class OperationsController(
                       OR COALESCE(u.email, '') LIKE CONCAT('%', @search, '%')
                   )
                 ORDER BY u.id DESC
-                LIMIT @limit;
+                LIMIT @limit OFFSET @offset;
                 """,
                 new
                 {
                     search = normalizedSearch,
-                    limit = normalizedLimit
+                    limit = normalizedLimit,
+                    offset = normalizedOffset
                 },
                 cancellationToken: cancellationToken))).ToList();
 
@@ -288,8 +292,10 @@ public sealed class OperationsController(
                 SELECT
                     COALESCE((SELECT SUM(balance) FROM wallets), 0.00) AS TotalBalance,
                     COALESCE((SELECT COUNT(1) FROM wallets WHERE COALESCE(balance, 0.00) > 0), 0) AS ActiveWallets,
-                    COALESCE((SELECT SUM(amount) FROM wallet_transactions WHERE type = 'credit' AND status = 'completed'), 0.00) AS TotalCredits,
-                    COALESCE((SELECT SUM(amount) FROM wallet_transactions WHERE type = 'debit' AND status = 'completed'), 0.00) AS TotalDebits;
+                    COALESCE(SUM(CASE WHEN wt.type = 'credit' AND wt.status = 'completed' THEN wt.amount ELSE 0 END), 0.00) AS TotalCredits,
+                    COALESCE(SUM(CASE WHEN wt.type = 'debit' AND wt.status = 'completed' THEN wt.amount ELSE 0 END), 0.00) AS TotalDebits
+                FROM wallet_transactions wt
+                WHERE 1=1;
                 """,
                 cancellationToken: cancellationToken));
 
@@ -306,6 +312,9 @@ public sealed class OperationsController(
             return Ok(Success("Wallets fetched successfully.", new
             {
                 wallets,
+                count = wallets.Count,
+                limit = normalizedLimit,
+                offset = normalizedOffset,
                 stats = new
                 {
                     totalBalance = RoundMoney(totals.TotalBalance),
@@ -323,18 +332,21 @@ public sealed class OperationsController(
     }
 
     [HttpGet("admin/wallet-transactions")]
+    [ResponseCache(Duration = 15, Location = ResponseCacheLocation.Any)]
     public async Task<IActionResult> GetAdminWalletTransactions(
         [FromQuery] string? type,
         [FromQuery] string? status,
         [FromQuery] string? search,
         [FromQuery] int? userId,
-        [FromQuery] int limit = 500,
+        [FromQuery] int limit = 50,
+        [FromQuery] int offset = 0,
         CancellationToken cancellationToken = default)
     {
         var normalizedType = NormalizeTransactionType(type);
         var normalizedStatus = NormalizeTransactionStatus(status);
         var normalizedSearch = (search ?? string.Empty).Trim();
-        var normalizedLimit = Math.Clamp(limit, 1, 2000);
+        var normalizedLimit = Math.Clamp(limit, 1, 200);
+        var normalizedOffset = Math.Max(offset, 0);
 
         try
         {
@@ -373,7 +385,7 @@ public sealed class OperationsController(
                       OR COALESCE(u.email, '') LIKE CONCAT('%', @search, '%')
                   )
                 ORDER BY wt.created_at DESC
-                LIMIT @limit;
+                LIMIT @limit OFFSET @offset;
                 """,
                 new
                 {
@@ -381,7 +393,8 @@ public sealed class OperationsController(
                     status = normalizedStatus,
                     search = normalizedSearch,
                     userId,
-                    limit = normalizedLimit
+                    limit = normalizedLimit,
+                    offset = normalizedOffset
                 },
                 cancellationToken: cancellationToken))).ToList();
 
@@ -404,7 +417,9 @@ public sealed class OperationsController(
             return Ok(Success("Wallet transactions fetched successfully.", new
             {
                 transactions,
-                total = transactions.Count
+                count = transactions.Count,
+                limit = normalizedLimit,
+                offset = normalizedOffset
             }));
         }
         catch (Exception ex)

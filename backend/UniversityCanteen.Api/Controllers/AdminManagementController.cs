@@ -943,10 +943,13 @@ public sealed class AdminManagementController(
     }
 
     [HttpGet("reviews")]
-    public async Task<IActionResult> GetReviews([FromQuery] int? rating, [FromQuery] string? status, [FromQuery] string? search, CancellationToken cancellationToken)
+    [ResponseCache(Duration = 20, Location = ResponseCacheLocation.Any)]
+    public async Task<IActionResult> GetReviews([FromQuery] int? rating, [FromQuery] string? status, [FromQuery] string? search, [FromQuery] int limit = 50, [FromQuery] int offset = 0, CancellationToken cancellationToken = default)
     {
         var normalizedStatus = (status ?? string.Empty).Trim().ToLowerInvariant();
         var normalizedSearch = (search ?? string.Empty).Trim();
+        var normalizedLimit = Math.Clamp(limit, 1, 200);
+        var normalizedOffset = Math.Max(offset, 0);
 
         try
         {
@@ -983,13 +986,16 @@ public sealed class AdminManagementController(
                       OR COALESCE(u.last_name, '') LIKE CONCAT('%', @search, '%')
                       OR COALESCE(c.name, '') LIKE CONCAT('%', @search, '%')
                   )
-                ORDER BY r.created_at DESC;
+                ORDER BY r.created_at DESC
+                LIMIT @limit OFFSET @offset;
                 """,
                 new
                 {
                     status = normalizedStatus,
                     rating,
-                    search = normalizedSearch
+                    search = normalizedSearch,
+                    limit = normalizedLimit,
+                    offset = normalizedOffset
                 },
                 cancellationToken: cancellationToken));
 
@@ -1012,7 +1018,9 @@ public sealed class AdminManagementController(
                     status = r.Status,
                     createdAt = r.CreatedAt
                 }),
-                total = list.Count,
+                count = list.Count,
+                limit = normalizedLimit,
+                offset = normalizedOffset,
                 averageRating = Math.Round(average, 1),
                 positive = list.Count(r => r.Rating >= 4),
                 responded = list.Count(r => !string.IsNullOrWhiteSpace(r.AdminResponse))
