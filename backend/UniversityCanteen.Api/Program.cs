@@ -80,13 +80,12 @@ builder.Services.Configure<GzipCompressionProviderOptions>(options =>
 builder.Services.AddOutputCache(options =>
 {
     options.AddBasePolicy(builder =>
-    {
         builder.Expire(TimeSpan.FromSeconds(30))
-               .WithExcludeQueryKeys("token");
-    }, excludeUrls: new[] { "/api/auth", "/api/orders", "/api/customer", "/api/canteen-admin/login" });
+               .WithExcludeQueryKeys("token"));
     options.AddPolicy("StaticContent", builder =>
         builder.Expire(TimeSpan.FromMinutes(10)));
 });
+builder.Services.AddSingleton<IMaintenanceStateCache>(new MaintenanceStateCache());
 
 var app = builder.Build();
 
@@ -112,9 +111,6 @@ app.UseStaticFiles(new StaticFileOptions
 app.UseOutputCache();
 app.UseAuthentication();
 app.UseAuthorization();
-
-var maintenanceStateCache = new MaintenanceStateCache();
-app.Services.AddSingleton<IMaintenanceStateCache>(maintenanceStateCache);
 
 app.Use(async (context, next) =>
 {
