@@ -401,12 +401,11 @@ static async Task EnsureCoreSchemaAsync(
 
             var adminPasswordHash = BCrypt.Net.BCrypt.HashPassword(seedAdminPassword);
 
-            // Insert or replace admin user atomically
+            // Ensure seed admin exists - use REPLACE for atomic operation
             await connection.ExecuteAsync(
                 """
-                INSERT INTO admin_users (name, email, password, created_at)
-                VALUES (@name, @email, @password, UTC_TIMESTAMP())
-                ON DUPLICATE KEY UPDATE name = @name, password = @password;
+                REPLACE INTO admin_users (name, email, password, created_at)
+                VALUES (@name, @email, @password, UTC_TIMESTAMP());
                 """,
                 new
                 {
