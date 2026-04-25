@@ -14,6 +14,7 @@ public sealed class CustomerController(
     IDbConnectionFactory dbConnectionFactory,
     ILogger<CustomerController> logger) : ControllerBase
 {
+    [AllowAnonymous]
     [HttpGet("wallet")]
     public async Task<IActionResult> GetWallet([FromQuery] string identifier, CancellationToken cancellationToken)
     {
