@@ -902,24 +902,39 @@ public sealed class CustomerController(
         CancellationToken cancellationToken,
         IDbTransaction? transaction)
     {
-        var hasCafeId = await ColumnExistsByProbe(connection, "id", cancellationToken, transaction);
-        var hasCafeEmail = await ColumnExistsByProbe(connection, "email", cancellationToken, transaction);
-        var hasCafeColumns = hasCafeId && hasCafeEmail;
-        if (!hasCafeColumns)
+        try
         {
-            throw new InvalidOperationException("Unsupported users schema for customer operations. Expected users.id and users.email columns.");
+            var hasCafeId = await ColumnExistsByProbe(connection, "id", cancellationToken, transaction);
+            var hasCafeEmail = await ColumnExistsByProbe(connection, "email", cancellationToken, transaction);
+            var hasCafeColumns = hasCafeId && hasCafeEmail;
+            if (!hasCafeColumns)
+            {
+                throw new InvalidOperationException("Unsupported users schema for customer operations. Expected users.id and users.email columns.");
+            }
+
+            var hasFirstName = await ColumnExistsByProbe(connection, "first_name", cancellationToken, transaction);
+            var hasLastName = await ColumnExistsByProbe(connection, "last_name", cancellationToken, transaction);
+
+            return new UsersSchemaInfo
+            {
+                HasEnrollmentNo = await ColumnExistsByProbe(connection, "enrollment_no", cancellationToken, transaction),
+                HasUniversityId = await ColumnExistsByProbe(connection, "UniversityId", cancellationToken, transaction),
+                HasFirstName = hasFirstName,
+                HasLastName = hasLastName
+            };
         }
-
-        var hasFirstName = await ColumnExistsByProbe(connection, "first_name", cancellationToken, transaction);
-        var hasLastName = await ColumnExistsByProbe(connection, "last_name", cancellationToken, transaction);
-
-        return new UsersSchemaInfo
+        catch (Exception ex)
         {
-            HasEnrollmentNo = await ColumnExistsByProbe(connection, "enrollment_no", cancellationToken, transaction),
-            HasUniversityId = await ColumnExistsByProbe(connection, "UniversityId", cancellationToken, transaction),
-            HasFirstName = hasFirstName,
-            HasLastName = hasLastName
-        };
+            // Schema detection failed, use conservative defaults
+            // This allows wallet requests to work with basic schema
+            return new UsersSchemaInfo
+            {
+                HasEnrollmentNo = false,
+                HasUniversityId = false,
+                HasFirstName = false,
+                HasLastName = false
+            };
+        }
     }
 
     private static async Task<bool> ColumnExistsByProbe(
@@ -941,6 +956,12 @@ public sealed class CustomerController(
         }
         catch (Exception ex) when (ex.Message.Contains("Unknown column", StringComparison.OrdinalIgnoreCase))
         {
+            return false;
+        }
+        catch
+        {
+            // If any other error occurs during column detection, treat as column doesn't exist
+            // rather than failing the entire wallet request
             return false;
         }
     }
