@@ -22,6 +22,10 @@ class CanteenProvider extends ChangeNotifier {
 
   List<MenuItem> menuFor(int canteenId) => _menuByCanteen[canteenId] ?? const <MenuItem>[];
 
+  List<MenuItem> get allItems => _menuByCanteen.values
+      .expand((items) => items)
+      .toList(growable: false);
+
   Future<void> loadCanteens() async {
     _loadingCanteens = true;
     _error = null;

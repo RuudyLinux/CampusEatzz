@@ -8,6 +8,7 @@ import '../../core/widgets/animated_reveal.dart';
 import '../../core/widgets/app_empty_state.dart';
 import '../../core/widgets/customer_bottom_nav.dart';
 import '../../core/widgets/gradient_header.dart';
+import '../../core/widgets/network_food_image.dart';
 import '../../state/cart_provider.dart';
 import '../home/home_screen.dart';
 import '../payment/payment_screen.dart';
@@ -95,18 +96,14 @@ class _CartItemCard extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         child: Row(
           children: <Widget>[
-            // Placeholder image square
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.darkSurface : AppColors.bgSoft,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: NetworkFoodImage(
+                imageUrl: item.imageUrl,
+                fallbackAsset: 'assets/images/Restaurants.jpg',
+                width: 72,
+                height: 72,
                 borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Icons.fastfood_rounded,
-                size: 32,
-                color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
               ),
             ),
             const SizedBox(width: 12),

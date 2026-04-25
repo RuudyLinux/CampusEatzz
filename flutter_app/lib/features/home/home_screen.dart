@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_typography.dart';
+import '../../core/constants/formatters.dart';
 import '../../core/widgets/animated_reveal.dart';
 import '../../core/widgets/app_async_view.dart';
 import '../../core/widgets/app_empty_state.dart';
@@ -12,7 +13,9 @@ import '../../core/widgets/network_food_image.dart';
 import '../../core/widgets/notification_bell_button.dart';
 import '../../core/widgets/shimmer_loader.dart';
 import '../../data/models/canteen.dart';
+import '../../data/models/menu_item.dart';
 import '../../state/canteen_provider.dart';
+import '../../state/cart_provider.dart';
 import '../contact/contact_us_screen.dart';
 import '../menu/menu_screen.dart';
 
@@ -27,8 +30,14 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<CanteenProvider>().loadCanteens();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final provider = context.read<CanteenProvider>();
+      await provider.loadCanteens();
+      if (!mounted) return;
+      for (final canteen in provider.canteens) {
+        await provider.loadMenu(canteen.id);
+        if (!mounted) return;
+      }
     });
   }
 
@@ -77,7 +86,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 24),
                     AnimatedReveal(
                         delayMs: 270,
-                        child: _TrendingSection(isDark: isDark)),
+                        child: _TrendingSection(
+                          isDark: isDark,
+                          items: canteenState.allItems.take(6).toList(),
+                        )),
                     const SizedBox(height: 20),
                     AnimatedReveal(
                       delayMs: 340,
@@ -498,54 +510,33 @@ class _CanteenCard extends StatelessWidget {
 // ── Trending Section ──────────────────────────────────────────────────────────
 
 class _TrendingSection extends StatelessWidget {
-  const _TrendingSection({required this.isDark});
+  const _TrendingSection({required this.isDark, required this.items});
 
   final bool isDark;
-
-  static const List<Map<String, String>> _items = <Map<String, String>>[
-    {
-      'name': 'Masala Tea',
-      'price': '₹15',
-      'image': 'assets/images/Iced_Latte.jpg'
-    },
-    {
-      'name': 'Veg Sandwich',
-      'price': '₹40',
-      'image': 'assets/images/Caesar_Salad.jpg'
-    },
-    {
-      'name': 'Samosa',
-      'price': '₹20',
-      'image': 'assets/images/Spring_Rolls.jpg'
-    },
-    {
-      'name': 'Cheese Pizza',
-      'price': '₹80',
-      'image': 'assets/images/Margherita_Pizza.jpg'
-    },
-  ];
+  final List<MenuItem> items;
 
   @override
   Widget build(BuildContext context) {
+    if (items.isEmpty) return const SizedBox.shrink();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
           'Trending Dishes',
           style: AppTypography.heading3.copyWith(
-            color:
-                isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+            color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 210,
+          height: 240,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            itemCount: _items.length,
+            itemCount: items.length,
             separatorBuilder: (_, __) => const SizedBox(width: 12),
             itemBuilder: (_, index) {
-              final item = _items[index];
+              final item = items[index];
               return SizedBox(
                 width: 160,
                 child: Card(
@@ -553,19 +544,20 @@ class _TrendingSection extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      Image.asset(
-                        item['image']!,
+                      NetworkFoodImage(
+                        imageUrl: item.imageUrl,
+                        fallbackAsset: 'assets/images/Restaurants.jpg',
                         width: double.infinity,
-                        height: 115,
-                        fit: BoxFit.cover,
+                        height: 105,
+                        borderRadius: BorderRadius.zero,
                       ),
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+                        padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
                             Text(
-                              item['name']!,
+                              item.name,
                               style: AppTypography.label.copyWith(
                                 color: isDark
                                     ? AppColors.darkTextPrimary
@@ -574,13 +566,42 @@ class _TrendingSection extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(height: 6),
+                            const SizedBox(height: 4),
                             Text(
-                              item['price']!,
+                              formatInr(item.price),
                               style: AppTypography.priceSm.copyWith(
                                 color: isDark
                                     ? AppColors.primaryOnDark
                                     : AppColors.primary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: item.isAvailable
+                                    ? () async {
+                                        await context
+                                            .read<CartProvider>()
+                                            .addMenuItem(item);
+                                        if (!context.mounted) return;
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(SnackBar(
+                                          content: Text(
+                                              '${item.name} added to cart'),
+                                          duration:
+                                              const Duration(seconds: 1),
+                                        ));
+                                      }
+                                    : null,
+                                icon: const Icon(Icons.add_rounded, size: 13),
+                                label: const Text('Add'),
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 6),
+                                  minimumSize: const Size(0, 30),
+                                  textStyle: const TextStyle(fontSize: 12),
+                                ),
                               ),
                             ),
                           ],
