@@ -27,17 +27,29 @@ public sealed class CustomerController(
             using var connection = dbConnectionFactory.CreateConnection();
             await EnsureWalletInfrastructureExists(connection, cancellationToken);
 
-            var user = await FindUserByIdentifier(connection, identifier.Trim(), cancellationToken);
+            // Simple direct lookup without schema detection
+            var user = await connection.QuerySingleOrDefaultAsync<dynamic>(new CommandDefinition(
+                """
+                SELECT id, email FROM users
+                WHERE email = @identifier
+                   OR CAST(id AS CHAR) = @identifier
+                   OR COALESCE(UniversityId, '') = @identifier
+                LIMIT 1;
+                """,
+                new { identifier = identifier.Trim() },
+                cancellationToken: cancellationToken));
+
             if (user is null)
             {
                 return NotFound(Failure("User not found."));
             }
 
-            await EnsureWalletExists(connection, user.Id, cancellationToken);
+            int userId = user.id;
+            await EnsureWalletExists(connection, userId, cancellationToken);
 
             var balance = await connection.ExecuteScalarAsync<decimal?>(new CommandDefinition(
                 "SELECT COALESCE(balance, 0.00) FROM wallets WHERE user_id = @userId LIMIT 1;",
-                new { userId = user.Id },
+                new { userId },
                 cancellationToken: cancellationToken)) ?? 0m;
 
             return Ok(Success("Wallet fetched successfully.", new WalletSummaryDto
@@ -49,14 +61,7 @@ public sealed class CustomerController(
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to fetch wallet for identifier {Identifier}: {ExceptionMessage}", identifier, ex.Message);
-            // For debugging: include error details in development
-            var errorMsg = "Internal server error while fetching wallet.";
-            if (ex.InnerException != null)
-            {
-                errorMsg += $" ({ex.InnerException.Message})";
-                logger.LogError(ex.InnerException, "Inner exception for wallet fetch");
-            }
-            return StatusCode(StatusCodes.Status500InternalServerError, Failure(errorMsg));
+            return StatusCode(StatusCodes.Status500InternalServerError, Failure("Internal server error while fetching wallet."));
         }
     }
 
