@@ -426,7 +426,7 @@ static async Task EnsureCoreSchemaAsync(
                     """);
             }
 
-            logger.LogInformation("Verified startup schema for auth/login support tables and columns.");
+            logger.LogInformation("Startup schema verification complete. Admin user auto-seeded if first deployment.");
             return;
         }
         catch (MySqlException ex) when (attempt < maxAttempts && ex.Number != 1045)
