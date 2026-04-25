@@ -8,7 +8,6 @@ import '../../core/widgets/animated_reveal.dart';
 import '../../core/widgets/app_async_view.dart';
 import '../../core/widgets/app_empty_state.dart';
 import '../../core/widgets/gradient_header.dart';
-import '../../core/widgets/network_food_image.dart';
 import '../../core/widgets/shimmer_loader.dart';
 import '../../data/models/canteen.dart';
 import '../../data/models/menu_item.dart';
@@ -256,63 +255,6 @@ class _MenuCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            // Image
-            Stack(
-              children: <Widget>[
-                NetworkFoodImage(
-                  imageUrl: item.imageUrl,
-                  fallbackAsset: 'assets/images/Restaurants.jpg',
-                  height: 170,
-                  borderRadius: BorderRadius.zero,
-                ),
-                if (item.isVegetarian)
-                  Positioned(
-                    top: 10,
-                    left: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.success,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          const Icon(Icons.eco_rounded,
-                              size: 11, color: Colors.white),
-                          const SizedBox(width: 3),
-                          Text(
-                            'Veg',
-                            style: AppTypography.labelSm
-                                .copyWith(color: Colors.white),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                if (!item.isAvailable)
-                  Positioned.fill(
-                    child: Container(
-                      color: Colors.black.withValues(alpha: 0.45),
-                      alignment: Alignment.center,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.60),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          'Unavailable',
-                          style: AppTypography.label
-                              .copyWith(color: Colors.white),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
             // Info
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
