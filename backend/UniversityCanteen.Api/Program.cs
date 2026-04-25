@@ -347,6 +347,16 @@ static async Task EnsureCoreSchemaAsync(
             KEY ix_wallet_transactions_user (user_id),
             KEY ix_wallet_transactions_created (created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS website_maintenance (
+            id INT NOT NULL AUTO_INCREMENT,
+            is_active TINYINT(1) NOT NULL DEFAULT 0,
+            maintenance_message TEXT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
         """
     };
 
@@ -404,6 +414,16 @@ static async Task EnsureCoreSchemaAsync(
                         email = seedAdminEmail,
                         password = adminPasswordHash
                     });
+            }
+
+            var maintenanceCount = await connection.ExecuteScalarAsync<int>("SELECT COUNT(1) FROM website_maintenance;");
+            if (maintenanceCount == 0)
+            {
+                await connection.ExecuteAsync(
+                    """
+                    INSERT INTO website_maintenance (id, is_active, maintenance_message, created_at, updated_at)
+                    VALUES (1, 0, NULL, UTC_TIMESTAMP(), UTC_TIMESTAMP());
+                    """);
             }
 
             logger.LogInformation("Verified startup schema for auth/login support tables and columns.");
