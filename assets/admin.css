@@ -1,0 +1,54 @@
+/* Central admin stylesheet - fallback when Tailwind isn't available */
+:root{--bg:#fff4f6;--card:#ffffff;--muted:#7e4d61;--accent:#4a2134;--accent-2:#b70049;--line:#d89cb4}
+body{font-family:"Be Vietnam Pro",Arial,Helvetica,sans-serif;margin:0;padding:0;background:var(--bg);color:var(--accent)}
+.max-w-6xl{max-width:72rem;margin-left:auto;margin-right:auto}
+.mx-auto{margin-left:auto;margin-right:auto}
+.p-4{padding:1rem}
+.flex{display:flex}
+.items-center{align-items:center}
+.justify-between{justify-content:space-between}
+.mb-6{margin-bottom:1.5rem}
+.text-2xl{font-size:1.5rem}
+.font-semibold{font-weight:600}
+.text-gray-800{color:var(--accent-2)}
+.text-sm{font-size:0.9rem}
+.text-gray-600{color:var(--muted)}
+.text-blue-600{color:var(--accent-2)}
+.hover\:underline:hover{text-decoration:underline}
+
+/* Card / table fallback */
+.overflow-x-auto{overflow-x:auto}
+.bg-white{background:#fff}
+.shadow{box-shadow:0 1px 3px rgba(74,33,52,0.12)}
+.rounded{border-radius:8px}
+.min-w-full{width:100%}
+table{border-collapse:collapse;width:100%}
+thead{background:#f9fafb}
+th,td{padding:8px;border-bottom:1px solid var(--line);text-align:left}
+th{font-size:0.75rem;color:#6b7280;text-transform:uppercase}
+.text-xs{font-size:0.75rem}
+.text-gray-500{color:var(--muted)}
+.text-gray-700{color:var(--accent)}
+.px-6{padding-left:1.5rem;padding-right:1.5rem}
+.py-4{padding-top:1rem;padding-bottom:1rem}
+.whitespace-nowrap{white-space:nowrap}
+.whitespace-normal{white-space:normal}
+.inline-flex{display:inline-flex}
+.items-center{align-items:center}
+.px-3{padding-left:0.75rem;padding-right:0.75rem}
+.py-1{padding-top:0.25rem;padding-bottom:0.25rem}
+.bg-red-600{background:#b31b25}
+.hover\:bg-red-700:hover{background:#90131b}
+.text-white{color:#fff}
+.rounded{border-radius:6px}
+
+/* Form fallback */
+.card{background:var(--card);border-radius:8px;padding:20px;box-shadow:0 1px 3px rgba(74,33,52,0.12)}
+label{display:block;margin-top:12px;font-weight:600}
+.field{width:100%;padding:10px;border:1px solid var(--line);border-radius:6px;margin-top:6px;box-sizing:border-box}
+.actions{margin-top:16px}
+.btn{display:inline-block;padding:10px 14px;background:var(--accent-2);color:#fff;border-radius:6px;border:none;cursor:pointer}
+.muted{color:var(--muted);font-size:14px}
+.msg-success{color:green;margin-top:12px}
+
+@media (max-width:640px){.card{padding:16px}}
