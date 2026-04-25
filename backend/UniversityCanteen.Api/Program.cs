@@ -1,8 +1,10 @@
 using Dapper;
 using Scalar.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.IdentityModel.Tokens;
 using MySqlConnector;
+using System.IO.Compression;
 using System.Net;
 using System.Text;
 using UniversityCanteen.Api.Configuration;
@@ -66,6 +68,25 @@ var failOnSchemaInitError = builder.Configuration
     .GetValue<bool?>("Startup:FailOnSchemaInitError") ?? false;
 
 builder.Services.AddCors();
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<GzipCompressionProvider>();
+});
+builder.Services.Configure<GzipCompressionProviderOptions>(options =>
+{
+    options.Level = System.IO.Compression.CompressionLevel.Fastest;
+});
+builder.Services.AddOutputCache(options =>
+{
+    options.AddBasePolicy(builder =>
+    {
+        builder.Expire(TimeSpan.FromSeconds(30))
+               .WithExcludeQueryKeys("token");
+    }, excludeUrls: new[] { "/api/auth", "/api/orders", "/api/customer", "/api/canteen-admin/login" });
+    options.AddPolicy("StaticContent", builder =>
+        builder.Expire(TimeSpan.FromMinutes(10)));
+});
 
 var app = builder.Build();
 
@@ -76,13 +97,24 @@ await EnsureCoreSchemaAsync(app.Services, app.Logger, app.Configuration, failOnS
 app.MapOpenApi();
 app.MapScalarApiReference();
 
+app.UseResponseCompression();
 app.UseCors(policy =>
     policy.AllowAnyOrigin()
           .AllowAnyMethod()
           .AllowAnyHeader());
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        ctx.Context.Response.Headers["Cache-Control"] = "public, max-age=604800";
+    }
+});
+app.UseOutputCache();
 app.UseAuthentication();
 app.UseAuthorization();
+
+var maintenanceStateCache = new MaintenanceStateCache();
+app.Services.AddSingleton<IMaintenanceStateCache>(maintenanceStateCache);
 
 app.Use(async (context, next) =>
 {
@@ -95,36 +127,25 @@ app.Use(async (context, next) =>
         return;
     }
 
-    try
+    var cache = context.RequestServices.GetRequiredService<IMaintenanceStateCache>();
+    var state = await cache.GetMaintenanceStateAsync(
+        () => GetMaintenanceStateFromDatabaseAsync(context.RequestServices));
+
+    if (state?.IsActive == true)
     {
-        using var scope = context.RequestServices.CreateScope();
-        var dbConnectionFactory = scope.ServiceProvider.GetRequiredService<IDbConnectionFactory>();
-        using var connection = dbConnectionFactory.CreateConnection();
+        var message = string.IsNullOrWhiteSpace(state.Message)
+            ? "System-wide maintenance is active. Please try again later."
+            : state.Message;
 
-        var state = await connection.QuerySingleOrDefaultAsync<SystemMaintenanceState>(new CommandDefinition(
-            "SELECT COALESCE(is_active, 0) AS IsActive, COALESCE(maintenance_message, '') AS Message FROM website_maintenance WHERE id = 1 LIMIT 1;",
-            cancellationToken: context.RequestAborted));
-
-        if (state?.IsActive == true)
+        context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsJsonAsync(new
         {
-            var message = string.IsNullOrWhiteSpace(state.Message)
-                ? "System-wide maintenance is active. Please try again later."
-                : state.Message;
-
-            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-            context.Response.ContentType = "application/json";
-            await context.Response.WriteAsJsonAsync(new
-            {
-                success = false,
-                message,
-                maintenance = true
-            }, context.RequestAborted);
-            return;
-        }
-    }
-    catch (Exception ex)
-    {
-        app.Logger.LogWarning(ex, "Failed to evaluate maintenance status. Allowing request to continue.");
+            success = false,
+            message,
+            maintenance = true
+        }, context.RequestAborted);
+        return;
     }
 
     await next();
@@ -815,6 +836,60 @@ static bool IsLocalDatabaseHost(string host)
         || string.Equals(host, "0.0.0.0", StringComparison.OrdinalIgnoreCase)
         || string.Equals(host, "::1", StringComparison.OrdinalIgnoreCase)
         || string.Equals(host, "host.docker.internal", StringComparison.OrdinalIgnoreCase);
+}
+
+static async Task<SystemMaintenanceState?> GetMaintenanceStateFromDatabaseAsync(IServiceProvider services)
+{
+    try
+    {
+        using var scope = services.CreateScope();
+        var dbConnectionFactory = scope.ServiceProvider.GetRequiredService<IDbConnectionFactory>();
+        using var connection = dbConnectionFactory.CreateConnection();
+
+        var state = await connection.QuerySingleOrDefaultAsync<SystemMaintenanceState>(new CommandDefinition(
+            "SELECT COALESCE(is_active, 0) AS IsActive, COALESCE(maintenance_message, '') AS Message FROM website_maintenance WHERE id = 1 LIMIT 1;",
+            cancellationToken: CancellationToken.None));
+
+        return state ?? new SystemMaintenanceState { IsActive = false, Message = string.Empty };
+    }
+    catch (Exception)
+    {
+        return new SystemMaintenanceState { IsActive = false, Message = string.Empty };
+    }
+}
+
+file interface IMaintenanceStateCache
+{
+    Task<SystemMaintenanceState?> GetMaintenanceStateAsync(Func<Task<SystemMaintenanceState?>> factory);
+}
+
+file sealed class MaintenanceStateCache : IMaintenanceStateCache
+{
+    private SystemMaintenanceState? _cachedState;
+    private DateTime _cacheExpiry = DateTime.MinValue;
+    private readonly TimeSpan _cacheDuration = TimeSpan.FromSeconds(30);
+    private readonly object _lock = new();
+
+    public async Task<SystemMaintenanceState?> GetMaintenanceStateAsync(Func<Task<SystemMaintenanceState?>> factory)
+    {
+        lock (_lock)
+        {
+            if (DateTime.UtcNow < _cacheExpiry && _cachedState != null)
+            {
+                return _cachedState;
+            }
+        }
+
+        var state = await factory();
+
+        lock (_lock)
+        {
+            _cachedState = state;
+            _cacheExpiry = DateTime.UtcNow.Add(_cacheDuration);
+        }
+
+        return state;
+    }
 }
 
 file sealed class SystemMaintenanceState
