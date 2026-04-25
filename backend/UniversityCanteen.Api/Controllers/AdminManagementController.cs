@@ -2126,6 +2126,16 @@ public sealed class AdminManagementController(
     [HttpGet("deploy-test")]
     public IActionResult DeployTest() => Ok(new { status = "deployed_v2" });
 
+    [HttpGet("check-schema")]
+    public async Task<IActionResult> CheckSchema()
+    {
+        using var connection = dbConnectionFactory.CreateConnection();
+        var categories = await connection.QueryAsync<dynamic>("SELECT id, name FROM menu_categories;");
+        var canteens = await connection.QueryAsync<dynamic>("SELECT id, name FROM canteens;");
+        var menuCount = await connection.QuerySingleAsync<int>("SELECT COUNT(*) FROM menu_items;");
+        return Ok(new { categories = categories.ToList(), canteens = canteens.ToList(), menuItemsCount = menuCount });
+    }
+
     [HttpPost("reset-menu")]
     public async Task<IActionResult> ResetMenu()
     {
