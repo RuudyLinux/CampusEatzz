@@ -14,8 +14,12 @@ import '../../core/widgets/notification_bell_button.dart';
 import '../../core/widgets/shimmer_loader.dart';
 import '../../data/models/canteen.dart';
 import '../../data/models/menu_item.dart';
+import '../../data/models/recommendation_item.dart';
+import '../../state/auth_provider.dart';
 import '../../state/canteen_provider.dart';
 import '../../state/cart_provider.dart';
+import '../../state/recommendation_provider.dart';
+import '../chat/chatbot_screen.dart';
 import '../contact/contact_us_screen.dart';
 import '../menu/menu_screen.dart';
 
@@ -31,25 +35,37 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final provider = context.read<CanteenProvider>();
-      await provider.loadCanteens();
+      final canteenProvider = context.read<CanteenProvider>();
+      final recProvider = context.read<RecommendationProvider>();
+      final userId = context.read<AuthProvider>().session?.id ?? 0;
+      await canteenProvider.loadCanteens();
       if (!mounted) return;
-      for (final canteen in provider.canteens) {
-        await provider.loadMenu(canteen.id);
+      for (final canteen in canteenProvider.canteens) {
+        await canteenProvider.loadMenu(canteen.id);
         if (!mounted) return;
       }
+      await recProvider.loadAll(userId: userId);
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final canteenState = context.watch<CanteenProvider>();
+    final recState = context.watch<RecommendationProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
     final greeting = _greeting();
 
     return Scaffold(
       bottomNavigationBar: const CustomerBottomNav(current: CustomerTab.home),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _openChatbot,
+        backgroundColor: isDark ? AppColors.darkCard : AppColors.primary,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.smart_toy_rounded),
+        label: const Text('AI Assistant'),
+        elevation: 4,
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: Column(
         children: <Widget>[
           GradientHeader(
@@ -64,10 +80,16 @@ class _HomeScreenState extends State<HomeScreen> {
               onRetry: () => context.read<CanteenProvider>().loadCanteens(),
               skeleton: const _HomeSkeleton(),
               child: RefreshIndicator(
-                onRefresh: () =>
-                    context.read<CanteenProvider>().loadCanteens(),
+                onRefresh: () async {
+                  final canteenProvider = context.read<CanteenProvider>();
+                  final recProvider = context.read<RecommendationProvider>();
+                  final userId = context.read<AuthProvider>().session?.id ?? 0;
+                  await canteenProvider.loadCanteens();
+                  if (!mounted) return;
+                  await recProvider.loadAll(userId: userId);
+                },
                 child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
                   children: <Widget>[
                     AnimatedReveal(
                         delayMs: 60, child: _HeroBanner(isDark: isDark)),
@@ -75,8 +97,53 @@ class _HomeScreenState extends State<HomeScreen> {
                     AnimatedReveal(
                         delayMs: 130, child: _FeatureRow(isDark: isDark)),
                     const SizedBox(height: 24),
+                    // AI Recommendations — "Recommended For You"
+                    if (recState.personal != null &&
+                        recState.personal!.items.isNotEmpty)
+                      AnimatedReveal(
+                        delayMs: 170,
+                        child: _RecommendationSection(
+                          section: recState.personal!,
+                          isDark: isDark,
+                          icon: Icons.auto_awesome_rounded,
+                          iconColor: AppColors.accent,
+                        ),
+                      ),
+                    if (recState.personal != null &&
+                        recState.personal!.items.isNotEmpty)
+                      const SizedBox(height: 24),
+                    // AI Recommendations — Trending Now
+                    if (recState.trending != null &&
+                        recState.trending!.items.isNotEmpty)
+                      AnimatedReveal(
+                        delayMs: 200,
+                        child: _RecommendationSection(
+                          section: recState.trending!,
+                          isDark: isDark,
+                          icon: Icons.local_fire_department_rounded,
+                          iconColor: AppColors.warning,
+                        ),
+                      ),
+                    if (recState.trending != null &&
+                        recState.trending!.items.isNotEmpty)
+                      const SizedBox(height: 24),
+                    // Budget Meals
+                    if (recState.budgetMeals != null &&
+                        recState.budgetMeals!.items.isNotEmpty)
+                      AnimatedReveal(
+                        delayMs: 230,
+                        child: _RecommendationSection(
+                          section: recState.budgetMeals!,
+                          isDark: isDark,
+                          icon: Icons.savings_rounded,
+                          iconColor: AppColors.success,
+                        ),
+                      ),
+                    if (recState.budgetMeals != null &&
+                        recState.budgetMeals!.items.isNotEmpty)
+                      const SizedBox(height: 24),
                     AnimatedReveal(
-                      delayMs: 200,
+                      delayMs: 260,
                       child: _CanteenSection(
                         canteens: canteenState.canteens,
                         isDark: isDark,
@@ -85,14 +152,22 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 24),
                     AnimatedReveal(
-                        delayMs: 270,
+                        delayMs: 310,
                         child: _TrendingSection(
                           isDark: isDark,
                           items: canteenState.allItems.take(6).toList(),
                         )),
                     const SizedBox(height: 20),
                     AnimatedReveal(
-                      delayMs: 340,
+                      delayMs: 360,
+                      child: _AiChatBannerSection(
+                        isDark: isDark,
+                        onTap: _openChatbot,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    AnimatedReveal(
+                      delayMs: 400,
                       child: _ContactUsPromptSection(
                         isDark: isDark,
                         onTap: _openContactUs,
@@ -114,6 +189,12 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (_) =>
             MenuScreen(canteenId: canteen.id, canteenName: canteen.name),
       ),
+    );
+  }
+
+  void _openChatbot() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const ChatbotScreen()),
     );
   }
 
@@ -618,6 +699,252 @@ class _TrendingSection extends StatelessWidget {
     );
   }
 }
+
+// ── AI Recommendation Section ─────────────────────────────────────────────────
+
+class _RecommendationSection extends StatelessWidget {
+  const _RecommendationSection({
+    required this.section,
+    required this.isDark,
+    required this.icon,
+    required this.iconColor,
+  });
+
+  final RecommendationSection section;
+  final bool isDark;
+  final IconData icon;
+  final Color iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Row(
+          children: <Widget>[
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: isDark ? 0.18 : 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 16, color: iconColor),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    section.title,
+                    style: AppTypography.heading3.copyWith(
+                      color: isDark
+                          ? AppColors.darkTextPrimary
+                          : AppColors.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    section.subtitle,
+                    style: AppTypography.caption.copyWith(
+                      color: isDark
+                          ? AppColors.darkTextMuted
+                          : AppColors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 220,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: section.items.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final item = section.items[index];
+              return SizedBox(
+                width: 158,
+                child: Card(
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      NetworkFoodImage(
+                        imageUrl: item.imageUrl,
+                        fallbackAsset: 'assets/images/Restaurants.jpg',
+                        width: double.infinity,
+                        height: 95,
+                        borderRadius: BorderRadius.zero,
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              item.name,
+                              style: AppTypography.label.copyWith(
+                                color: isDark
+                                    ? AppColors.darkTextPrimary
+                                    : AppColors.textPrimary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              formatInr(item.price),
+                              style: AppTypography.priceSm.copyWith(
+                                color: isDark
+                                    ? AppColors.primaryOnDark
+                                    : AppColors.primary,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              item.reason,
+                              style: AppTypography.caption.copyWith(
+                                color: iconColor,
+                                fontSize: 10,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 6),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: item.isAvailable
+                                    ? () async {
+                                        // Add to cart via cart provider
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(SnackBar(
+                                          content: Text(
+                                              'Browse ${item.canteenName} to add ${item.name}'),
+                                          duration:
+                                              const Duration(seconds: 2),
+                                        ));
+                                      }
+                                    : null,
+                                icon: const Icon(Icons.storefront_rounded,
+                                    size: 12),
+                                label: Text(
+                                  item.canteenName.split(' ').first,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 5),
+                                  minimumSize: const Size(0, 28),
+                                  textStyle: const TextStyle(fontSize: 11),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── AI Chat Banner ──────────────────────────────────────────────────────────���─
+
+class _AiChatBannerSection extends StatelessWidget {
+  const _AiChatBannerSection({required this.isDark, required this.onTap});
+
+  final bool isDark;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: isDark
+                  ? <Color>[
+                      AppColors.accent.withValues(alpha: 0.3),
+                      AppColors.primary.withValues(alpha: 0.2),
+                    ]
+                  : <Color>[
+                      AppColors.accent.withValues(alpha: 0.08),
+                      AppColors.primary.withValues(alpha: 0.06),
+                    ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: <Widget>[
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  gradient: isDark
+                      ? AppColors.darkHeaderGradient
+                      : AppColors.primaryGradient,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.smart_toy_rounded,
+                  color: Colors.white,
+                  size: 26,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Ask CampusEatzz AI',
+                      style: AppTypography.heading3.copyWith(
+                        color: isDark
+                            ? AppColors.darkTextPrimary
+                            : AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '"Suggest food under ₹100" or "What\'s popular today?"',
+                      style: AppTypography.caption.copyWith(
+                        color: isDark
+                            ? AppColors.darkTextMuted
+                            : AppColors.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_rounded,
+                size: 18,
+                color: isDark ? AppColors.primaryOnDark : AppColors.primary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Contact Us Section ────────────────────────────────────────────────────────
 
 class _ContactUsPromptSection extends StatelessWidget {
   const _ContactUsPromptSection({

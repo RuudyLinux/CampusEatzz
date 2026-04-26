@@ -2,6 +2,7 @@ using Dapper;
 using Scalar.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.IdentityModel.Tokens;
 using MySqlConnector;
 using System.IO.Compression;
@@ -20,6 +21,7 @@ builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptio
 builder.Services.Configure<OtpOptions>(builder.Configuration.GetSection(OtpOptions.SectionName));
 builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection(SmtpOptions.SectionName));
 builder.Services.Configure<FcmOptions>(builder.Configuration.GetSection(FcmOptions.SectionName));
+builder.Services.Configure<AiOptions>(builder.Configuration.GetSection(AiOptions.SectionName));
 
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
 var jwtSecret = JwtTokenService.ResolveSecret(jwtOptions.Secret);
@@ -63,6 +65,19 @@ if (notificationSchedulerEnabled)
 {
     builder.Services.AddHostedService<NotificationSchedulerHostedService>();
 }
+
+// AI + Recommendation services
+var aiOptions = builder.Configuration.GetSection(AiOptions.SectionName).Get<AiOptions>() ?? new AiOptions();
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient("Anthropic", client =>
+{
+    client.BaseAddress = new Uri("https://api.anthropic.com/");
+    client.DefaultRequestHeaders.Add("x-api-key", aiOptions.AnthropicApiKey);
+    client.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+builder.Services.AddScoped<IAiChatService, AiChatService>();
+builder.Services.AddScoped<IRecommendationService, RecommendationService>();
 
 var failOnSchemaInitError = builder.Configuration
     .GetValue<bool?>("Startup:FailOnSchemaInitError") ?? false;
@@ -373,6 +388,31 @@ static async Task EnsureCoreSchemaAsync(
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS chatbot_conversations (
+            id VARCHAR(100) NOT NULL,
+            user_id INT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY ix_chatbot_conversations_user (user_id),
+            KEY ix_chatbot_conversations_updated (updated_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS chatbot_messages (
+            id BIGINT NOT NULL AUTO_INCREMENT,
+            conversation_id VARCHAR(100) NOT NULL,
+            role ENUM('user', 'assistant') NOT NULL,
+            content TEXT NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY ix_chatbot_messages_conversation (conversation_id),
+            CONSTRAINT fk_chatbot_messages_conversation
+                FOREIGN KEY (conversation_id) REFERENCES chatbot_conversations(id)
+                ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         """
     };
 

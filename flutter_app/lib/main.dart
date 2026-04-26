@@ -7,15 +7,19 @@ import 'data/services/app_preferences.dart';
 import 'data/services/auth_service.dart';
 import 'data/services/canteen_service.dart';
 import 'data/services/canteen_admin_service.dart';
+import 'data/services/chat_service.dart';
 import 'data/services/customer_service.dart';
 import 'data/services/push_notification_service.dart';
+import 'data/services/recommendation_service.dart';
 import 'features/auth/bootstrap_screen.dart';
 import 'features/notifications/notification_navigation.dart';
 import 'state/auth_provider.dart';
 import 'state/canteen_provider.dart';
 import 'state/cart_provider.dart';
+import 'state/chat_provider.dart';
 import 'state/notification_provider.dart';
 import 'state/orders_provider.dart';
+import 'state/recommendation_provider.dart';
 import 'state/wallet_provider.dart';
 
 void main() {
@@ -36,6 +40,10 @@ class CampusEatzzApp extends StatelessWidget {
         Provider<CanteenService>(create: (context) => CanteenService(context.read<ApiClient>())),
         Provider<CanteenAdminService>(create: (context) => CanteenAdminService(context.read<ApiClient>())),
         Provider<CustomerService>(create: (context) => CustomerService(context.read<ApiClient>())),
+        Provider<ChatService>(create: (context) => ChatService(context.read<ApiClient>())),
+        Provider<RecommendationService>(
+          create: (context) => RecommendationService(context.read<ApiClient>()),
+        ),
         Provider<PushNotificationService>(
           create: (context) => PushNotificationService(context.read<ApiClient>()),
         ),
@@ -53,6 +61,13 @@ class CampusEatzzApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<OrdersProvider>(
           create: (context) => OrdersProvider(context.read<CustomerService>()),
+        ),
+        ChangeNotifierProvider<ChatProvider>(
+          create: (context) => ChatProvider(context.read<ChatService>()),
+        ),
+        ChangeNotifierProvider<RecommendationProvider>(
+          create: (context) =>
+              RecommendationProvider(context.read<RecommendationService>()),
         ),
         ChangeNotifierProxyProvider<AuthProvider, NotificationProvider>(
           create: (context) => NotificationProvider(context.read<PushNotificationService>()),
