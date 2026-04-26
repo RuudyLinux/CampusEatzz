@@ -38,8 +38,12 @@ class ApiClient {
     String? bearerTokenOverride,
   }) async {
     final savedBase = await _preferences.getApiBase();
-    final candidates = ApiConfig.allBaseUrls(savedBase);
+    final allCandidates = ApiConfig.allBaseUrls(savedBase);
     final normalizedPath = path.startsWith('/') ? path : '/$path';
+
+    // FormData is consumed (finalized) after first send — never retry with fallback URLs.
+    // Multipart uploads must only attempt the primary/saved base.
+    final candidates = data is FormData ? [allCandidates.first] : allCandidates;
 
     Object? lastError;
     Response<dynamic>? lastFallbackResponse;
