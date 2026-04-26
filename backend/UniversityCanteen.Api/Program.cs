@@ -268,6 +268,9 @@ static async Task EnsureCoreSchemaAsync(
         // Ensure id has AUTO_INCREMENT (may be missing if DB was not seeded from full SQL file)
         "ALTER TABLE menu_items ADD PRIMARY KEY (id);",
         "ALTER TABLE menu_items MODIFY id INT NOT NULL AUTO_INCREMENT;",
+        // Ensure order_items.id has AUTO_INCREMENT
+        "ALTER TABLE order_items ADD PRIMARY KEY (id);",
+        "ALTER TABLE order_items MODIFY id INT NOT NULL AUTO_INCREMENT;",
         """
         CREATE TABLE IF NOT EXISTS system_settings (
             id INT NOT NULL AUTO_INCREMENT,
