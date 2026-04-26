@@ -47,6 +47,7 @@ class OrderItem {
     required this.quantity,
     required this.unitPrice,
     required this.totalPrice,
+    required this.imageUrl,
   });
 
   final int id;
@@ -55,6 +56,7 @@ class OrderItem {
   final int quantity;
   final double unitPrice;
   final double totalPrice;
+  final String imageUrl;
 
   factory OrderItem.fromJson(Map<String, dynamic> json) {
     return OrderItem(
@@ -64,6 +66,7 @@ class OrderItem {
       quantity: _asInt(json['quantity']),
       unitPrice: _asDouble(json['unitPrice']),
       totalPrice: _asDouble(json['totalPrice']),
+      imageUrl: (json['imageUrl'] ?? '').toString(),
     );
   }
 }

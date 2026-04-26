@@ -8,6 +8,7 @@ import '../../core/widgets/animated_reveal.dart';
 import '../../core/widgets/app_empty_state.dart';
 import '../../core/widgets/app_status_badge.dart';
 import '../../core/widgets/gradient_header.dart';
+import '../../core/widgets/network_food_image.dart';
 import '../../core/widgets/shimmer_loader.dart';
 import '../../data/models/order_models.dart';
 import '../../state/auth_provider.dart';
@@ -134,22 +135,32 @@ class OrderDetailsScreen extends StatelessWidget {
                               padding: const EdgeInsets.only(bottom: 10),
                               child: Row(
                                 children: <Widget>[
-                                  Container(
-                                    width: 36,
-                                    height: 36,
-                                    decoration: BoxDecoration(
-                                      color: isDark
-                                          ? AppColors.darkSurface
-                                          : AppColors.bgSoft,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Icon(
-                                      Icons.fastfood_rounded,
-                                      size: 18,
-                                      color: isDark
-                                          ? AppColors.darkTextMuted
-                                          : AppColors.textMuted,
-                                    ),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: item.imageUrl.isNotEmpty
+                                        ? NetworkFoodImage(
+                                            imageUrl: item.imageUrl,
+                                            fallbackAsset:
+                                                'assets/images/Restaurants.jpg',
+                                            foodName: item.itemName,
+                                            width: 48,
+                                            height: 48,
+                                            borderRadius: BorderRadius.zero,
+                                          )
+                                        : Container(
+                                            width: 48,
+                                            height: 48,
+                                            color: isDark
+                                                ? AppColors.darkSurface
+                                                : AppColors.bgSoft,
+                                            child: Icon(
+                                              Icons.fastfood_rounded,
+                                              size: 22,
+                                              color: isDark
+                                                  ? AppColors.darkTextMuted
+                                                  : AppColors.textMuted,
+                                            ),
+                                          ),
                                   ),
                                   const SizedBox(width: 10),
                                   Expanded(

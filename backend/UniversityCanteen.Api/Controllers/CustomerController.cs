@@ -360,8 +360,10 @@ public sealed class CustomerController(
                     COALESCE(oi.item_name, 'Item') AS ItemName,
                     COALESCE(oi.quantity, 1) AS Quantity,
                     COALESCE(oi.unit_price, 0.00) AS UnitPrice,
-                    COALESCE(oi.total_price, 0.00) AS TotalPrice
+                    COALESCE(oi.total_price, 0.00) AS TotalPrice,
+                    COALESCE(mi.image_url, '') AS ImageUrl
                 FROM order_items oi
+                LEFT JOIN menu_items mi ON mi.id = oi.menu_item_id
                 WHERE oi.order_id = @orderId
                 ORDER BY oi.id ASC;
                 """,
@@ -398,7 +400,8 @@ public sealed class CustomerController(
                     ItemName = item.ItemName,
                     Quantity = item.Quantity,
                     UnitPrice = Math.Round(item.UnitPrice, 2, MidpointRounding.AwayFromZero),
-                    TotalPrice = Math.Round(item.TotalPrice, 2, MidpointRounding.AwayFromZero)
+                    TotalPrice = Math.Round(item.TotalPrice, 2, MidpointRounding.AwayFromZero),
+                    ImageUrl = item.ImageUrl
                 }).ToList(),
                 StatusHistory = historyRows.Select(history => new OrderStatusHistoryDto
                 {
@@ -1247,6 +1250,7 @@ public sealed class CustomerController(
         public int Quantity { get; init; }
         public decimal UnitPrice { get; init; }
         public decimal TotalPrice { get; init; }
+        public string ImageUrl { get; init; } = string.Empty;
     }
 
     private sealed class OrderHistoryRow
@@ -1284,6 +1288,7 @@ public sealed class CustomerController(
         public int Quantity { get; init; }
         public decimal UnitPrice { get; init; }
         public decimal TotalPrice { get; init; }
+        public string ImageUrl { get; init; } = string.Empty;
     }
 
     private sealed class OrderStatusHistoryDto

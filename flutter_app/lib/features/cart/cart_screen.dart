@@ -23,9 +23,14 @@ class CartScreen extends StatelessWidget {
     return Scaffold(
       body: Column(
         children: <Widget>[
-          const GradientHeader(
+          GradientHeader(
             title: 'Your Cart',
             subtitle: 'Review items before checkout',
+            showLogo: false,
+            trailing: IconButton(
+              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
           ),
           Expanded(
             child: cart.items.isEmpty
