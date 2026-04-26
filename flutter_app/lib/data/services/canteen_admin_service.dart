@@ -131,9 +131,7 @@ class CanteenAdminService {
           filename: fileName,
         ),
       }),
-      headers: <String, dynamic>{
-        'Content-Type': 'multipart/form-data',
-      },
+      // No Content-Type override — Dio sets multipart/form-data; boundary=... automatically.
     );
 
     final data = _extractData(response);
