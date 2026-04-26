@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Data;
 using System.Data.Common;
 using UniversityCanteen.Api.Data;
+using UniversityCanteen.Api.Services;
 
 namespace UniversityCanteen.Api.Controllers;
 
@@ -11,6 +12,7 @@ namespace UniversityCanteen.Api.Controllers;
 [Route("api/customer")]
 public sealed class CustomerController(
     IDbConnectionFactory dbConnectionFactory,
+    INotificationService notificationService,
     ILogger<CustomerController> logger) : ControllerBase
 {
     [Authorize]
@@ -610,6 +612,28 @@ public sealed class CustomerController(
             }
 
             await transaction.CommitAsync(cancellationToken);
+
+            // Fire-and-forget notifications (don't fail the order if notification fails)
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await notificationService.NotifyNewOrderAsync(new NotificationNewOrderRequest
+                    {
+                        OrderId = orderId,
+                        OrderNumber = orderNumber,
+                        UserId = user.Id,
+                        UserRole = "student",
+                        CustomerName = user.Name,
+                        Total = total,
+                        CanteenId = request.CanteenId is > 0 ? request.CanteenId : null,
+                    }, CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Failed to send order notifications for order {OrderNumber}.", orderNumber);
+                }
+            }, CancellationToken.None);
 
             var response = new
             {

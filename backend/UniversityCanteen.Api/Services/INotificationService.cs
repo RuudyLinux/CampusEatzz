@@ -23,6 +23,8 @@ public interface INotificationService
 
     Task NotifyOrderStatusAsync(NotificationOrderStatusRequest request, CancellationToken cancellationToken);
 
+    Task NotifyNewOrderAsync(NotificationNewOrderRequest request, CancellationToken cancellationToken);
+
     Task NotifySystemMaintenanceAsync(
         bool isActive,
         string message,
@@ -92,4 +94,15 @@ public sealed class NotificationOrderStatusRequest
     public int? EstimatedTime { get; init; }
     public int ChangedByUserId { get; init; }
     public string ChangedByRole { get; init; } = "canteen_admin";
+}
+
+public sealed class NotificationNewOrderRequest
+{
+    public long OrderId { get; init; }
+    public string OrderNumber { get; init; } = string.Empty;
+    public int UserId { get; init; }
+    public string UserRole { get; init; } = "student";
+    public string CustomerName { get; init; } = string.Empty;
+    public decimal Total { get; init; }
+    public int? CanteenId { get; init; }
 }

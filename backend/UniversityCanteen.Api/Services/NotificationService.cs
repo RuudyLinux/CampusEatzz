@@ -191,7 +191,22 @@ public sealed class NotificationService(
         var payloadJson = JsonSerializer.Serialize(request.Data ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
 
         using var connection = dbConnectionFactory.CreateConnection();
-        var notificationId = await connection.ExecuteScalarAsync<long>(new CommandDefinition(
+        var insertParams = new
+        {
+            notificationType = normalizedType,
+            title = request.Title.Trim(),
+            message = request.Message.Trim(),
+            payloadJson,
+            targetScope = normalizedScope,
+            targetUserId = request.TargetUserId,
+            targetRole = string.IsNullOrWhiteSpace(normalizedTargetRole) ? null : normalizedTargetRole,
+            targetCanteenId = request.TargetCanteenId,
+            scheduledForUtc,
+            status = shouldSchedule ? "scheduled" : "pending",
+            createdByUserId = request.CreatedByUserId <= 0 ? (int?)null : request.CreatedByUserId,
+            createdByRole = string.IsNullOrWhiteSpace(normalizedCreatorRole) ? null : normalizedCreatorRole
+        };
+        await connection.ExecuteAsync(new CommandDefinition(
             """
             INSERT INTO app_notifications
                 (notification_type, title, message, payload_json, target_scope, target_user_id, target_role, target_canteen_id,
@@ -199,23 +214,16 @@ public sealed class NotificationService(
             VALUES
                 (@notificationType, @title, @message, @payloadJson, @targetScope, @targetUserId, @targetRole, @targetCanteenId,
                  @scheduledForUtc, @status, @createdByUserId, @createdByRole, UTC_TIMESTAMP());
-            SELECT LAST_INSERT_ID();
             """,
-            new
-            {
-                notificationType = normalizedType,
-                title = request.Title.Trim(),
-                message = request.Message.Trim(),
-                payloadJson,
-                targetScope = normalizedScope,
-                targetUserId = request.TargetUserId,
-                targetRole = string.IsNullOrWhiteSpace(normalizedTargetRole) ? null : normalizedTargetRole,
-                targetCanteenId = request.TargetCanteenId,
-                scheduledForUtc,
-                status = shouldSchedule ? "scheduled" : "pending",
-                createdByUserId = request.CreatedByUserId <= 0 ? (int?)null : request.CreatedByUserId,
-                createdByRole = string.IsNullOrWhiteSpace(normalizedCreatorRole) ? null : normalizedCreatorRole
-            },
+            insertParams,
+            cancellationToken: cancellationToken));
+        var notificationId = await connection.ExecuteScalarAsync<long>(new CommandDefinition(
+            """
+            SELECT id FROM app_notifications
+            WHERE title = @title AND target_scope = @targetScope
+            ORDER BY id DESC LIMIT 1;
+            """,
+            new { insertParams.title, insertParams.targetScope },
             cancellationToken: cancellationToken));
 
         if (shouldSchedule)
@@ -682,6 +690,66 @@ public sealed class NotificationService(
         }
 
         return CultureInfo.InvariantCulture.TextInfo.ToTitleCase(normalized.ToLowerInvariant());
+    }
+
+    public async Task NotifyNewOrderAsync(NotificationNewOrderRequest request, CancellationToken cancellationToken)
+    {
+        if (request.OrderId <= 0 || request.UserId <= 0) return;
+
+        var orderRef = (request.OrderNumber ?? string.Empty).Trim();
+        var customerName = (request.CustomerName ?? "Customer").Trim();
+        var total = request.Total;
+        var canteenId = request.CanteenId;
+        var data = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["action"] = "order_details",
+            ["orderRef"] = orderRef,
+            ["orderId"] = request.OrderId.ToString(),
+        };
+
+        // Notify canteen admin about new order
+        if (canteenId is > 0)
+        {
+            try
+            {
+                await CreateOrScheduleAsync(new NotificationCreateRequest
+                {
+                    NotificationType = "new_order",
+                    Title = $"New Order #{orderRef}",
+                    Message = $"{customerName} placed an order — ₹{total:0.00}",
+                    TargetScope = "canteen",
+                    TargetCanteenId = canteenId,
+                    Data = data,
+                    CreatedByUserId = request.UserId,
+                    CreatedByRole = request.UserRole,
+                }, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to notify canteen {CanteenId} of new order {OrderRef}.", canteenId, orderRef);
+            }
+        }
+
+        // Notify customer with order confirmation
+        try
+        {
+            await CreateOrScheduleAsync(new NotificationCreateRequest
+            {
+                NotificationType = "order_placed",
+                Title = "Order Placed!",
+                Message = $"Your order #{orderRef} has been placed successfully. Total: ₹{total:0.00}",
+                TargetScope = "user",
+                TargetUserId = request.UserId,
+                TargetRole = request.UserRole,
+                Data = data,
+                CreatedByUserId = request.UserId,
+                CreatedByRole = request.UserRole,
+            }, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to send order confirmation to user {UserId} for order {OrderRef}.", request.UserId, orderRef);
+        }
     }
 
     public async Task NotifySystemMaintenanceAsync(
