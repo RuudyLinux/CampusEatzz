@@ -13,7 +13,6 @@ import '../../core/widgets/shimmer_loader.dart';
 import '../../data/models/menu_item.dart';
 import '../../state/canteen_provider.dart';
 import '../../state/cart_provider.dart';
-import '../cart/cart_screen.dart';
 
 class MenuScreen extends StatefulWidget {
   const MenuScreen({
@@ -55,7 +54,6 @@ class _MenuScreenState extends State<MenuScreen> {
   @override
   Widget build(BuildContext context) {
     final canteenState = context.watch<CanteenProvider>();
-    final cartState = context.watch<CartProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final menuRows = widget.canteenId == null
@@ -72,8 +70,6 @@ class _MenuScreenState extends State<MenuScreen> {
         : menuRows
             .where((item) => item.category == _selectedCategory)
             .toList(growable: false);
-
-    final cartCount = cartState.totalItems;
 
     return Scaffold(
       body: Column(
@@ -98,10 +94,8 @@ class _MenuScreenState extends State<MenuScreen> {
                       .loadMenu(widget.canteenId!, force: true),
               skeleton: const _MenuSkeleton(),
               child: ListView(
-                padding: EdgeInsets.fromLTRB(
-                    16, 16, 16, cartCount > 0 ? 90 : 24),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                 children: <Widget>[
-                  // Category chips
                   AnimatedReveal(
                     delayMs: 60,
                     child: _CategoryBar(
@@ -136,59 +130,6 @@ class _MenuScreenState extends State<MenuScreen> {
             ),
           ),
         ],
-      ),
-      floatingActionButton: cartCount > 0
-          ? _CartFab(count: cartCount, isDark: isDark)
-          : null,
-    );
-  }
-}
-
-// ── Cart FAB ──────────────────────────────────────────────────────────────────
-
-class _CartFab extends StatelessWidget {
-  const _CartFab({required this.count, required this.isDark});
-
-  final int count;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return FloatingActionButton.extended(
-      onPressed: () => Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const CartScreen()),
-      ),
-      backgroundColor: isDark ? AppColors.primaryOnDark : AppColors.primary,
-      icon: Stack(
-        clipBehavior: Clip.none,
-        children: <Widget>[
-          const Icon(Icons.shopping_cart_rounded, color: Colors.white, size: 22),
-          Positioned(
-            top: -6,
-            right: -8,
-            child: Container(
-              padding: const EdgeInsets.all(3),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-              ),
-              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-              child: Text(
-                count > 99 ? '99+' : '$count',
-                style: TextStyle(
-                  color: isDark ? AppColors.primaryOnDark : AppColors.primary,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-        ],
-      ),
-      label: Text(
-        'View Cart',
-        style: AppTypography.label.copyWith(color: Colors.white),
       ),
     );
   }
@@ -265,6 +206,7 @@ class _MenuCard extends StatelessWidget {
                   NetworkFoodImage(
                     imageUrl: item.imageUrl,
                     fallbackAsset: 'assets/images/Restaurants.jpg',
+                    foodName: item.name,
                     height: 170,
                     borderRadius: BorderRadius.zero,
                   ),
@@ -357,14 +299,41 @@ class _MenuCard extends StatelessWidget {
                       ElevatedButton.icon(
                         onPressed: item.isAvailable
                             ? () async {
-                                await context
-                                    .read<CartProvider>()
-                                    .addMenuItem(item);
+                                final cart = context.read<CartProvider>();
+                                if (cart.hasCanteenConflict(item)) {
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (_) => AlertDialog(
+                                      title: const Text('Start new cart?'),
+                                      content: const Text(
+                                        'Your cart has items from a different canteen. Adding this item will clear your current cart.',
+                                      ),
+                                      actions: <Widget>[
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context, false),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context, true),
+                                          child: const Text('Clear & Add'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirm != true) return;
+                                  if (!context.mounted) return;
+                                  await context
+                                      .read<CartProvider>()
+                                      .clearAndAddMenuItem(item);
+                                } else {
+                                  await cart.addMenuItem(item);
+                                }
                                 if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content:
-                                        Text('${item.name} added to cart'),
+                                    content: Text('${item.name} added to cart'),
                                     duration: const Duration(seconds: 1),
                                   ),
                                 );

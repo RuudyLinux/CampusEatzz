@@ -29,6 +29,19 @@ class CartProvider extends ChangeNotifier {
     return null;
   }
 
+  bool hasCanteenConflict(MenuItem item) {
+    final active = activeCanteenId;
+    if (active == null || _items.isEmpty) return false;
+    if (item.canteenId <= 0) return false;
+    return active != item.canteenId;
+  }
+
+  Future<void> clearAndAddMenuItem(MenuItem item) async {
+    _items.clear();
+    _items.add(CartItem.fromMenu(item));
+    await _persist();
+  }
+
   Future<void> load() async {
     final saved = await _preferences.getCart();
     _items
