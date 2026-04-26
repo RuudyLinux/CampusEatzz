@@ -209,20 +209,20 @@ public sealed class AdminManagementController(
             var status = NormalizeStatus(request.Status);
             var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password!.Trim());
 
-            var id = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            var userEmail = request.Email!.Trim();
+            await connection.ExecuteAsync(new CommandDefinition(
                 """
                 INSERT INTO users
                     (UniversityId, first_name, last_name, email, contact, department, password_hash, role, canteen_id, status, is_deleted, created_at)
                 VALUES
                     (@universityId, @firstName, @lastName, @email, @contact, @department, @passwordHash, @role, @canteenId, @status, 0, UTC_TIMESTAMP());
-                SELECT LAST_INSERT_ID();
                 """,
                 new
                 {
                     universityId = string.IsNullOrWhiteSpace(request.UniversityId) ? null : request.UniversityId.Trim(),
                     firstName = request.FirstName!.Trim(),
                     lastName = request.LastName!.Trim(),
-                    email = request.Email!.Trim(),
+                    email = userEmail,
                     contact = request.Contact?.Trim() ?? string.Empty,
                     department = request.Department?.Trim() ?? string.Empty,
                     passwordHash,
@@ -230,6 +230,10 @@ public sealed class AdminManagementController(
                     canteenId = request.CanteenId,
                     status
                 },
+                cancellationToken: cancellationToken));
+            var id = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+                "SELECT id FROM users WHERE LOWER(email) = LOWER(@email) LIMIT 1;",
+                new { email = userEmail },
                 cancellationToken: cancellationToken));
 
             return Ok(Success("User created successfully.", new { id }));
@@ -487,20 +491,24 @@ public sealed class AdminManagementController(
             }
 
             var status = request.IsActive ? "active" : "deactive";
-            var id = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            var canteenName = request.Name.Trim();
+            await connection.ExecuteAsync(new CommandDefinition(
                 """
                 INSERT INTO canteens (name, description, image_url, status, display_order, created_at)
                 VALUES (@name, @description, @imageUrl, @status, @displayOrder, UTC_TIMESTAMP());
-                SELECT LAST_INSERT_ID();
                 """,
                 new
                 {
-                    name = request.Name.Trim(),
+                    name = canteenName,
                     description = request.Description?.Trim(),
                     imageUrl = request.ImageUrl?.Trim(),
                     status,
                     displayOrder = request.DisplayOrder
                 },
+                cancellationToken: cancellationToken));
+            var id = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+                "SELECT id FROM canteens WHERE name = @name ORDER BY id DESC LIMIT 1;",
+                new { name = canteenName },
                 cancellationToken: cancellationToken));
 
             return Ok(Success("Canteen created successfully.", new { id }));
@@ -677,18 +685,18 @@ public sealed class AdminManagementController(
             }
 
             var hashedPassword = BCrypt.Net.BCrypt.HashPassword(request.Password!.Trim());
-            var id = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            var adminUsername = request.Username!.Trim();
+            await connection.ExecuteAsync(new CommandDefinition(
                 """
                 INSERT INTO canteen_admins
                     (canteen_id, username, password, plain_password, name, email, contact, image_url, status, created_at, updated_at)
                 VALUES
                     (@canteenId, @username, @password, @plainPassword, @name, @email, @contact, @imageUrl, @status, UTC_TIMESTAMP(), UTC_TIMESTAMP());
-                SELECT LAST_INSERT_ID();
                 """,
                 new
                 {
                     canteenId = request.CanteenId,
-                    username = request.Username!.Trim(),
+                    username = adminUsername,
                     password = hashedPassword,
                     plainPassword = request.Password!.Trim(),
                     name = request.Name!.Trim(),
@@ -697,6 +705,10 @@ public sealed class AdminManagementController(
                     imageUrl = request.ImageUrl?.Trim(),
                     status = NormalizeStatus(request.Status)
                 },
+                cancellationToken: cancellationToken));
+            var id = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+                "SELECT id FROM canteen_admins WHERE username = @username ORDER BY id DESC LIMIT 1;",
+                new { username = adminUsername },
                 cancellationToken: cancellationToken));
 
             return Ok(Success("Canteen admin created successfully.", new { id }));

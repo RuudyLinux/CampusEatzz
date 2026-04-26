@@ -632,7 +632,7 @@ public sealed class CustomerController(
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to place order for identifier {Identifier}", identifier);
-            return StatusCode(StatusCodes.Status500InternalServerError, Failure($"Internal server error while placing order: {ex.GetType().Name} - {ex.Message}"));
+            return StatusCode(StatusCodes.Status500InternalServerError, Failure("Internal server error while placing order."));
         }
     }
 
