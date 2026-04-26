@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/food_image_resolver.dart';
 import '../../core/constants/app_typography.dart';
 import '../../core/constants/formatters.dart';
 import '../../core/widgets/animated_reveal.dart';
@@ -52,8 +53,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final canteenState = context.watch<CanteenProvider>();
     final recState = context.watch<RecommendationProvider>();
+    final session = context.watch<AuthProvider>().session;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final greeting = _greeting();
+    final greeting = _greeting(session?.firstName.trim().isNotEmpty == true
+        ? session!.firstName.trim()
+        : session?.name.split(' ').first.trim() ?? '');
 
     return Scaffold(
       bottomNavigationBar: const CustomerBottomNav(current: CustomerTab.home),
@@ -204,11 +208,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  String _greeting() {
+  String _greeting(String name) {
     final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
+    final base = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    return name.isEmpty ? base : '$base, $name';
   }
 }
 
@@ -628,6 +631,7 @@ class _TrendingSection extends StatelessWidget {
                       NetworkFoodImage(
                         imageUrl: item.imageUrl,
                         fallbackAsset: 'assets/images/Restaurants.jpg',
+                        foodName: item.name,
                         width: double.infinity,
                         height: 105,
                         borderRadius: BorderRadius.zero,
@@ -827,6 +831,10 @@ class _RecommendationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasImage = item.imageUrl.trim().isNotEmpty;
     final grad = _gradientForItem();
+    final mappedFoodAsset = FoodImageResolver.assetForFoodName(item.name);
+    final hasMappedMenuUpload =
+        FoodImageResolver.uploadUrlForFoodName(item.name) != null;
+    final canRenderFoodImage = hasImage || mappedFoodAsset != null || hasMappedMenuUpload;
 
     return SizedBox(
       width: 160,
@@ -842,16 +850,16 @@ class _RecommendationCard extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               height: 92,
-              child: hasImage
-                  ? Image.network(
-                      item.imageUrl,
+              child: canRenderFoodImage
+                  ? NetworkFoodImage(
+                      imageUrl: item.imageUrl,
+                      fallbackAsset:
+                          mappedFoodAsset ?? FoodImageResolver.defaultFoodAsset,
+                      foodName: item.name,
                       fit: BoxFit.cover,
                       width: double.infinity,
                       height: 92,
-                      errorBuilder: (_, __, ___) => _Placeholder(
-                        grad: grad,
-                        icon: _iconForItem(),
-                      ),
+                      borderRadius: BorderRadius.zero,
                     )
                   : _Placeholder(grad: grad, icon: _iconForItem()),
             ),
