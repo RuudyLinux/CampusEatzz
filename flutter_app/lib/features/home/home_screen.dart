@@ -758,108 +758,205 @@ class _RecommendationSection extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 230,
+          height: 222,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: section.items.length,
             separatorBuilder: (_, __) => const SizedBox(width: 12),
             itemBuilder: (context, index) {
               final item = section.items[index];
-              return SizedBox(
-                width: 160,
-                child: Card(
-                  clipBehavior: Clip.antiAlias,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      NetworkFoodImage(
-                        imageUrl: item.imageUrl,
-                        fallbackAsset: 'assets/images/Restaurants.jpg',
-                        width: double.infinity,
-                        height: 90,
-                        borderRadius: BorderRadius.zero,
-                      ),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(10, 7, 10, 8),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: <Widget>[
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  Text(
-                                    item.name,
-                                    style: AppTypography.label.copyWith(
-                                      color: isDark
-                                          ? AppColors.darkTextPrimary
-                                          : AppColors.textPrimary,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    formatInr(item.price),
-                                    style: AppTypography.priceSm.copyWith(
-                                      color: isDark
-                                          ? AppColors.primaryOnDark
-                                          : AppColors.primary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    item.reason,
-                                    style: AppTypography.caption.copyWith(
-                                      color: iconColor,
-                                      fontSize: 10,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton.icon(
-                                  onPressed: item.isAvailable
-                                      ? () {
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(SnackBar(
-                                            content: Text(
-                                                'Browse ${item.canteenName} to add ${item.name}'),
-                                            duration:
-                                                const Duration(seconds: 2),
-                                          ));
-                                        }
-                                      : null,
-                                  icon: const Icon(Icons.storefront_rounded,
-                                      size: 12),
-                                  label: Text(
-                                    item.canteenName.split(' ').first,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 6, vertical: 4),
-                                    minimumSize: const Size(0, 28),
-                                    textStyle: const TextStyle(fontSize: 11),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              return _RecommendationCard(
+                item: item,
+                isDark: isDark,
+                iconColor: iconColor,
               );
             },
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── Recommendation Card ───────────────────────────────────────────────────────
+
+class _RecommendationCard extends StatelessWidget {
+  const _RecommendationCard({
+    required this.item,
+    required this.isDark,
+    required this.iconColor,
+  });
+
+  final RecommendationItem item;
+  final bool isDark;
+  final Color iconColor;
+
+  static const List<List<Color>> _gradients = <List<Color>>[
+    <Color>[Color(0xFFFF6B6B), Color(0xFFFF8E53)],
+    <Color>[Color(0xFF4ECDC4), Color(0xFF44A08D)],
+    <Color>[Color(0xFF6C63FF), Color(0xFFA78BFA)],
+    <Color>[Color(0xFFFF9A9E), Color(0xFFFECFEF)],
+    <Color>[Color(0xFF43E97B), Color(0xFF38F9D7)],
+    <Color>[Color(0xFFF093FB), Color(0xFFF5576C)],
+    <Color>[Color(0xFF4FACFE), Color(0xFF00F2FE)],
+    <Color>[Color(0xFFFA709A), Color(0xFFFEE140)],
+  ];
+
+  static const List<IconData> _foodIcons = <IconData>[
+    Icons.restaurant_rounded,
+    Icons.local_cafe_rounded,
+    Icons.lunch_dining_rounded,
+    Icons.bakery_dining_rounded,
+    Icons.ramen_dining_rounded,
+    Icons.set_meal_rounded,
+    Icons.local_pizza_rounded,
+    Icons.emoji_food_beverage_rounded,
+  ];
+
+  List<Color> _gradientForItem() {
+    final hash = item.name.codeUnits.fold(0, (int a, int b) => a + b);
+    return _gradients[hash % _gradients.length];
+  }
+
+  IconData _iconForItem() {
+    final hash = item.name.codeUnits.fold(0, (int a, int b) => a + b);
+    return _foodIcons[(hash + 3) % _foodIcons.length];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasImage = item.imageUrl.trim().isNotEmpty;
+    final grad = _gradientForItem();
+
+    return SizedBox(
+      width: 160,
+      height: 222,
+      child: Card(
+        margin: EdgeInsets.zero,
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.max,
+          children: <Widget>[
+            // ── Image / placeholder ─────────────────────────────
+            SizedBox(
+              width: double.infinity,
+              height: 92,
+              child: hasImage
+                  ? Image.network(
+                      item.imageUrl,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: 92,
+                      errorBuilder: (_, __, ___) => _Placeholder(
+                        grad: grad,
+                        icon: _iconForItem(),
+                      ),
+                    )
+                  : _Placeholder(grad: grad, icon: _iconForItem()),
+            ),
+            // ── Text content ────────────────────────────────────
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 7, 10, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: <Widget>[
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          item.name,
+                          style: AppTypography.label.copyWith(
+                            color: isDark
+                                ? AppColors.darkTextPrimary
+                                : AppColors.textPrimary,
+                            fontSize: 12,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          formatInr(item.price),
+                          style: AppTypography.priceSm.copyWith(
+                            color: isDark
+                                ? AppColors.primaryOnDark
+                                : AppColors.primary,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          item.reason,
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: iconColor,
+                            height: 1.3,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 28,
+                      child: ElevatedButton(
+                        onPressed: item.isAvailable
+                            ? () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                        'Browse ${item.canteenName} to add ${item.name}'),
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                              }
+                            : null,
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: const Size(0, 28),
+                          maximumSize: const Size(double.infinity, 28),
+                          textStyle: const TextStyle(fontSize: 10),
+                        ),
+                        child: Text(
+                          item.canteenName.split(' ').first,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Placeholder extends StatelessWidget {
+  const _Placeholder({required this.grad, required this.icon});
+  final List<Color> grad;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: 92,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: grad,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Icon(icon, color: Colors.white.withValues(alpha: 0.85), size: 36),
     );
   }
 }
