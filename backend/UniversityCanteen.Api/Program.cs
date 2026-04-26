@@ -265,6 +265,9 @@ static async Task EnsureCoreSchemaAsync(
         "ALTER TABLE menu_items ADD COLUMN preparation_time INT NOT NULL DEFAULT 0;",
         "ALTER TABLE menu_items ADD COLUMN display_order INT NOT NULL DEFAULT 0;",
         "ALTER TABLE menu_items ADD COLUMN description TEXT NULL;",
+        // Ensure id has AUTO_INCREMENT (may be missing if DB was not seeded from full SQL file)
+        "ALTER TABLE menu_items ADD PRIMARY KEY (id);",
+        "ALTER TABLE menu_items MODIFY id INT NOT NULL AUTO_INCREMENT;",
         """
         CREATE TABLE IF NOT EXISTS system_settings (
             id INT NOT NULL AUTO_INCREMENT,
@@ -451,7 +454,13 @@ static async Task EnsureCoreSchemaAsync(
             foreach (var sql in schemaSql)
             {
                 try { await connection.ExecuteAsync(sql); }
-                catch (MySqlException ex) when (ex.Number == 1060) { } // column already exists
+                catch (MySqlException ex) when (
+                    ex.Number == 1060   // Duplicate column name
+                    || ex.Number == 1061 // Duplicate key name
+                    || ex.Number == 1062 // Duplicate entry for PRIMARY KEY
+                    || ex.Number == 1068 // Multiple primary key defined
+                    || ex.Number == 1091 // Can't DROP, check that column/key exists
+                ) { } // already applied — skip
             }
 
             foreach (var setting in settingsSeed)
