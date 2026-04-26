@@ -15,9 +15,9 @@ class ApiClient {
   ApiClient(this._preferences)
       : _dio = Dio(
           BaseOptions(
-            connectTimeout: const Duration(seconds: 10),
-            receiveTimeout: const Duration(seconds: 12),
-            sendTimeout: const Duration(seconds: 12),
+            connectTimeout: const Duration(seconds: 30),
+            receiveTimeout: const Duration(seconds: 35),
+            sendTimeout: const Duration(seconds: 30),
             headers: const <String, dynamic>{
               'Content-Type': 'application/json',
               'Accept': 'application/json',
@@ -101,12 +101,27 @@ class ApiClient {
       return lastFallbackResponse;
     }
 
-    final attemptedBases = candidates.join(', ');
-    final lastErrorText = (lastError ?? '').toString().trim();
-    throw Exception(
-      lastErrorText.isEmpty
-          ? 'Unable to reach backend server. Please start backend_api.bat and ensure phone + PC are on same Wi-Fi. Tried: $attemptedBases'
-          : 'Unable to reach backend server. Please start backend_api.bat and ensure phone + PC are on same Wi-Fi. Tried: $attemptedBases. Last error: $lastErrorText',
-    );
+    // Determine if this looks like a pure connectivity failure or a cold-start timeout
+    final lastErrorText = (lastError ?? '').toString().toLowerCase();
+    final isConnectionRefused = lastErrorText.contains('connection refused')
+        || lastErrorText.contains('connection error')
+        || lastErrorText.contains('socketexception')
+        || lastErrorText.contains('failed host lookup')
+        || lastErrorText.contains('network is unreachable');
+    final isTimeout = lastErrorText.contains('timeout') || lastErrorText.contains('timed out');
+
+    if (isTimeout) {
+      throw Exception(
+        'Server is waking up after a period of inactivity. Please wait 30 seconds and try again.',
+      );
+    }
+
+    if (isConnectionRefused) {
+      throw Exception(
+        'No internet connection or server unreachable. Please check your connection and try again.',
+      );
+    }
+
+    throw Exception('Unable to reach the server. Please check your internet connection and try again.');
   }
 }

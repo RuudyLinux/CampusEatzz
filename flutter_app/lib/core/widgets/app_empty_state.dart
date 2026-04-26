@@ -79,6 +79,8 @@ class AppEmptyState extends StatelessWidget {
                   color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
                 ),
                 textAlign: TextAlign.center,
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
 
