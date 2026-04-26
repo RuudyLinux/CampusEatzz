@@ -85,7 +85,11 @@ class _WalletScreenState extends State<WalletScreen> {
             subtitle: 'Balance & transactions',
           ),
           Expanded(
-            child: AppAsyncView(
+            child: _isSessionExpired(wallet.error)
+                ? _SessionExpiredView(
+                    onLogIn: () => context.read<AuthProvider>().logout(),
+                  )
+                : AppAsyncView(
               isLoading: wallet.isLoading,
               error: wallet.error,
               onRetry: () {
@@ -369,6 +373,63 @@ class _TransactionsCard extends StatelessWidget {
                   ),
                 );
               }),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Session expired helpers ───────────────────────────────────────────────────
+
+bool _isSessionExpired(String? error) =>
+    error != null && error.contains('session_expired');
+
+class _SessionExpiredView extends StatelessWidget {
+  const _SessionExpiredView({required this.onLogIn});
+
+  final VoidCallback onLogIn;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(
+              Icons.lock_clock_rounded,
+              size: 64,
+              color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Session Expired',
+              style: AppTypography.heading2.copyWith(
+                color: isDark
+                    ? AppColors.darkTextPrimary
+                    : AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Your login session has expired. Please log in again to access your wallet.',
+              textAlign: TextAlign.center,
+              style: AppTypography.body.copyWith(
+                color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
+              ),
+            ),
+            const SizedBox(height: 28),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: onLogIn,
+                icon: const Icon(Icons.login_rounded),
+                label: const Text('Log In Again'),
+              ),
+            ),
           ],
         ),
       ),

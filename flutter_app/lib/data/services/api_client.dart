@@ -5,6 +5,12 @@ import 'package:dio/dio.dart';
 import '../../core/constants/api_config.dart';
 import 'app_preferences.dart';
 
+class SessionExpiredException implements Exception {
+  const SessionExpiredException();
+  @override
+  String toString() => 'session_expired';
+}
+
 class ApiClient {
   ApiClient(this._preferences)
       : _dio = Dio(
@@ -67,6 +73,13 @@ class ApiClient {
         return response;
       } on DioException catch (e) {
         final status = e.response?.statusCode ?? 0;
+
+        if (status == 401) {
+          // Token expired or invalid — clear saved session so next restoreSession forces re-login
+          await _preferences.clearSession();
+          throw const SessionExpiredException();
+        }
+
         if (status == 404 || status == 405 || status == 0) {
           lastFallbackResponse = e.response;
           lastError = e;
