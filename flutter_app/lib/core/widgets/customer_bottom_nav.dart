@@ -2,14 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../constants/app_colors.dart';
 import '../constants/app_typography.dart';
-import '../../features/cart/cart_screen.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/wallet/wallet_screen.dart';
 
 enum CustomerTab {
   home,
-  cart,
   wallet,
   profile,
 }
@@ -44,12 +42,6 @@ class CustomerBottomNav extends StatelessWidget {
       color: AppColors.tabHome,
     ),
     _CustomerNavItem(
-      label: 'Cart',
-      icon: Icons.shopping_cart_outlined,
-      activeIcon: Icons.shopping_cart_rounded,
-      color: AppColors.tabCart,
-    ),
-    _CustomerNavItem(
       label: 'Wallet',
       icon: Icons.account_balance_wallet_outlined,
       activeIcon: Icons.account_balance_wallet_rounded,
@@ -67,8 +59,6 @@ class CustomerBottomNav extends StatelessWidget {
     switch (tab) {
       case CustomerTab.home:
         return const HomeScreen();
-      case CustomerTab.cart:
-        return const CartScreen();
       case CustomerTab.wallet:
         return const WalletScreen();
       case CustomerTab.profile:

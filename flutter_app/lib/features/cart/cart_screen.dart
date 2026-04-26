@@ -6,7 +6,6 @@ import '../../core/constants/app_typography.dart';
 import '../../core/constants/formatters.dart';
 import '../../core/widgets/animated_reveal.dart';
 import '../../core/widgets/app_empty_state.dart';
-import '../../core/widgets/customer_bottom_nav.dart';
 import '../../core/widgets/gradient_header.dart';
 import '../../core/widgets/network_food_image.dart';
 import '../../state/cart_provider.dart';
@@ -22,7 +21,6 @@ class CartScreen extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      bottomNavigationBar: const CustomerBottomNav(current: CustomerTab.cart),
       body: Column(
         children: <Widget>[
           const GradientHeader(
@@ -101,6 +99,7 @@ class _CartItemCard extends StatelessWidget {
               child: NetworkFoodImage(
                 imageUrl: item.imageUrl,
                 fallbackAsset: 'assets/images/Restaurants.jpg',
+                foodName: item.name,
                 width: 72,
                 height: 72,
                 borderRadius: BorderRadius.circular(12),

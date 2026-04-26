@@ -13,6 +13,7 @@ import '../../core/widgets/shimmer_loader.dart';
 import '../../data/models/menu_item.dart';
 import '../../state/canteen_provider.dart';
 import '../../state/cart_provider.dart';
+import '../cart/cart_screen.dart';
 
 class MenuScreen extends StatefulWidget {
   const MenuScreen({
@@ -54,6 +55,7 @@ class _MenuScreenState extends State<MenuScreen> {
   @override
   Widget build(BuildContext context) {
     final canteenState = context.watch<CanteenProvider>();
+    final cart = context.watch<CartProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final menuRows = widget.canteenId == null
@@ -70,6 +72,11 @@ class _MenuScreenState extends State<MenuScreen> {
         : menuRows
             .where((item) => item.category == _selectedCategory)
             .toList(growable: false);
+
+    // Show checkout bar only when cart has items from THIS canteen
+    final showCheckoutBar = cart.items.isNotEmpty &&
+        widget.canteenId != null &&
+        cart.activeCanteenId == widget.canteenId;
 
     return Scaffold(
       body: Column(
@@ -94,7 +101,8 @@ class _MenuScreenState extends State<MenuScreen> {
                       .loadMenu(widget.canteenId!, force: true),
               skeleton: const _MenuSkeleton(),
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                padding: EdgeInsets.fromLTRB(
+                    16, 16, 16, showCheckoutBar ? 90 : 24),
                 children: <Widget>[
                   AnimatedReveal(
                     delayMs: 60,
@@ -129,7 +137,82 @@ class _MenuScreenState extends State<MenuScreen> {
               ),
             ),
           ),
+          if (showCheckoutBar)
+            _CheckoutBar(
+              itemCount: cart.totalItems,
+              total: cart.total,
+              isDark: isDark,
+            ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Checkout Bar ──────────────────────────────────────────────────────────────
+
+class _CheckoutBar extends StatelessWidget {
+  const _CheckoutBar({
+    required this.itemCount,
+    required this.total,
+    required this.isDark,
+  });
+
+  final int itemCount;
+  final double total;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isDark ? AppColors.primaryOnDark : AppColors.primary;
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        child: SizedBox(
+          width: double.infinity,
+          height: 54,
+          child: ElevatedButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const CartScreen()),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: color,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: <Widget>[
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.20),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '$itemCount item${itemCount == 1 ? '' : 's'}',
+                    style: AppTypography.labelSm
+                        .copyWith(color: Colors.white, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                Text(
+                  'View Cart',
+                  style: AppTypography.label
+                      .copyWith(color: Colors.white, fontWeight: FontWeight.w700),
+                ),
+                Text(
+                  formatInr(total),
+                  style: AppTypography.label
+                      .copyWith(color: Colors.white, fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
