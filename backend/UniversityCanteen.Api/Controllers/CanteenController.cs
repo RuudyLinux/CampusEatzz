@@ -284,24 +284,28 @@ public sealed class CanteenController(
 
             var categoryId = await ResolveCategoryId(connection, request.Category, cancellationToken);
 
-            var newId = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            var insertParams = new
+            {
+                canteenId = request.CanteenId,
+                categoryId,
+                name = request.Name.Trim(),
+                description = (request.Description ?? string.Empty).Trim(),
+                price = request.Price,
+                imageUrl = string.IsNullOrWhiteSpace(request.ImageUrl) ? null : request.ImageUrl.Trim(),
+                isAvailable = request.IsAvailable ? 1 : 0,
+                isVegetarian = request.IsVegetarian ? 1 : 0
+            };
+
+            await connection.ExecuteAsync(new CommandDefinition(
                 """
                 INSERT INTO menu_items (canteen_id, category_id, name, description, price, image_url, is_available, is_vegetarian, created_at, updated_at)
                 VALUES (@canteenId, @categoryId, @name, @description, @price, @imageUrl, @isAvailable, @isVegetarian, UTC_TIMESTAMP(), UTC_TIMESTAMP());
-                SELECT LAST_INSERT_ID();
                 """,
-                new
-                {
-                    canteenId = request.CanteenId,
-                    categoryId,
-                    name = request.Name.Trim(),
-                    description = (request.Description ?? string.Empty).Trim(),
-                    price = request.Price,
-                    imageUrl = string.IsNullOrWhiteSpace(request.ImageUrl) ? null : request.ImageUrl.Trim(),
-                    isAvailable = request.IsAvailable ? 1 : 0,
-                    isVegetarian = request.IsVegetarian ? 1 : 0
-                },
+                insertParams,
                 cancellationToken: cancellationToken));
+
+            var newId = await connection.ExecuteScalarAsync<int>(
+                new CommandDefinition("SELECT LAST_INSERT_ID();", cancellationToken: cancellationToken));
 
             return Ok(Success("Menu item added.", new { id = newId }));
         }
