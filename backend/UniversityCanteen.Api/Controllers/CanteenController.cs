@@ -304,8 +304,15 @@ public sealed class CanteenController(
                 insertParams,
                 cancellationToken: cancellationToken));
 
-            var newId = await connection.ExecuteScalarAsync<int>(
-                new CommandDefinition("SELECT LAST_INSERT_ID();", cancellationToken: cancellationToken));
+            var newId = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+                """
+                SELECT id FROM menu_items
+                WHERE canteen_id = @canteenId
+                ORDER BY id DESC
+                LIMIT 1;
+                """,
+                new { canteenId = request.CanteenId },
+                cancellationToken: cancellationToken));
 
             return Ok(Success("Menu item added.", new { id = newId }));
         }
