@@ -758,7 +758,7 @@ class _RecommendationSection extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 220,
+          height: 230,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: section.items.length,
@@ -766,7 +766,7 @@ class _RecommendationSection extends StatelessWidget {
             itemBuilder: (context, index) {
               final item = section.items[index];
               return SizedBox(
-                width: 158,
+                width: 160,
                 child: Card(
                   clipBehavior: Clip.antiAlias,
                   child: Column(
@@ -776,74 +776,80 @@ class _RecommendationSection extends StatelessWidget {
                         imageUrl: item.imageUrl,
                         fallbackAsset: 'assets/images/Restaurants.jpg',
                         width: double.infinity,
-                        height: 95,
+                        height: 90,
                         borderRadius: BorderRadius.zero,
                       ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text(
-                              item.name,
-                              style: AppTypography.label.copyWith(
-                                color: isDark
-                                    ? AppColors.darkTextPrimary
-                                    : AppColors.textPrimary,
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(10, 7, 10, 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: <Widget>[
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: <Widget>[
+                                  Text(
+                                    item.name,
+                                    style: AppTypography.label.copyWith(
+                                      color: isDark
+                                          ? AppColors.darkTextPrimary
+                                          : AppColors.textPrimary,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    formatInr(item.price),
+                                    style: AppTypography.priceSm.copyWith(
+                                      color: isDark
+                                          ? AppColors.primaryOnDark
+                                          : AppColors.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    item.reason,
+                                    style: AppTypography.caption.copyWith(
+                                      color: iconColor,
+                                      fontSize: 10,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              formatInr(item.price),
-                              style: AppTypography.priceSm.copyWith(
-                                color: isDark
-                                    ? AppColors.primaryOnDark
-                                    : AppColors.primary,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              item.reason,
-                              style: AppTypography.caption.copyWith(
-                                color: iconColor,
-                                fontSize: 10,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 6),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: item.isAvailable
-                                    ? () async {
-                                        // Add to cart via cart provider
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(SnackBar(
-                                          content: Text(
-                                              'Browse ${item.canteenName} to add ${item.name}'),
-                                          duration:
-                                              const Duration(seconds: 2),
-                                        ));
-                                      }
-                                    : null,
-                                icon: const Icon(Icons.storefront_rounded,
-                                    size: 12),
-                                label: Text(
-                                  item.canteenName.split(' ').first,
-                                  overflow: TextOverflow.ellipsis,
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: item.isAvailable
+                                      ? () {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(SnackBar(
+                                            content: Text(
+                                                'Browse ${item.canteenName} to add ${item.name}'),
+                                            duration:
+                                                const Duration(seconds: 2),
+                                          ));
+                                        }
+                                      : null,
+                                  icon: const Icon(Icons.storefront_rounded,
+                                      size: 12),
+                                  label: Text(
+                                    item.canteenName.split(' ').first,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 4),
+                                    minimumSize: const Size(0, 28),
+                                    textStyle: const TextStyle(fontSize: 11),
+                                  ),
                                 ),
-                                style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 5),
-                                  minimumSize: const Size(0, 28),
-                                  textStyle: const TextStyle(fontSize: 11),
-                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ],

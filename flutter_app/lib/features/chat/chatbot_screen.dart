@@ -642,17 +642,13 @@ class _InputBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Use padding.bottom (safe-area / home indicator) — not viewInsets.bottom,
+    // because Scaffold already resizes the body when the keyboard is open.
+    final bottomPad = 8.0 + MediaQuery.of(context).padding.bottom;
     return Container(
       color: isDark ? AppColors.darkSurface : Colors.white,
-      padding: EdgeInsets.fromLTRB(
-        12,
-        8,
-        12,
-        8 + MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: SafeArea(
-        top: false,
-        child: Row(
+      padding: EdgeInsets.fromLTRB(12, 8, 12, bottomPad),
+      child: Row(
           children: <Widget>[
             Expanded(
               child: Container(
@@ -725,7 +721,6 @@ class _InputBar extends StatelessWidget {
             ),
           ],
         ),
-      ),
     );
   }
 }
