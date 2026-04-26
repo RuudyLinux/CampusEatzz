@@ -69,11 +69,22 @@ if (notificationSchedulerEnabled)
 // AI + Recommendation services
 var aiOptions = builder.Configuration.GetSection(AiOptions.SectionName).Get<AiOptions>() ?? new AiOptions();
 builder.Services.AddMemoryCache();
-builder.Services.AddHttpClient("Anthropic", client =>
+// Resolve the API key — supports both Ai:ApiKey config and standalone ApiKey env var
+var resolvedAiApiKey = !string.IsNullOrWhiteSpace(aiOptions.ApiKey)
+    ? aiOptions.ApiKey
+    : (Environment.GetEnvironmentVariable("ApiKey") ?? string.Empty);
+builder.Services.AddHttpClient("OpenRouter", client =>
 {
-    client.BaseAddress = new Uri("https://api.anthropic.com/");
-    client.DefaultRequestHeaders.Add("x-api-key", aiOptions.AnthropicApiKey);
-    client.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
+    var baseUrl = string.IsNullOrWhiteSpace(aiOptions.BaseUrl)
+        ? "https://openrouter.ai/api/v1/"
+        : aiOptions.BaseUrl;
+    client.BaseAddress = new Uri(baseUrl);
+    if (!string.IsNullOrWhiteSpace(resolvedAiApiKey))
+    {
+        client.DefaultRequestHeaders.Add("Authorization", $"Bearer {resolvedAiApiKey}");
+        client.DefaultRequestHeaders.Add("HTTP-Referer", "https://campuseatzz.onrender.com");
+        client.DefaultRequestHeaders.Add("X-Title", "CampusEatzz");
+    }
     client.Timeout = TimeSpan.FromSeconds(30);
 });
 builder.Services.AddScoped<IAiChatService, AiChatService>();
