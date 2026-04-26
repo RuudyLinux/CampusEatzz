@@ -511,7 +511,24 @@ public sealed class CustomerController(
             }
 
             var orderNumber = BuildOrderNumber();
-            var orderId = await dbConnection.ExecuteScalarAsync<long>(new CommandDefinition(
+            var insertParams = new
+            {
+                userId = user.Id,
+                canteenId = request.CanteenId is > 0 ? request.CanteenId : null,
+                orderNumber,
+                customerName = string.IsNullOrWhiteSpace(request.CustomerName) ? user.Name : request.CustomerName.Trim(),
+                customerPhone = string.IsNullOrWhiteSpace(request.CustomerPhone) ? null : request.CustomerPhone.Trim(),
+                deliveryAddress = string.IsNullOrWhiteSpace(request.DeliveryAddress) ? null : request.DeliveryAddress.Trim(),
+                orderType,
+                tableNumber = string.IsNullOrWhiteSpace(request.TableNumber) ? null : request.TableNumber.Trim(),
+                subtotal,
+                tax,
+                total,
+                paymentMethod,
+                paymentStatus,
+                specialInstructions = string.IsNullOrWhiteSpace(request.SpecialInstructions) ? null : request.SpecialInstructions.Trim()
+            };
+            await dbConnection.ExecuteAsync(new CommandDefinition(
                 """
                 INSERT INTO orders
                     (user_id, canteen_id, order_number, customer_name, customer_phone, delivery_address, order_type, table_number,
@@ -521,25 +538,13 @@ public sealed class CustomerController(
                     (@userId, @canteenId, @orderNumber, @customerName, @customerPhone, @deliveryAddress, @orderType, @tableNumber,
                      @subtotal, 0.00, @tax, @total, @paymentMethod, @paymentStatus, 'pending',
                      @specialInstructions, NULL, UTC_TIMESTAMP(), UTC_TIMESTAMP());
-                SELECT LAST_INSERT_ID();
                 """,
-                new
-                {
-                    userId = user.Id,
-                    canteenId = request.CanteenId is > 0 ? request.CanteenId : null,
-                    orderNumber,
-                    customerName = string.IsNullOrWhiteSpace(request.CustomerName) ? user.Name : request.CustomerName.Trim(),
-                    customerPhone = string.IsNullOrWhiteSpace(request.CustomerPhone) ? null : request.CustomerPhone.Trim(),
-                    deliveryAddress = string.IsNullOrWhiteSpace(request.DeliveryAddress) ? null : request.DeliveryAddress.Trim(),
-                    orderType,
-                    tableNumber = string.IsNullOrWhiteSpace(request.TableNumber) ? null : request.TableNumber.Trim(),
-                    subtotal,
-                    tax,
-                    total,
-                    paymentMethod,
-                    paymentStatus,
-                    specialInstructions = string.IsNullOrWhiteSpace(request.SpecialInstructions) ? null : request.SpecialInstructions.Trim()
-                },
+                insertParams,
+                transaction: transaction,
+                cancellationToken: cancellationToken));
+            var orderId = await dbConnection.ExecuteScalarAsync<long>(new CommandDefinition(
+                "SELECT id FROM orders WHERE order_number = @orderNumber LIMIT 1;",
+                new { orderNumber },
                 transaction: transaction,
                 cancellationToken: cancellationToken));
 
@@ -627,7 +632,7 @@ public sealed class CustomerController(
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to place order for identifier {Identifier}", identifier);
-            return StatusCode(StatusCodes.Status500InternalServerError, Failure("Internal server error while placing order."));
+            return StatusCode(StatusCodes.Status500InternalServerError, Failure($"Internal server error while placing order: {ex.GetType().Name} - {ex.Message}"));
         }
     }
 
