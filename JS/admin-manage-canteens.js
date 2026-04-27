@@ -174,30 +174,83 @@
         }
     };
 
+    window.__toggleCanteenStatus = async function(id) {
+        const canteen = window.__canteensData.find(function(c) { return c.id === id; });
+        if (!canteen) return;
+
+        const s = String(canteen.status || "").toLowerCase();
+        const isCurrentlyOpen = s === "open" || s === "active";
+        const newStatus = isCurrentlyOpen ? "closed" : "open";
+
+        const btn = document.getElementById("toggle-btn-" + id);
+        if (btn) {
+            btn.disabled = true;
+            btn.style.opacity = "0.5";
+        }
+
+        try {
+            await AdminApi.request("/api/admin/canteens/" + id, {
+                method: "PUT",
+                body: JSON.stringify({
+                    name: canteen.name,
+                    description: canteen.description || "",
+                    imageUrl: canteen.imageUrl || null,
+                    isActive: !isCurrentlyOpen,
+                    displayOrder: 0
+                })
+            });
+            canteen.status = newStatus;
+            render(window.__canteensData);
+            AdminApi.showMessage(canteen.name + " marked as " + newStatus + ".", "success");
+        } catch (error) {
+            if (btn) {
+                btn.disabled = false;
+                btn.style.opacity = "";
+            }
+            AdminApi.showMessage(error.message, "error");
+        }
+    };
+
+    window.__canteensData = [];
+
     function render(canteens) {
         if (!grid) return;
+        window.__canteensData = canteens;
         grid.innerHTML = canteens.map(function(c) {
             const s = String(c.status || "").toLowerCase();
-            const isActive = s === "open" || s === "active";
+            const isOpen = s === "open" || s === "active";
             const displayImage = withCacheBust(getDisplayImageUrl(c));
             const fallbackImage = createPlaceholderImage(c && c.name);
             return `
                 <div class="bg-white rounded-lg shadow overflow-hidden">
-                    <div class="h-44 bg-gray-100">
+                    <div class="relative h-44 bg-gray-100">
                         <img src="${escapeHtml(displayImage)}" alt="${escapeHtml(c.name || "Canteen")}" class="w-full h-full object-cover" loading="lazy" onerror="this.onerror=null;this.src='${escapeHtml(fallbackImage)}'">
+                        <span class="absolute top-3 left-3 text-xs font-semibold px-2.5 py-1 rounded-full ${isOpen ? "bg-green-500 text-white" : "bg-red-500 text-white"}">
+                            ${isOpen ? "Open" : "Closed"}
+                        </span>
                     </div>
-                    <div class="p-6">
-                    <div class="flex items-start justify-between">
-                        <div>
-                            <h3 class="text-lg font-bold text-gray-800">${escapeHtml(c.name)}</h3>
-                            <p class="text-sm text-gray-600 mt-1">${escapeHtml(c.description || "-")}</p>
-                            <p class="text-xs mt-2 ${isActive ? "text-green-600" : "text-red-600"}">${isActive ? "Active" : "Inactive"}</p>
+                    <div class="p-5">
+                        <div class="flex items-start justify-between gap-2 mb-3">
+                            <div class="min-w-0">
+                                <h3 class="text-base font-bold text-gray-800 truncate">${escapeHtml(c.name)}</h3>
+                                <p class="text-sm text-gray-500 mt-0.5 line-clamp-2">${escapeHtml(c.description || "-")}</p>
+                            </div>
+                            <button
+                                id="toggle-btn-${c.id}"
+                                onclick="window.__toggleCanteenStatus(${c.id})"
+                                title="${isOpen ? "Mark as Closed" : "Mark as Open"}"
+                                class="shrink-0 relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${isOpen ? "bg-green-500" : "bg-gray-300"}">
+                                <span class="inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${isOpen ? "translate-x-6" : "translate-x-1"}"></span>
+                            </button>
                         </div>
-                    </div>
-                    <div class="mt-4 flex gap-3">
-                        <button class="px-3 py-2 text-sm bg-blue-100 text-blue-700 rounded" onclick='window.__editCanteen(${JSON.stringify(c).replace(/'/g, "\\'")})'>Edit</button>
-                        <button class="px-3 py-2 text-sm bg-red-100 text-red-700 rounded" onclick="window.__deleteCanteen(${c.id})">Delete</button>
-                    </div>
+                        <div class="flex gap-2">
+                            <button class="flex-1 px-3 py-2 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition" onclick='window.__editCanteen(${JSON.stringify(c).replace(/'/g, "\\'")})'>
+                                <i class="fas fa-pencil mr-1"></i>Edit
+                            </button>
+                            <button class="px-3 py-2 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition" onclick="window.__deleteCanteen(${c.id})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>`;
         }).join("");

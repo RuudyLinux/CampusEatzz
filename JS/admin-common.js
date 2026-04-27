@@ -328,12 +328,16 @@
         let lastMessage = "Request failed.";
         let sawAuthFailure = false;
 
-        for (const candidate of candidates) {
+        for (let _ci = 0; _ci < candidates.length; _ci++) {
+            const candidate = candidates[_ci];
             const normalizedPath = String(path || "").replace(/^\//, "");
             const url = candidate ? (candidate + "/" + normalizedPath) : ("/" + normalizedPath);
+            // First candidate is the known-good base — give it ample time.
+            // Subsequent candidates are fallback probes — fail fast.
+            const perTimeout = _ci === 0 ? 20000 : REQUEST_CANDIDATE_TIMEOUT_MS;
 
             try {
-                const response = await fetchWithTimeout(url, finalOptions, REQUEST_CANDIDATE_TIMEOUT_MS);
+                const response = await fetchWithTimeout(url, finalOptions, perTimeout);
                 const body = await parseJsonSafe(response);
 
                 if (response.ok) {
