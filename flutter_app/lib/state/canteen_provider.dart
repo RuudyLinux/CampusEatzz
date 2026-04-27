@@ -11,6 +11,7 @@ class CanteenProvider extends ChangeNotifier {
 
   List<Canteen> _canteens = const <Canteen>[];
   final Map<int, List<MenuItem>> _menuByCanteen = <int, List<MenuItem>>{};
+  List<MenuItem>? _cachedAllItems;
   bool _loadingCanteens = false;
   bool _loadingMenu = false;
   String? _error;
@@ -22,9 +23,10 @@ class CanteenProvider extends ChangeNotifier {
 
   List<MenuItem> menuFor(int canteenId) => _menuByCanteen[canteenId] ?? const <MenuItem>[];
 
-  List<MenuItem> get allItems => _menuByCanteen.values
-      .expand((items) => items)
-      .toList(growable: false);
+  List<MenuItem> get allItems =>
+      _cachedAllItems ??= _menuByCanteen.values
+          .expand((items) => items)
+          .toList(growable: false);
 
   Future<void> loadCanteens() async {
     _loadingCanteens = true;
@@ -53,6 +55,7 @@ class CanteenProvider extends ChangeNotifier {
     try {
       final rows = await _service.fetchMenuItems(canteenId);
       _menuByCanteen[canteenId] = rows;
+      _cachedAllItems = null;
     } catch (e) {
       _error = e.toString();
     } finally {

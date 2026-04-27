@@ -642,85 +642,99 @@ class _InputBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Use padding.bottom (safe-area / home indicator) — not viewInsets.bottom,
-    // because Scaffold already resizes the body when the keyboard is open.
-    final bottomPad = 8.0 + MediaQuery.of(context).padding.bottom;
+    final bottomPad = MediaQuery.of(context).padding.bottom;
     return Container(
-      color: isDark ? AppColors.darkSurface : Colors.white,
-      padding: EdgeInsets.fromLTRB(12, 8, 12, bottomPad),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkBg : Colors.white,
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: AppColors.shadowPink,
+            blurRadius: 12,
+            offset: const Offset(0, -3),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.fromLTRB(16, 10, 16, bottomPad + 10),
       child: Row(
-          children: <Widget>[
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isDark ? AppColors.darkCard : const Color(0xFFF5F5F5),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: isDark ? AppColors.darkBorder : AppColors.border,
-                  ),
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: <Widget>[
+          // Text field — pill, clean, no visible border
+          Expanded(
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 48, maxHeight: 120),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkSurface : AppColors.surfaceRaised,
+                borderRadius: BorderRadius.circular(26),
+              ),
+              child: TextField(
+                controller: controller,
+                focusNode: focusNode,
+                enabled: !isSending,
+                maxLines: 5,
+                minLines: 1,
+                textCapitalization: TextCapitalization.sentences,
+                style: AppTypography.body.copyWith(
+                  color: isDark
+                      ? AppColors.darkTextPrimary
+                      : AppColors.textPrimary,
+                  fontSize: 15,
                 ),
-                child: TextField(
-                  controller: controller,
-                  focusNode: focusNode,
-                  enabled: !isSending,
-                  maxLines: 4,
-                  minLines: 1,
-                  textCapitalization: TextCapitalization.sentences,
-                  style: AppTypography.body.copyWith(
-                    color: isDark
-                        ? AppColors.darkTextPrimary
-                        : AppColors.textPrimary,
+                decoration: InputDecoration(
+                  hintText: 'Ask about food, menu, prices...',
+                  hintStyle: AppTypography.body.copyWith(
+                    color:
+                        isDark ? AppColors.darkTextMuted : AppColors.textMuted,
+                    fontSize: 15,
                   ),
-                  decoration: InputDecoration(
-                    hintText: 'Ask about food, menu, prices...',
-                    hintStyle: AppTypography.body.copyWith(
-                      color: isDark
-                          ? AppColors.darkTextMuted
-                          : AppColors.textMuted,
-                    ),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 10),
-                  ),
-                  onSubmitted: isSending ? null : onSend,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 18, vertical: 13),
+                  isDense: true,
                 ),
+                onSubmitted: isSending ? null : onSend,
               ),
             ),
-            const SizedBox(width: 8),
-            AnimatedContainer(
+          ),
+          const SizedBox(width: 10),
+          // Send button — pink circle
+          GestureDetector(
+            onTap: isSending ? null : () => onSend(controller.text),
+            child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              width: 44,
-              height: 44,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
-                gradient: isSending
-                    ? null
-                    : (isDark
-                        ? AppColors.darkHeaderGradient
-                        : AppColors.primaryGradient),
                 color: isSending
                     ? (isDark ? AppColors.darkCard : AppColors.surfaceRaised)
-                    : null,
+                    : AppColors.primary,
                 shape: BoxShape.circle,
-              ),
-              child: IconButton(
-                onPressed: isSending
+                boxShadow: isSending
                     ? null
-                    : () => onSend(controller.text),
-                icon: Icon(
-                  isSending
-                      ? Icons.hourglass_top_rounded
-                      : Icons.send_rounded,
+                    : <BoxShadow>[
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.35),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+              ),
+              child: Center(
+                child: Icon(
+                  isSending ? Icons.hourglass_top_rounded : Icons.send_rounded,
                   color: isSending
                       ? (isDark
                           ? AppColors.darkTextMuted
                           : AppColors.textMuted)
                       : Colors.white,
-                  size: 18,
+                  size: 20,
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
     );
   }
 }

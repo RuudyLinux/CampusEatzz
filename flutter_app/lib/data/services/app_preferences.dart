@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/cart_item.dart';
@@ -117,6 +118,41 @@ class AppPreferences {
   Future<void> clearCart() async {
     final prefs = await _prefs;
     await prefs.remove(_cartKey);
+  }
+
+  // ── Saved canteens ────────────────────────────────────────────────────────
+  static const _savedCanteensKey = 'flutter_saved_canteens';
+
+  Future<void> saveSavedCanteenIds(List<int> ids) async {
+    final prefs = await _prefs;
+    await prefs.setString(_savedCanteensKey, jsonEncode(ids));
+  }
+
+  Future<List<int>> getSavedCanteenIds() async {
+    final prefs = await _prefs;
+    final raw = prefs.getString(_savedCanteensKey);
+    if (raw == null) return <int>[];
+    try {
+      final list = jsonDecode(raw) as List<dynamic>;
+      return list.map((e) => (e as num).toInt()).toList();
+    } catch (_) {
+      return <int>[];
+    }
+  }
+
+  // ── Theme mode ───────────────────────────────────────────────────────────
+  static const _themeModeKey = 'flutter_theme_mode';
+
+  Future<void> saveThemeMode(ThemeMode mode) async {
+    final prefs = await _prefs;
+    await prefs.setInt(_themeModeKey, mode.index);
+  }
+
+  Future<ThemeMode> getThemeMode() async {
+    final prefs = await _prefs;
+    final index = prefs.getInt(_themeModeKey);
+    if (index == null || index >= ThemeMode.values.length) return ThemeMode.system;
+    return ThemeMode.values[index];
   }
 
   Future<void> setWalletBalance(double balance) async {

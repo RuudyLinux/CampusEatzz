@@ -17,15 +17,15 @@ class RecommendationItem {
   factory RecommendationItem.fromJson(Map<String, dynamic> json) =>
       RecommendationItem(
         id: (json['id'] as num?)?.toInt() ?? 0,
-        name: json['name'] as String? ?? '',
+        name: (json['name'] ?? json['itemName'] ?? '').toString(),
         price: (json['price'] as num?)?.toDouble() ?? 0.0,
-        imageUrl: json['imageUrl'] as String? ?? '',
+        imageUrl: _asImageUrl(json),
         canteenId: (json['canteenId'] as num?)?.toInt() ?? 0,
         canteenName: json['canteenName'] as String? ?? '',
         category: json['category'] as String? ?? '',
         reason: json['reason'] as String? ?? '',
         orderCount: (json['orderCount'] as num?)?.toInt() ?? 0,
-        isAvailable: json['isAvailable'] as bool? ?? true,
+        isAvailable: _asBool(json['isAvailable'], fallback: true),
         spiceLevel: json['spiceLevel'] as String? ?? '',
         preparationTime: (json['preparationTime'] as num?)?.toInt() ?? 0,
       );
@@ -42,6 +42,26 @@ class RecommendationItem {
   final bool isAvailable;
   final String spiceLevel;
   final int preparationTime;
+}
+
+String _asImageUrl(Map<String, dynamic> json) {
+  return (json['imageUrl'] ??
+          json['image_url'] ??
+          json['image'] ??
+          json['photoUrl'] ??
+          json['photo'] ??
+          '')
+      .toString();
+}
+
+bool _asBool(dynamic value, {bool fallback = false}) {
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+
+  final normalized = (value ?? '').toString().trim().toLowerCase();
+  if (normalized == 'true' || normalized == '1') return true;
+  if (normalized == 'false' || normalized == '0') return false;
+  return fallback;
 }
 
 class RecommendationSection {

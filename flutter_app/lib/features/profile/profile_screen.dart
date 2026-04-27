@@ -6,18 +6,17 @@ import '../../core/constants/app_typography.dart';
 import '../../core/constants/formatters.dart';
 import '../../core/widgets/animated_reveal.dart';
 import '../../core/widgets/app_empty_state.dart';
-import '../../core/widgets/app_status_badge.dart';
 import '../../core/widgets/customer_bottom_nav.dart';
-import '../../core/widgets/gradient_header.dart';
-import '../../core/widgets/notification_bell_button.dart';
 import '../../state/auth_provider.dart';
 import '../../state/cart_provider.dart';
 import '../../state/orders_provider.dart';
+import '../../state/theme_provider.dart';
 import '../../state/wallet_provider.dart';
 import '../auth/login_screen.dart';
-import '../orders/order_details_screen.dart';
+import '../notifications/notifications_screen.dart';
 import '../orders/orders_screen.dart';
 import '../wallet/wallet_screen.dart';
+import 'saved_canteens_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -45,13 +44,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _logout() async {
+    final nav = Navigator.of(context);
     final authProvider = context.read<AuthProvider>();
     final cartProvider = context.read<CartProvider>();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Sign out?', style: AppTypography.heading3),
+        content: Text(
+          'You\'ll need to sign in again to access your account.',
+          style: AppTypography.body,
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            child: const Text('Sign out'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
     await authProvider.logout();
     if (!mounted) return;
     await cartProvider.clear();
     if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
+    nav.pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
       (route) => false,
     );
@@ -62,243 +85,220 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final auth = context.watch<AuthProvider>();
     final orders = context.watch<OrdersProvider>();
     final wallet = context.watch<WalletProvider>();
+    final themeProvider = context.watch<ThemeProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final user = auth.session;
 
     if (user == null) {
       return Scaffold(
-        bottomNavigationBar:
-            const CustomerBottomNav(current: CustomerTab.profile),
-        body: Column(
-          children: <Widget>[
-            const GradientHeader(title: 'My Profile'),
-            Expanded(
-              child: AppEmptyState(
-                icon: Icons.lock_outline_rounded,
-                title: 'Not Signed In',
-                subtitle: 'Please login to view your profile.',
-                actionLabel: 'Sign In',
-                onAction: () {
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute<void>(
-                        builder: (_) => const LoginScreen()),
-                    (route) => false,
-                  );
-                },
-              ),
+        bottomNavigationBar: const CustomerBottomNav(current: CustomerTab.profile),
+        body: SafeArea(
+          child: AppEmptyState(
+            icon: Icons.lock_outline_rounded,
+            title: 'Not Signed In',
+            subtitle: 'Please login to view your profile.',
+            actionLabel: 'Sign In',
+            onAction: () => Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
+              (route) => false,
             ),
-          ],
+          ),
         ),
       );
     }
 
-    final recent = orders.orders.take(3).toList(growable: false);
+    final totalOrders = orders.orders.length;
 
     return Scaffold(
-      bottomNavigationBar:
-          const CustomerBottomNav(current: CustomerTab.profile),
-      body: Column(
-        children: <Widget>[
-          const GradientHeader(
-            title: 'My Profile',
-            subtitle: 'Personal info & recent orders',
-            trailing: NotificationBellButton(),
-          ),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: _loadData,
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                children: <Widget>[
-                  // ── Avatar + name ─────────────────────────────────────
-                  AnimatedReveal(
-                    delayMs: 60,
-                    child: _AvatarCard(user: user, isDark: isDark),
-                  ),
-                  const SizedBox(height: 12),
+      backgroundColor: isDark ? AppColors.darkBg : AppColors.bg,
+      bottomNavigationBar: const CustomerBottomNav(current: CustomerTab.profile),
+      body: RefreshIndicator(
+        onRefresh: _loadData,
+        child: CustomScrollView(
+          slivers: <Widget>[
+            // ── Minimal top app bar ───────────────────────────────────────
+            SliverAppBar(
+              backgroundColor: isDark ? AppColors.darkBg : AppColors.bg,
+              elevation: 0,
+              pinned: false,
+              expandedHeight: 0,
+              toolbarHeight: 0,
+            ),
 
-                  // ── Wallet quick view ────────────────────────────────
-                  AnimatedReveal(
-                    delayMs: 120,
-                    child: _WalletBanner(
-                      balance: wallet.wallet.balance,
-                      isDark: isDark,
-                      onManage: () {
-                        Navigator.of(context).push(
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    // ── Page title ───────────────────────────────────────
+                    AnimatedReveal(
+                      delayMs: 0,
+                      child: Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: Text(
+                              'Profile',
+                              style: AppTypography.display.copyWith(
+                                color: isDark
+                                    ? AppColors.darkTextPrimary
+                                    : AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── Avatar card ───────────────────────────────────────
+                    AnimatedReveal(
+                      delayMs: 50,
+                      child: _AvatarCard(user: user, isDark: isDark),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // ── Wallet balance card ───────────────────────────────
+                    AnimatedReveal(
+                      delayMs: 100,
+                      child: _WalletCard(
+                        balance: wallet.wallet.balance,
+                        isDark: isDark,
+                        onTap: () => Navigator.of(context).push(
                           MaterialPageRoute<void>(
                               builder: (_) => const WalletScreen()),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // ── Personal info ────────────────────────────────────
-                  AnimatedReveal(
-                    delayMs: 180,
-                    child: _SectionCard(
-                      title: 'Personal Information',
-                      isDark: isDark,
-                      child: Column(
-                        children: <Widget>[
-                          _Field(
-                            label: 'Name',
-                            value: user.firstName.isEmpty
-                                ? user.name
-                                : user.firstName,
-                            isDark: isDark,
-                          ),
-                          _Field(
-                              label: 'Last Name',
-                              value: user.lastName,
-                              isDark: isDark),
-                          _Field(
-                              label: 'Email',
-                              value: user.email,
-                              isDark: isDark),
-                          _Field(
-                              label: 'Enrollment No.',
-                              value: user.universityId,
-                              isDark: isDark),
-                          _Field(
-                              label: 'Contact',
-                              value: user.contact,
-                              isDark: isDark),
-                          _Field(
-                              label: 'Department',
-                              value: user.department,
-                              isDark: isDark),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
+                    const SizedBox(height: 24),
 
-                  // ── Recent orders ────────────────────────────────────
-                  AnimatedReveal(
-                    delayMs: 240,
-                    child: _SectionCard(
-                      title: 'Recent Orders',
-                      isDark: isDark,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          if (recent.isEmpty)
-                            Text(
-                              'No recent orders yet.',
-                              style: AppTypography.body.copyWith(
-                                color: isDark
-                                    ? AppColors.darkTextMuted
-                                    : AppColors.textMuted,
-                              ),
-                            )
-                          else
-                            ...recent.map((order) {
-                              return ListTile(
-                                contentPadding: EdgeInsets.zero,
-                                leading: Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    color: (isDark
-                                            ? AppColors.primaryOnDark
-                                            : AppColors.primary)
-                                        .withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Icon(
-                                    Icons.receipt_long_rounded,
-                                    size: 18,
-                                    color: isDark
-                                        ? AppColors.primaryOnDark
-                                        : AppColors.primary,
-                                  ),
-                                ),
-                                title: Text(
-                                  'Order #${order.orderNumber}',
-                                  style: AppTypography.label.copyWith(
-                                    color: isDark
-                                        ? AppColors.darkTextPrimary
-                                        : AppColors.textPrimary,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  '${order.itemCount} items • ${formatDate(order.createdAt)}',
-                                  style: AppTypography.caption.copyWith(
-                                    color: isDark
-                                        ? AppColors.darkTextMuted
-                                        : AppColors.textMuted,
-                                  ),
-                                ),
-                                trailing: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: <Widget>[
-                                    Text(
-                                      formatInr(order.total),
-                                      style: AppTypography.priceSm.copyWith(
-                                        color: isDark
-                                            ? AppColors.darkTextPrimary
-                                            : AppColors.textPrimary,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    AppStatusBadge.fromString(order.status,
-                                        small: true),
-                                  ],
-                                ),
-                                onTap: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => OrderDetailsScreen(
-                                          orderRef: order.orderNumber),
-                                    ),
-                                  );
-                                },
-                              );
-                            }),
-                          const SizedBox(height: 6),
-                          TextButton.icon(
-                            onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                    builder: (_) => const OrdersScreen()),
-                              );
-                            },
-                            icon: const Icon(Icons.list_alt_outlined, size: 16),
-                            label: const Text('View All Orders'),
+                    // ── Account section ───────────────────────────────────
+                    AnimatedReveal(
+                      delayMs: 140,
+                      child: _SectionLabel(label: 'Account', isDark: isDark),
+                    ),
+                    const SizedBox(height: 10),
+                    AnimatedReveal(
+                      delayMs: 160,
+                      child: _MenuGroup(
+                        isDark: isDark,
+                        items: <_MenuItem>[
+                          _MenuItem(
+                            icon: Icons.receipt_long_rounded,
+                            iconColor: AppColors.primary,
+                            title: 'My orders',
+                            subtitle: '$totalOrders placed',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                  builder: (_) => const OrdersScreen()),
+                            ),
+                          ),
+                          _MenuItem(
+                            icon: Icons.storefront_rounded,
+                            iconColor: const Color(0xFFE91E63),
+                            title: 'Saved canteens',
+                            subtitle: 'Your favourite spots',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                  builder: (_) => const SavedCanteensScreen()),
+                            ),
+                          ),
+                          _MenuItem(
+                            icon: Icons.credit_card_rounded,
+                            iconColor: const Color(0xFF9C27B0),
+                            title: 'Payment methods',
+                            subtitle: 'CampusWallet · UPI',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                  builder: (_) => const WalletScreen()),
+                            ),
                           ),
                         ],
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
+                    const SizedBox(height: 24),
 
-                  // ── Logout ───────────────────────────────────────────
-                  AnimatedReveal(
-                    delayMs: 300,
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _logout,
-                        icon: const Icon(Icons.logout_rounded,
-                            color: AppColors.danger),
-                        label: const Text(
-                          'Logout',
-                          style: TextStyle(color: AppColors.danger),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(
-                              color: AppColors.danger, width: 1.5),
+                    // ── Preferences section ───────────────────────────────
+                    AnimatedReveal(
+                      delayMs: 200,
+                      child: _SectionLabel(label: 'Preferences', isDark: isDark),
+                    ),
+                    const SizedBox(height: 10),
+                    AnimatedReveal(
+                      delayMs: 220,
+                      child: _MenuGroup(
+                        isDark: isDark,
+                        items: <_MenuItem>[
+                          _MenuItem(
+                            icon: Icons.notifications_outlined,
+                            iconColor: const Color(0xFFFF9800),
+                            title: 'Notifications',
+                            subtitle: 'Orders, deals, streak',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                  builder: (_) => const NotificationsScreen()),
+                            ),
+                          ),
+                          _MenuItem(
+                            icon: Icons.tune_rounded,
+                            iconColor: AppColors.accent,
+                            title: 'Taste profile',
+                            subtitle: 'Set your food preferences',
+                            onTap: () => _comingSoon('Taste profile'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // ── Dark mode toggle row ───────────────────────────────
+                    AnimatedReveal(
+                      delayMs: 250,
+                      child: _DarkModeRow(
+                        isDark: isDark,
+                        enabled: themeProvider.isDark,
+                        onToggle: () => themeProvider.toggle(),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // ── Logout ────────────────────────────────────────────
+                    AnimatedReveal(
+                      delayMs: 290,
+                      child: _LogoutRow(isDark: isDark, onTap: _logout),
+                    ),
+                    const SizedBox(height: 32),
+
+                    // ── Version ───────────────────────────────────────────
+                    AnimatedReveal(
+                      delayMs: 320,
+                      child: Center(
+                        child: Text(
+                          'CampusEatzz v1.0.0',
+                          style: AppTypography.caption.copyWith(
+                            color: isDark
+                                ? AppColors.darkTextMuted
+                                : AppColors.textMuted,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _comingSoon(String feature) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$feature — coming soon!'),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -312,202 +312,204 @@ class _AvatarCard extends StatelessWidget {
   final dynamic user;
   final bool isDark;
 
+  void _showDetails(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _UserDetailsSheet(user: user, isDark: isDark),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final initials = _initials(user.name as String);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: <Widget>[
-            CircleAvatar(
-              radius: 30,
-              backgroundColor: (isDark
-                      ? AppColors.primaryOnDark
-                      : AppColors.primary)
-                  .withValues(alpha: 0.15),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: AppColors.shadowPink,
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
               child: Text(
                 initials,
                 style: AppTypography.heading2.copyWith(
-                  color: isDark ? AppColors.primaryOnDark : AppColors.primary,
+                  color: AppColors.primary,
                 ),
               ),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    user.name as String,
-                    style: AppTypography.heading3.copyWith(
-                      color: isDark
-                          ? AppColors.darkTextPrimary
-                          : AppColors.textPrimary,
-                    ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  user.name as String,
+                  style: AppTypography.heading3.copyWith(
+                    color: isDark
+                        ? AppColors.darkTextPrimary
+                        : AppColors.textPrimary,
                   ),
-                  const SizedBox(height: 3),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  user.email as String,
+                  style: AppTypography.bodySm.copyWith(
+                    color:
+                        isDark ? AppColors.darkTextMuted : AppColors.textMuted,
+                  ),
+                ),
+                if ((user.universityId as String).isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 2),
                   Text(
-                    user.email as String,
-                    style: AppTypography.body.copyWith(
-                      color: isDark
-                          ? AppColors.darkTextMuted
-                          : AppColors.textMuted,
+                    user.universityId as String,
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
+              ],
+            ),
+          ),
+          // Open button — shows full user details
+          GestureDetector(
+            onTap: () => _showDetails(context),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(50),
+              ),
+              child: Text(
+                'Open',
+                style: AppTypography.labelSm
+                    .copyWith(color: Colors.white, fontWeight: FontWeight.w700),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   String _initials(String name) {
     final parts = name.trim().split(' ');
-    if (parts.length >= 2) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    }
+    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     return name.isNotEmpty ? name[0].toUpperCase() : '?';
   }
 }
 
-// ── Wallet Banner ─────────────────────────────────────────────────────────────
+// ── User Details Bottom Sheet ─────────────────────────────────────────────────
 
-class _WalletBanner extends StatelessWidget {
-  const _WalletBanner({
-    required this.balance,
-    required this.isDark,
-    required this.onManage,
-  });
-
-  final double balance;
+class _UserDetailsSheet extends StatelessWidget {
+  const _UserDetailsSheet({required this.user, required this.isDark});
+  final dynamic user;
   final bool isDark;
-  final VoidCallback onManage;
 
   @override
   Widget build(BuildContext context) {
+    final fields = <_DetailField>[
+      _DetailField(label: 'First Name', value: user.firstName as String),
+      _DetailField(label: 'Last Name', value: user.lastName as String),
+      _DetailField(label: 'Email', value: user.email as String),
+      _DetailField(
+          label: 'Enrollment No.', value: user.universityId as String),
+      _DetailField(label: 'Contact', value: user.contact as String),
+      _DetailField(label: 'Department', value: user.department as String),
+    ];
+
     return Container(
-      decoration: BoxDecoration(
-        gradient: isDark ? AppColors.darkHeaderGradient : AppColors.walletGradient,
-        borderRadius: BorderRadius.circular(16),
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 32,
       ),
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-      child: Row(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkBg : AppColors.bg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  'Wallet Balance',
-                  style: AppTypography.caption
-                      .copyWith(color: Colors.white.withValues(alpha: 0.80)),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  formatInr(balance),
-                  style: AppTypography.priceLg.copyWith(color: Colors.white),
-                ),
-              ],
+          // Handle
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkBorder : AppColors.divider,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ),
-          ElevatedButton(
-            onPressed: onManage,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white.withValues(alpha: 0.20),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shadowColor: Colors.transparent,
+          Text(
+            'My Details',
+            style: AppTypography.heading3.copyWith(
+              color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
             ),
-            child: const Text('Manage'),
           ),
+          const SizedBox(height: 16),
+          ...fields.map((f) => _DetailRow(field: f, isDark: isDark)),
         ],
       ),
     );
   }
 }
 
-// ── Section Card ──────────────────────────────────────────────────────────────
-
-class _SectionCard extends StatelessWidget {
-  const _SectionCard({
-    required this.title,
-    required this.isDark,
-    required this.child,
-  });
-
-  final String title;
-  final bool isDark;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              title,
-              style: AppTypography.heading3.copyWith(
-                color:
-                    isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 14),
-            child,
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Read-only Field ───────────────────────────────────────────────────────────
-
-class _Field extends StatelessWidget {
-  const _Field({
-    required this.label,
-    required this.value,
-    required this.isDark,
-  });
-
+class _DetailField {
+  const _DetailField({required this.label, required this.value});
   final String label;
   final String value;
+}
+
+class _DetailRow extends StatelessWidget {
+  const _DetailRow({required this.field, required this.isDark});
+  final _DetailField field;
   final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Column(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(
-            label,
-            style: AppTypography.caption.copyWith(
-              color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
-              letterSpacing: 0.3,
+          SizedBox(
+            width: 120,
+            child: Text(
+              field.label,
+              style: AppTypography.caption.copyWith(
+                color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
-          const SizedBox(height: 4),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.darkSurface : AppColors.surfaceRaised,
-              border: Border.all(
-                color: isDark ? AppColors.darkBorder : AppColors.border,
-              ),
-              borderRadius: BorderRadius.circular(10),
-            ),
+          Expanded(
             child: Text(
-              value.isEmpty ? '—' : value,
-              style: AppTypography.body.copyWith(
-                color: value.isEmpty
+              field.value.isEmpty ? '—' : field.value,
+              style: AppTypography.bodySm.copyWith(
+                color: field.value.isEmpty
                     ? (isDark ? AppColors.darkTextMuted : AppColors.textMuted)
                     : (isDark
                         ? AppColors.darkTextPrimary
@@ -516,6 +518,381 @@ class _Field extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Wallet Card ───────────────────────────────────────────────────────────────
+
+class _WalletCard extends StatelessWidget {
+  const _WalletCard({
+    required this.balance,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  final double balance;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+        decoration: BoxDecoration(
+          gradient: isDark
+              ? AppColors.darkHeaderGradient
+              : AppColors.walletGradient,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.25),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.20),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                Icons.account_balance_wallet_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    'Wallet Balance',
+                    style: AppTypography.caption.copyWith(
+                      color: Colors.white.withValues(alpha: 0.80),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    formatInr(balance),
+                    style: AppTypography.priceLg.copyWith(color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.20),
+                borderRadius: BorderRadius.circular(50),
+              ),
+              child: Text(
+                'Manage',
+                style: AppTypography.labelSm.copyWith(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Section Label ─────────────────────────────────────────────────────────────
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({required this.label, required this.isDark});
+
+  final String label;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label.toUpperCase(),
+      style: AppTypography.labelSm.copyWith(
+        color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
+        letterSpacing: 1.0,
+        fontSize: 11,
+      ),
+    );
+  }
+}
+
+// ── Menu Group + Item ─────────────────────────────────────────────────────────
+
+class _MenuItem {
+  const _MenuItem({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+}
+
+class _MenuGroup extends StatelessWidget {
+  const _MenuGroup({required this.items, required this.isDark});
+
+  final List<_MenuItem> items;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: AppColors.shadowPink,
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: List<Widget>.generate(items.length, (i) {
+          final item = items[i];
+          final isLast = i == items.length - 1;
+          return _MenuRowTile(
+            item: item,
+            isDark: isDark,
+            showDivider: !isLast,
+          );
+        }),
+      ),
+    );
+  }
+}
+
+class _MenuRowTile extends StatelessWidget {
+  const _MenuRowTile({
+    required this.item,
+    required this.isDark,
+    required this.showDivider,
+  });
+
+  final _MenuItem item;
+  final bool isDark;
+  final bool showDivider;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: <Widget>[
+        InkWell(
+          onTap: item.onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: <Widget>[
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: item.iconColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(item.icon, size: 20, color: item.iconColor),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        item.title,
+                        style: AppTypography.label.copyWith(
+                          color: isDark
+                              ? AppColors.darkTextPrimary
+                              : AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        item.subtitle,
+                        style: AppTypography.caption.copyWith(
+                          color: isDark
+                              ? AppColors.darkTextMuted
+                              : AppColors.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 20,
+                  color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (showDivider)
+          Divider(
+            height: 1,
+            indent: 70,
+            endIndent: 0,
+            color: isDark
+                ? AppColors.darkDivider
+                : AppColors.divider.withValues(alpha: 0.8),
+          ),
+      ],
+    );
+  }
+}
+
+// ── Dark Mode Toggle Row ──────────────────────────────────────────────────────
+
+class _DarkModeRow extends StatelessWidget {
+  const _DarkModeRow({
+    required this.isDark,
+    required this.enabled,
+    required this.onToggle,
+  });
+
+  final bool isDark;
+  final bool enabled;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: AppColors.shadowPink,
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: const Color(0xFF5C6BC0).withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.dark_mode_outlined,
+              size: 20,
+              color: Color(0xFF5C6BC0),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Dark mode',
+                  style: AppTypography.label.copyWith(
+                    color: isDark
+                        ? AppColors.darkTextPrimary
+                        : AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  enabled ? 'On' : 'Off — follows system',
+                  style: AppTypography.caption.copyWith(
+                    color:
+                        isDark ? AppColors.darkTextMuted : AppColors.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: enabled,
+            onChanged: (_) => onToggle(),
+            activeThumbColor: AppColors.primary,
+            trackColor: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
+                return AppColors.primary.withValues(alpha: 0.30);
+              }
+              return null;
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Logout Row ────────────────────────────────────────────────────────────────
+
+class _LogoutRow extends StatelessWidget {
+  const _LogoutRow({required this.isDark, required this.onTap});
+
+  final bool isDark;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: isDark
+              ? AppColors.danger.withValues(alpha: 0.12)
+              : AppColors.dangerBg,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.danger.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.logout_rounded,
+                size: 20,
+                color: AppColors.danger,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                'Sign out',
+                style: AppTypography.label.copyWith(color: AppColors.danger),
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 20,
+              color: AppColors.danger.withValues(alpha: 0.60),
+            ),
+          ],
+        ),
       ),
     );
   }

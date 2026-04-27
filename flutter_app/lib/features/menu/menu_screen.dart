@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_typography.dart';
 import '../../core/constants/formatters.dart';
 import '../../core/widgets/animated_reveal.dart';
-import '../../core/widgets/app_async_view.dart';
 import '../../core/widgets/app_empty_state.dart';
-import '../../core/widgets/gradient_header.dart';
 import '../../core/widgets/network_food_image.dart';
 import '../../core/widgets/shimmer_loader.dart';
+import '../../data/models/canteen.dart';
 import '../../data/models/menu_item.dart';
 import '../../state/canteen_provider.dart';
 import '../../state/cart_provider.dart';
@@ -30,18 +30,18 @@ class MenuScreen extends StatefulWidget {
 }
 
 class _MenuScreenState extends State<MenuScreen> {
-  String _selectedCategory = 'All Categories';
+  String _selectedCategory = 'All';
 
   @override
   void initState() {
     super.initState();
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final canteenProvider = context.read<CanteenProvider>();
       if (canteenProvider.canteens.isEmpty) {
         await canteenProvider.loadCanteens();
         if (!mounted) return;
       }
-
       final canteenId = widget.canteenId ??
           (canteenProvider.canteens.isNotEmpty
               ? canteenProvider.canteens.first.id
@@ -53,97 +53,747 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   @override
+  void dispose() {
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final canteenState = context.watch<CanteenProvider>();
     final cart = context.watch<CartProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    final canteen = widget.canteenId == null
+        ? null
+        : canteenState.canteens.where((c) => c.id == widget.canteenId).firstOrNull;
+
     final menuRows = widget.canteenId == null
         ? const <MenuItem>[]
         : canteenState.menuFor(widget.canteenId!);
 
-    final categories = <String>{'All Categories'};
+    final categories = <String>['All'];
     for (final item in menuRows) {
-      if (item.category.trim().isNotEmpty) categories.add(item.category.trim());
+      if (item.category.trim().isNotEmpty &&
+          !categories.contains(item.category.trim())) {
+        categories.add(item.category.trim());
+      }
     }
 
-    final visibleRows = _selectedCategory == 'All Categories'
+    final visibleRows = _selectedCategory == 'All'
         ? menuRows
         : menuRows
             .where((item) => item.category == _selectedCategory)
             .toList(growable: false);
 
-    // Show checkout bar only when cart has items from THIS canteen
     final showCheckoutBar = cart.items.isNotEmpty &&
         widget.canteenId != null &&
         cart.activeCanteenId == widget.canteenId;
 
     return Scaffold(
-      body: Column(
+      backgroundColor: isDark ? AppColors.darkBg : AppColors.bg,
+      body: Stack(
         children: <Widget>[
-          GradientHeader(
-            title: widget.canteenName ?? 'Menu',
-            subtitle: 'Fresh, delicious dishes daily',
-            showLogo: false,
-            trailing: IconButton(
-              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-              onPressed: () => Navigator.of(context).maybePop(),
-            ),
-          ),
-          Expanded(
-            child: AppAsyncView(
-              isLoading: canteenState.loadingMenu,
-              error: canteenState.error,
-              onRetry: widget.canteenId == null
-                  ? null
-                  : () => context
-                      .read<CanteenProvider>()
-                      .loadMenu(widget.canteenId!, force: true),
-              skeleton: const _MenuSkeleton(),
-              child: ListView(
-                padding: EdgeInsets.fromLTRB(
-                    16, 16, 16, showCheckoutBar ? 90 : 24),
-                children: <Widget>[
-                  AnimatedReveal(
-                    delayMs: 60,
-                    child: _CategoryBar(
-                      isDark: isDark,
-                      categories: categories,
-                      selectedCategory: _selectedCategory,
-                      onCategoryChanged: (cat) =>
-                          setState(() => _selectedCategory = cat),
+          CustomScrollView(
+            slivers: <Widget>[
+              // ── Hero app bar ──────────────────────────────────────────
+              SliverAppBar(
+                expandedHeight: 260,
+                pinned: true,
+                floating: false,
+                backgroundColor:
+                    isDark ? AppColors.darkSurface : AppColors.primary,
+                elevation: 0,
+                automaticallyImplyLeading: false,
+                flexibleSpace: FlexibleSpaceBar(
+                  collapseMode: CollapseMode.parallax,
+                  background: _CanteenHero(
+                    canteen: canteen,
+                    canteenName:
+                        widget.canteenName ?? canteen?.name ?? 'Menu',
+                    isDark: isDark,
+                  ),
+                ),
+                // Collapsed state bar
+                title: Text(
+                  widget.canteenName ?? 'Menu',
+                  style: AppTypography.heading3
+                      .copyWith(color: Colors.white, fontSize: 16),
+                ),
+                leading: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: _CircleButton(
+                    icon: Icons.arrow_back_rounded,
+                    onTap: () => Navigator.of(context).maybePop(),
+                    light: false,
+                  ),
+                ),
+              ),
+
+              // ── Pre-order bar ─────────────────────────────────────────
+              SliverToBoxAdapter(
+                child: _PreOrderBar(isDark: isDark),
+              ),
+
+              // ── Loading / error / content ─────────────────────────────
+              if (canteenState.loadingMenu && menuRows.isEmpty)
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _MenuSkeleton(),
+                )
+              else if (canteenState.error != null && menuRows.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: AppEmptyState(
+                      icon: Icons.cloud_off_rounded,
+                      title: 'Could not load menu',
+                      subtitle: canteenState.error ?? 'Try again',
+                      actionLabel: 'Retry',
+                      onAction: widget.canteenId == null
+                          ? null
+                          : () => context
+                              .read<CanteenProvider>()
+                              .loadMenu(widget.canteenId!, force: true),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  if (visibleRows.isEmpty)
-                    AnimatedReveal(
-                      delayMs: 120,
-                      child: AppEmptyState(
-                        icon: Icons.no_food_outlined,
-                        title: 'Nothing Here',
-                        subtitle:
-                            'No items in this category. Try another filter.',
-                        compact: true,
-                      ),
-                    )
-                  else
-                    ...visibleRows.asMap().entries.map((entry) {
-                      return AnimatedReveal(
-                        delayMs: 120 + (entry.key * 40),
-                        child: _MenuCard(item: entry.value, isDark: isDark),
-                      );
-                    }),
+                )
+              else ...<Widget>[
+                // Category chips (sticky via SliverPersistentHeader)
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _CategoryHeaderDelegate(
+                    categories: categories,
+                    selected: _selectedCategory,
+                    isDark: isDark,
+                    onChanged: (cat) =>
+                        setState(() => _selectedCategory = cat),
+                  ),
+                ),
+                // Menu items
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(
+                      16, 8, 16, showCheckoutBar ? 96 : 32),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        if (visibleRows.isEmpty) {
+                          return const Padding(
+                            padding: EdgeInsets.only(top: 40),
+                            child: AppEmptyState(
+                              icon: Icons.no_food_outlined,
+                              title: 'Nothing here',
+                              subtitle: 'Try a different category.',
+                              compact: true,
+                            ),
+                          );
+                        }
+                        final item = visibleRows[index];
+                        return AnimatedReveal(
+                          delayMs: 60 + index * 30,
+                          child: _MenuCard(item: item, isDark: isDark),
+                        );
+                      },
+                      childCount:
+                          visibleRows.isEmpty ? 1 : visibleRows.length,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+
+          // ── Checkout bar ──────────────────────────────────────────────
+          if (showCheckoutBar)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: _CheckoutBar(
+                itemCount: cart.totalItems,
+                total: cart.total,
+                isDark: isDark,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Canteen Hero ──────────────────────────────────────────────────────────────
+
+class _CanteenHero extends StatelessWidget {
+  const _CanteenHero({
+    required this.canteenName,
+    required this.isDark,
+    this.canteen,
+  });
+
+  final Canteen? canteen;
+  final String canteenName;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: <Widget>[
+        // Image
+        canteen != null && canteen!.imageUrl.isNotEmpty
+            ? NetworkFoodImage(
+                imageUrl: canteen!.imageUrl,
+                fallbackAsset: 'assets/images/Restaurants.jpg',
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
+                borderRadius: BorderRadius.zero,
+              )
+            : Container(
+                color: isDark
+                    ? AppColors.darkSurface
+                    : AppColors.primary.withValues(alpha: 0.85),
+                child: const Center(
+                  child: Icon(Icons.storefront_rounded,
+                      size: 80, color: Colors.white38),
+                ),
+              ),
+
+        // Gradient overlay bottom → transparent
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: <Color>[
+                  Colors.transparent,
+                  Colors.black.withValues(alpha: 0.30),
+                  Colors.black.withValues(alpha: 0.75),
                 ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                stops: const <double>[0.0, 0.5, 1.0],
               ),
             ),
           ),
-          if (showCheckoutBar)
-            _CheckoutBar(
-              itemCount: cart.totalItems,
-              total: cart.total,
-              isDark: isDark,
+        ),
+
+        // Bottom overlay — canteen info
+        Positioned(
+          left: 16,
+          right: 16,
+          bottom: 16,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                canteenName,
+                style: AppTypography.display.copyWith(
+                  color: Colors.white,
+                  fontSize: 26,
+                  shadows: <Shadow>[
+                    Shadow(
+                      color: Colors.black.withValues(alpha: 0.40),
+                      blurRadius: 8,
+                    ),
+                  ],
+                ),
+              ),
+              if (canteen != null && canteen!.description.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
+                    canteen!.description,
+                    style: AppTypography.bodySm.copyWith(
+                      color: Colors.white.withValues(alpha: 0.85),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              const SizedBox(height: 10),
+              // Stats row
+              Row(
+                children: <Widget>[
+                  _StatChip(
+                    icon: Icons.star_rounded,
+                    label: '4.5',
+                    iconColor: const Color(0xFFFFC107),
+                  ),
+                  const SizedBox(width: 10),
+                  _StatChip(
+                    icon: Icons.timer_outlined,
+                    label: '10–20 min',
+                    iconColor: Colors.white,
+                  ),
+                  const SizedBox(width: 10),
+                  _StatChip(
+                    icon: Icons.circle,
+                    label: canteen?.status == 'open' ? 'Open' : 'Closed',
+                    iconColor: canteen?.status == 'open'
+                        ? const Color(0xFF4CAF50)
+                        : AppColors.danger,
+                    iconSize: 8,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Small circle overlay button (on hero image) ───────────────────────────────
+
+class _CircleButton extends StatelessWidget {
+  const _CircleButton({
+    required this.icon,
+    required this.onTap,
+    this.light = true,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool light; // true = glass, false = opaque dark
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: light
+              ? Colors.white.withValues(alpha: 0.20)
+              : Colors.black.withValues(alpha: 0.45),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.30),
+          ),
+        ),
+        child: Icon(icon, color: Colors.white, size: 20),
+      ),
+    );
+  }
+}
+
+// ── Stat chip on hero image ───────────────────────────────────────────────────
+
+class _StatChip extends StatelessWidget {
+  const _StatChip({
+    required this.icon,
+    required this.label,
+    required this.iconColor,
+    this.iconSize = 14,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color iconColor;
+  final double iconSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Icon(icon, size: iconSize, color: iconColor),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: AppTypography.labelSm.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Pre-order bar ─────────────────────────────────────────────────────────────
+
+class _PreOrderBar extends StatelessWidget {
+  const _PreOrderBar({required this.isDark});
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now().add(const Duration(minutes: 15));
+    final hour = now.hour > 12 ? now.hour - 12 : now.hour == 0 ? 12 : now.hour;
+    final minute = now.minute.toString().padLeft(2, '0');
+    final period = now.hour >= 12 ? 'PM' : 'AM';
+    final timeStr = '$hour:$minute $period';
+
+    return Container(
+      color: isDark ? AppColors.darkCard : Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: isDark ? 0.15 : 0.08),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: <Widget>[
+            const Icon(
+              Icons.access_time_rounded,
+              size: 18,
+              color: AppColors.primary,
             ),
-        ],
+            const SizedBox(width: 10),
+            Expanded(
+              child: RichText(
+                text: TextSpan(
+                  style: AppTypography.bodySm.copyWith(
+                    color: isDark
+                        ? AppColors.darkTextPrimary
+                        : AppColors.textPrimary,
+                  ),
+                  children: <InlineSpan>[
+                    const TextSpan(text: 'Pre-order for pickup at '),
+                    TextSpan(
+                      text: timeStr,
+                      style: AppTypography.bodySm.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right_rounded,
+              size: 18,
+              color: AppColors.primary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Category header (sticky) ──────────────────────────────────────────────────
+
+class _CategoryHeaderDelegate extends SliverPersistentHeaderDelegate {
+  _CategoryHeaderDelegate({
+    required this.categories,
+    required this.selected,
+    required this.isDark,
+    required this.onChanged,
+  });
+
+  final List<String> categories;
+  final String selected;
+  final bool isDark;
+  final ValueChanged<String> onChanged;
+
+  @override
+  double get minExtent => 56;
+  @override
+  double get maxExtent => 56;
+
+  @override
+  bool shouldRebuild(_CategoryHeaderDelegate old) =>
+      old.selected != selected ||
+      old.categories.length != categories.length ||
+      old.isDark != isDark;
+
+  @override
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      height: 56,
+      color: isDark ? AppColors.darkBg : AppColors.bg,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        itemCount: categories.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (_, i) {
+          final cat = categories[i];
+          final active = cat == selected;
+          return GestureDetector(
+            onTap: () => onChanged(cat),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              decoration: BoxDecoration(
+                color: active
+                    ? AppColors.primary
+                    : (isDark ? AppColors.darkCard : Colors.white),
+                borderRadius: BorderRadius.circular(50),
+                boxShadow: active
+                    ? <BoxShadow>[
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.30),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Text(
+                cat,
+                style: AppTypography.labelSm.copyWith(
+                  color: active
+                      ? Colors.white
+                      : (isDark
+                          ? AppColors.darkTextMuted
+                          : AppColors.textMuted),
+                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ── Menu Card ─────────────────────────────────────────────────────────────────
+
+class _MenuCard extends StatelessWidget {
+  const _MenuCard({required this.item, required this.isDark});
+
+  final MenuItem item;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkCard : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: AppColors.shadowPink,
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            // Image
+            if (item.imageUrl.isNotEmpty)
+              Stack(
+                children: <Widget>[
+                  NetworkFoodImage(
+                    imageUrl: item.imageUrl,
+                    fallbackAsset: 'assets/images/Restaurants.jpg',
+                    foodName: item.name,
+                    height: 160,
+                    borderRadius: BorderRadius.zero,
+                  ),
+                  if (item.isVegetarian)
+                    Positioned(
+                      top: 10,
+                      left: 10,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.success,
+                          borderRadius: BorderRadius.circular(50),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            const Icon(Icons.eco_rounded,
+                                size: 11, color: Colors.white),
+                            const SizedBox(width: 3),
+                            Text('Veg',
+                                style: AppTypography.labelSm
+                                    .copyWith(color: Colors.white)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  if (!item.isAvailable)
+                    Positioned.fill(
+                      child: Container(
+                        color: Colors.black.withValues(alpha: 0.50),
+                        alignment: Alignment.center,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.60),
+                            borderRadius: BorderRadius.circular(50),
+                          ),
+                          child: Text('Sold Out',
+                              style: AppTypography.label
+                                  .copyWith(color: Colors.white)),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            // Info row
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  // Veg/non-veg dot
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4, right: 8),
+                    child: Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: item.isVegetarian
+                              ? AppColors.success
+                              : AppColors.danger,
+                          width: 1.5,
+                        ),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: Center(
+                        child: Container(
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            color: item.isVegetarian
+                                ? AppColors.success
+                                : AppColors.danger,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          item.name,
+                          style: AppTypography.label.copyWith(
+                            color: isDark
+                                ? AppColors.darkTextPrimary
+                                : AppColors.textPrimary,
+                            fontSize: 15,
+                          ),
+                        ),
+                        if (item.description.isNotEmpty) ...<Widget>[
+                          const SizedBox(height: 3),
+                          Text(
+                            item.description,
+                            style: AppTypography.caption.copyWith(
+                              color: isDark
+                                  ? AppColors.darkTextMuted
+                                  : AppColors.textMuted,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                        const SizedBox(height: 10),
+                        Row(
+                          children: <Widget>[
+                            Text(
+                              formatInr(item.price),
+                              style: AppTypography.price.copyWith(
+                                color: isDark
+                                    ? AppColors.primaryOnDark
+                                    : AppColors.primary,
+                                fontSize: 18,
+                              ),
+                            ),
+                            const Spacer(),
+                            _AddButton(item: item, isDark: isDark),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Add to Cart button — always pink ─────────────────────────────────────────
+
+class _AddButton extends StatelessWidget {
+  const _AddButton({required this.item, required this.isDark});
+
+  final MenuItem item;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return ElevatedButton.icon(
+      onPressed: item.isAvailable
+          ? () async {
+              final cart = context.read<CartProvider>();
+              final messenger = ScaffoldMessenger.of(context);
+              if (cart.hasCanteenConflict(item)) {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20)),
+                    title: const Text('Start new cart?'),
+                    content: const Text(
+                      'Your cart has items from a different canteen. Adding this clears your current cart.',
+                    ),
+                    actions: <Widget>[
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text('Clear & Add'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm != true) return;
+                if (!context.mounted) return;
+                await context.read<CartProvider>().clearAndAddMenuItem(item);
+              } else {
+                await cart.addMenuItem(item);
+              }
+              if (!context.mounted) return;
+              messenger.showSnackBar(SnackBar(
+                content: Text('${item.name} added'),
+                duration: const Duration(seconds: 1),
+              ));
+            }
+          : null,
+      icon: const Icon(Icons.add_rounded, size: 16),
+      label: Text(item.isAvailable ? 'Add' : 'Sold Out'),
+      style: ElevatedButton.styleFrom(
+        // Override global dark button: use pink for Add to Cart
+        backgroundColor:
+            isDark ? AppColors.primaryOnDark : AppColors.primary,
+        foregroundColor: Colors.white,
+        disabledBackgroundColor:
+            AppColors.primary.withValues(alpha: 0.30),
+        disabledForegroundColor: Colors.white60,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        minimumSize: const Size(0, 38),
+        elevation: 0,
+        shape: const StadiumBorder(),
+        textStyle: AppTypography.labelSm,
       ),
     );
   }
@@ -164,279 +814,67 @@ class _CheckoutBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isDark ? AppColors.primaryOnDark : AppColors.primary;
     return SafeArea(
       top: false,
-      child: Padding(
+      child: Container(
+        color: isDark
+            ? AppColors.darkBg.withValues(alpha: 0.95)
+            : AppColors.bg.withValues(alpha: 0.95),
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-        child: SizedBox(
-          width: double.infinity,
-          height: 54,
-          child: ElevatedButton(
-            onPressed: () => Navigator.of(context).push(
+        child: Container(
+          height: 56,
+          decoration: BoxDecoration(
+            color: AppColors.textPrimary,
+            borderRadius: BorderRadius.circular(50),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: AppColors.textPrimary.withValues(alpha: 0.30),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: InkWell(
+            onTap: () => Navigator.of(context).push(
               MaterialPageRoute<void>(builder: (_) => const CartScreen()),
             ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: color,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(50),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: Row(
+                children: <Widget>[
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(50),
+                    ),
+                    child: Text(
+                      '$itemCount',
+                      style: AppTypography.labelSm.copyWith(
+                          color: Colors.white, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'View Cart',
+                      style: AppTypography.label.copyWith(color: Colors.white),
+                    ),
+                  ),
+                  Text(
+                    formatInr(total),
+                    style: AppTypography.label.copyWith(
+                        color: Colors.white, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.arrow_forward_rounded,
+                      size: 18, color: Colors.white),
+                ],
               ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: <Widget>[
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.20),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    '$itemCount item${itemCount == 1 ? '' : 's'}',
-                    style: AppTypography.labelSm
-                        .copyWith(color: Colors.white, fontWeight: FontWeight.w700),
-                  ),
-                ),
-                Text(
-                  'View Cart',
-                  style: AppTypography.label
-                      .copyWith(color: Colors.white, fontWeight: FontWeight.w700),
-                ),
-                Text(
-                  formatInr(total),
-                  style: AppTypography.label
-                      .copyWith(color: Colors.white, fontWeight: FontWeight.w700),
-                ),
-              ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Category Bar ──────────────────────────────────────────────────────────────
-
-class _CategoryBar extends StatelessWidget {
-  const _CategoryBar({
-    required this.isDark,
-    required this.categories,
-    required this.selectedCategory,
-    required this.onCategoryChanged,
-  });
-
-  final bool isDark;
-  final Set<String> categories;
-  final String selectedCategory;
-  final ValueChanged<String> onCategoryChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: categories.map((category) {
-          final isActive = category == selectedCategory;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilterChip(
-              label: Text(category),
-              selected: isActive,
-              selectedColor:
-                  isDark ? AppColors.primaryOnDark : AppColors.primary,
-              checkmarkColor: Colors.white,
-              labelStyle: TextStyle(
-                color: isActive
-                    ? Colors.white
-                    : (isDark
-                        ? AppColors.darkTextPrimary
-                        : AppColors.textPrimary),
-                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                fontSize: 12,
-              ),
-              onSelected: (_) => onCategoryChanged(category),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
-
-// ── Menu Card ─────────────────────────────────────────────────────────────────
-
-class _MenuCard extends StatelessWidget {
-  const _MenuCard({required this.item, required this.isDark});
-
-  final MenuItem item;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            if (item.imageUrl.isNotEmpty)
-              Stack(
-                children: <Widget>[
-                  NetworkFoodImage(
-                    imageUrl: item.imageUrl,
-                    fallbackAsset: 'assets/images/Restaurants.jpg',
-                    foodName: item.name,
-                    height: 170,
-                    borderRadius: BorderRadius.zero,
-                  ),
-                  if (item.isVegetarian)
-                    Positioned(
-                      top: 10,
-                      left: 10,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.success,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: <Widget>[
-                            const Icon(Icons.eco_rounded,
-                                size: 11, color: Colors.white),
-                            const SizedBox(width: 3),
-                            Text(
-                              'Veg',
-                              style: AppTypography.labelSm
-                                  .copyWith(color: Colors.white),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  if (!item.isAvailable)
-                    Positioned.fill(
-                      child: Container(
-                        color: Colors.black.withValues(alpha: 0.45),
-                        alignment: Alignment.center,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.60),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            'Unavailable',
-                            style: AppTypography.label
-                                .copyWith(color: Colors.white),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    item.name,
-                    style: AppTypography.heading3.copyWith(
-                      color: isDark
-                          ? AppColors.darkTextPrimary
-                          : AppColors.textPrimary,
-                    ),
-                  ),
-                  if (item.description.isNotEmpty) ...<Widget>[
-                    const SizedBox(height: 4),
-                    Text(
-                      item.description,
-                      style: AppTypography.body.copyWith(
-                        color: isDark
-                            ? AppColors.darkTextMuted
-                            : AppColors.textMuted,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  Row(
-                    children: <Widget>[
-                      Text(
-                        formatInr(item.price),
-                        style: AppTypography.price.copyWith(
-                          color: isDark
-                              ? AppColors.primaryOnDark
-                              : AppColors.primary,
-                        ),
-                      ),
-                      const Spacer(),
-                      ElevatedButton.icon(
-                        onPressed: item.isAvailable
-                            ? () async {
-                                final cart = context.read<CartProvider>();
-                                if (cart.hasCanteenConflict(item)) {
-                                  final confirm = await showDialog<bool>(
-                                    context: context,
-                                    builder: (_) => AlertDialog(
-                                      title: const Text('Start new cart?'),
-                                      content: const Text(
-                                        'Your cart has items from a different canteen. Adding this item will clear your current cart.',
-                                      ),
-                                      actions: <Widget>[
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(context, false),
-                                          child: const Text('Cancel'),
-                                        ),
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(context, true),
-                                          child: const Text('Clear & Add'),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                  if (confirm != true) return;
-                                  if (!context.mounted) return;
-                                  await context
-                                      .read<CartProvider>()
-                                      .clearAndAddMenuItem(item);
-                                } else {
-                                  await cart.addMenuItem(item);
-                                }
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('${item.name} added to cart'),
-                                    duration: const Duration(seconds: 1),
-                                  ),
-                                );
-                              }
-                            : null,
-                        icon: const Icon(Icons.add_rounded, size: 16),
-                        label: Text(
-                            item.isAvailable ? 'Add to Cart' : 'Sold Out'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 10),
-                          minimumSize: const Size(0, 38),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -454,7 +892,7 @@ class _MenuSkeleton extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: <Widget>[
-          ShimmerBox(width: double.infinity, height: 50, radius: 16),
+          ShimmerBox(width: double.infinity, height: 50, radius: 50),
           const SizedBox(height: 16),
           const SkeletonMenuCard(),
           const SizedBox(height: 14),

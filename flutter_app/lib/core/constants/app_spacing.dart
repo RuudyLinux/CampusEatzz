@@ -5,6 +5,6 @@ class AppSpacing {
   static const double lg = 16;
   static const double xl = 20;
   static const double xxl = 24;
-  static const double cardRadius = 14;
-  static const double buttonRadius = 12;
+  static const double cardRadius = 24;
+  static const double buttonRadius = 50;
 }

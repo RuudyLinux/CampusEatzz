@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -20,6 +22,7 @@ import '../../state/auth_provider.dart';
 import '../../state/canteen_provider.dart';
 import '../../state/cart_provider.dart';
 import '../../state/recommendation_provider.dart';
+import '../../state/saved_canteens_provider.dart';
 import '../chat/chatbot_screen.dart';
 import '../contact/contact_us_screen.dart';
 import '../menu/menu_screen.dart';
@@ -32,6 +35,61 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _canteenSectionKey = GlobalKey();
+  bool _filterVegOnly = false;
+  bool _filterOpenOnly = false;
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToCanteens() {
+    final ctx = _canteenSectionKey.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 450),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  void _openSearch(BuildContext context) {
+    final canteenProvider = context.read<CanteenProvider>();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _SearchSheet(
+        canteens: canteenProvider.canteens,
+        allItems: canteenProvider.allItems,
+        onOpenMenu: (canteen) {
+          Navigator.of(context).push(MaterialPageRoute<void>(
+            builder: (_) =>
+                MenuScreen(canteenId: canteen.id, canteenName: canteen.name),
+          ));
+        },
+      ),
+    );
+  }
+
+  Future<void> _openFilter(BuildContext context) async {
+    final result = await showModalBottomSheet<({bool vegOnly, bool openOnly})?>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _FilterSheet(),
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _filterVegOnly = result.vegOnly;
+        _filterOpenOnly = result.openOnly;
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -59,15 +117,28 @@ class _HomeScreenState extends State<HomeScreen> {
         ? session!.firstName.trim()
         : session?.name.split(' ').first.trim() ?? '');
 
+    var filteredCanteens = canteenState.canteens;
+    if (_filterOpenOnly) {
+      filteredCanteens = filteredCanteens
+          .where((c) => c.status.toLowerCase() == 'open')
+          .toList(growable: false);
+    }
+    if (_filterVegOnly) {
+      filteredCanteens = filteredCanteens
+          .where((c) =>
+              canteenState.menuFor(c.id).any((item) => item.isVegetarian))
+          .toList(growable: false);
+    }
+
     return Scaffold(
       bottomNavigationBar: const CustomerBottomNav(current: CustomerTab.home),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton(
         onPressed: _openChatbot,
-        backgroundColor: isDark ? AppColors.darkCard : AppColors.primary,
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
-        icon: const Icon(Icons.smart_toy_rounded),
-        label: const Text('AI Assistant'),
         elevation: 4,
+        shape: const CircleBorder(),
+        child: const Icon(Icons.smart_toy_rounded),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: Column(
@@ -76,6 +147,7 @@ class _HomeScreenState extends State<HomeScreen> {
             title: 'CampusEatzz',
             subtitle: greeting,
             trailing: const NotificationBellButton(),
+            minimal: true,
           ),
           Expanded(
             child: AppAsyncView(
@@ -93,10 +165,25 @@ class _HomeScreenState extends State<HomeScreen> {
                   await recProvider.loadAll(userId: userId);
                 },
                 child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                  controller: _scrollController,
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
                   children: <Widget>[
                     AnimatedReveal(
-                        delayMs: 60, child: _HeroBanner(isDark: isDark)),
+                      delayMs: 30,
+                      child: _SearchBar(
+                        isDark: isDark,
+                        onTap: () => _openSearch(context),
+                        onFilter: () => _openFilter(context),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    AnimatedReveal(
+                      delayMs: 60,
+                      child: _HeroBanner(
+                        isDark: isDark,
+                        onBrowse: _scrollToCanteens,
+                      ),
+                    ),
                     const SizedBox(height: 24),
                     AnimatedReveal(
                         delayMs: 130, child: _FeatureRow(isDark: isDark)),
@@ -149,7 +236,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     AnimatedReveal(
                       delayMs: 260,
                       child: _CanteenSection(
-                        canteens: canteenState.canteens,
+                        key: _canteenSectionKey,
+                        canteens: filteredCanteens,
                         isDark: isDark,
                         onTap: _openMenu,
                       ),
@@ -215,73 +303,191 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// ── Hero Banner ───────────────────────────────────────────────────────────────
+// ── Search Bar ────────────────────────────────────────────────────────────────
 
-class _HeroBanner extends StatelessWidget {
-  const _HeroBanner({required this.isDark});
-
+class _SearchBar extends StatelessWidget {
+  const _SearchBar({
+    required this.isDark,
+    required this.onTap,
+    required this.onFilter,
+  });
   final bool isDark;
+  final VoidCallback onTap;
+  final VoidCallback onFilter;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: isDark ? AppColors.darkHeaderGradient : AppColors.primaryGradient,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 22),
-      child: Stack(
-        children: <Widget>[
-          Positioned(
-            top: -20,
-            right: -10,
-            child: Container(
-              width: 90,
-              height: 90,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.08),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 52,
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurface : AppColors.surfaceRaised,
+          borderRadius: BorderRadius.circular(50),
+          boxShadow: const <BoxShadow>[
+            BoxShadow(
+              color: AppColors.shadowPink,
+              blurRadius: 12,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: <Widget>[
+            const SizedBox(width: 18),
+            Icon(
+              Icons.search_rounded,
+              size: 20,
+              color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Search canteens, dishes…',
+                style: AppTypography.body.copyWith(
+                  color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
+                ),
               ),
             ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                'Fresh, Tasty & Made With Love',
-                style: AppTypography.heading3.copyWith(color: Colors.white),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Order your favorite meals from campus canteens — fast, easy, and cashless.',
-                style: AppTypography.bodySm.copyWith(
-                  color: Colors.white.withValues(alpha: 0.85),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            GestureDetector(
+              onTap: onFilter,
+              child: Container(
+                margin: const EdgeInsets.all(6),
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.30)),
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(44),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    const Icon(Icons.bolt_rounded,
-                        size: 14, color: Colors.white),
-                    const SizedBox(width: 5),
-                    Text(
-                      'Skip the queue — order ahead',
-                      style: AppTypography.labelSm
-                          .copyWith(color: Colors.white),
-                    ),
-                  ],
-                ),
+                child: const Icon(Icons.tune_rounded, size: 18, color: Colors.white),
               ),
-            ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Hero Banner ───────────────────────────────────────────────────────────────
+
+class _HeroBanner extends StatelessWidget {
+  const _HeroBanner({required this.isDark, required this.onBrowse});
+
+  final bool isDark;
+  final VoidCallback onBrowse;
+
+  @override
+  Widget build(BuildContext context) {
+    final cardBg = isDark ? AppColors.darkCard : Colors.white;
+    final textColor = isDark ? AppColors.darkTextPrimary : AppColors.textPrimary;
+    final mutedColor = isDark ? AppColors.darkTextMuted : AppColors.textMuted;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: AppColors.shadowPink,
+            blurRadius: 20,
+            spreadRadius: 2,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.fromLTRB(22, 22, 22, 22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          // Label chip
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(50),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  'CAMPUS CANTEENS',
+                  style: AppTypography.labelSm.copyWith(
+                    color: AppColors.primary,
+                    letterSpacing: 0.8,
+                    fontSize: 10,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Big headline
+          RichText(
+            text: TextSpan(
+              style: AppTypography.heading1.copyWith(color: textColor),
+              children: <InlineSpan>[
+                const TextSpan(text: 'Taste the '),
+                TextSpan(
+                  text: 'Difference',
+                  style: AppTypography.heading1.copyWith(
+                    color: AppColors.primary,
+                  ),
+                ),
+                const TextSpan(text: '\nwith Campus Food'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Order your favorite meals — fast, easy, and cashless.',
+            style: AppTypography.bodySm.copyWith(color: mutedColor),
+          ),
+          const SizedBox(height: 18),
+          // CTA pill button — taps scroll to canteen section
+          GestureDetector(
+            onTap: onBrowse,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppColors.textPrimary,
+                borderRadius: BorderRadius.circular(50),
+                boxShadow: <BoxShadow>[
+                  BoxShadow(
+                    color: AppColors.textPrimary.withValues(alpha: 0.25),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: const BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.arrow_forward_rounded,
+                        size: 18, color: Colors.white),
+                  ),
+                  const SizedBox(width: 14),
+                  Text('Browse Canteens',
+                      style: AppTypography.label.copyWith(color: Colors.white)),
+                  const SizedBox(width: 20),
+                ],
+              ),
+            ),
           ),
         ],
       ),
@@ -403,6 +609,7 @@ class _FeatureCard extends StatelessWidget {
 
 class _CanteenSection extends StatelessWidget {
   const _CanteenSection({
+    super.key,
     required this.canteens,
     required this.isDark,
     required this.onTap,
@@ -439,7 +646,7 @@ class _CanteenSection extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         if (canteens.isEmpty)
-          AppEmptyState(
+          const AppEmptyState(
             icon: Icons.storefront_outlined,
             title: 'No Canteens Yet',
             subtitle:
@@ -472,60 +679,108 @@ class _CanteenCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    final saved = context.watch<SavedCanteensProvider>();
+    final isSaved = saved.isSaved(canteen.id);
+    final isOpen = canteen.status.toLowerCase() == 'open';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: AppColors.shadowPink,
+            blurRadius: 16,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => onTap(canteen),
+        borderRadius: BorderRadius.circular(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            // Image
-            if (canteen.imageUrl.isNotEmpty)
-              NetworkFoodImage(
-                imageUrl: canteen.imageUrl,
-                fallbackAsset: 'assets/images/Restaurants.jpg',
-                height: 190,
-                borderRadius: BorderRadius.zero,
-              )
-            else
-              Container(
-                width: double.infinity,
-                height: 190,
-                color: isDark
-                    ? AppColors.darkBg.withValues(alpha: 0.5)
-                    : AppColors.bg,
-                child: Icon(Icons.storefront_rounded,
-                    size: 60,
-                    color: isDark
-                        ? AppColors.darkTextMuted
-                        : AppColors.textMuted),
-              ),
-            // Status pill
-            Positioned(
-              top: 12,
-              right: 12,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: AppColors.success,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    const Icon(Icons.circle, size: 6, color: Colors.white),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Open',
-                      style: AppTypography.labelSm
-                          .copyWith(color: Colors.white),
+            // ── Image with overlays ─────────────────────────────────
+            Stack(
+              children: <Widget>[
+                canteen.imageUrl.isNotEmpty
+                    ? NetworkFoodImage(
+                        imageUrl: canteen.imageUrl,
+                        fallbackAsset: 'assets/images/Restaurants.jpg',
+                        height: 190,
+                        borderRadius: BorderRadius.zero,
+                      )
+                    : Container(
+                        width: double.infinity,
+                        height: 190,
+                        color: isDark
+                            ? AppColors.darkSurface
+                            : AppColors.surfaceRaised,
+                        child: Icon(Icons.storefront_rounded,
+                            size: 60,
+                            color: isDark
+                                ? AppColors.darkTextMuted
+                                : AppColors.textMuted),
+                      ),
+                // Status pill
+                Positioned(
+                  top: 12,
+                  left: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: isOpen ? AppColors.success : AppColors.danger,
+                      borderRadius: BorderRadius.circular(20),
                     ),
-                  ],
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        const Icon(Icons.circle, size: 6, color: Colors.white),
+                        const SizedBox(width: 4),
+                        Text(
+                          isOpen ? 'Open' : 'Closed',
+                          style: AppTypography.labelSm
+                              .copyWith(color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+                // Heart / save button
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: GestureDetector(
+                    onTap: () => saved.toggle(canteen.id),
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.90),
+                        shape: BoxShape.circle,
+                        boxShadow: <BoxShadow>[
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.10),
+                            blurRadius: 6,
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        isSaved
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_border_rounded,
+                        size: 18,
+                        color: isSaved ? AppColors.primary : AppColors.textMuted,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            // Info
+            // ── Info ────────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
               child: Column(
@@ -555,30 +810,23 @@ class _CanteenCard extends StatelessWidget {
                   const SizedBox(height: 10),
                   Row(
                     children: <Widget>[
-                      Icon(
-                        Icons.restaurant_menu_rounded,
-                        size: 14,
-                        color: isDark
-                            ? AppColors.primaryOnDark
-                            : AppColors.primary,
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        'View Menu',
-                        style: AppTypography.label.copyWith(
+                      Icon(Icons.restaurant_menu_rounded,
+                          size: 14,
                           color: isDark
                               ? AppColors.primaryOnDark
-                              : AppColors.primary,
-                        ),
-                      ),
+                              : AppColors.primary),
+                      const SizedBox(width: 5),
+                      Text('View Menu',
+                          style: AppTypography.label.copyWith(
+                              color: isDark
+                                  ? AppColors.primaryOnDark
+                                  : AppColors.primary)),
                       const Spacer(),
-                      Icon(
-                        Icons.arrow_forward_rounded,
-                        size: 16,
-                        color: isDark
-                            ? AppColors.primaryOnDark
-                            : AppColors.primary,
-                      ),
+                      Icon(Icons.arrow_forward_rounded,
+                          size: 16,
+                          color: isDark
+                              ? AppColors.primaryOnDark
+                              : AppColors.primary),
                     ],
                   ),
                 ],
@@ -911,28 +1159,28 @@ class _RecommendationCard extends StatelessWidget {
                     SizedBox(
                       width: double.infinity,
                       height: 28,
-                      child: ElevatedButton(
+                      child: ElevatedButton.icon(
                         onPressed: item.isAvailable
-                            ? () {
+                            ? () async {
+                                await context
+                                    .read<CartProvider>()
+                                    .addMenuItem(_toMenuItem());
+                                if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text(
-                                        'Browse ${item.canteenName} to add ${item.name}'),
-                                    duration: const Duration(seconds: 2),
+                                    content: Text('${item.name} added to cart'),
+                                    duration: const Duration(seconds: 1),
                                   ),
                                 );
                               }
                             : null,
+                        icon: const Icon(Icons.add_rounded, size: 13),
+                        label: const Text('Add'),
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           minimumSize: const Size(0, 28),
                           maximumSize: const Size(double.infinity, 28),
                           textStyle: const TextStyle(fontSize: 10),
-                        ),
-                        child: Text(
-                          item.canteenName.split(' ').first,
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
                         ),
                       ),
                     ),
@@ -943,6 +1191,20 @@ class _RecommendationCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  MenuItem _toMenuItem() {
+    return MenuItem(
+      id: item.id,
+      name: item.name,
+      description: item.reason,
+      price: item.price,
+      category: item.category,
+      imageUrl: item.imageUrl,
+      isAvailable: item.isAvailable,
+      isVegetarian: false,
+      canteenId: item.canteenId,
     );
   }
 }
@@ -1106,6 +1368,432 @@ class _ContactUsPromptSection extends StatelessWidget {
   }
 }
 
+// ── Search Sheet ─────────────────────────────────────────────────────────────
+
+class _SearchSheet extends StatefulWidget {
+  const _SearchSheet({
+    required this.canteens,
+    required this.allItems,
+    required this.onOpenMenu,
+  });
+  final List<Canteen> canteens;
+  final List<MenuItem> allItems;
+  final void Function(Canteen) onOpenMenu;
+
+  @override
+  State<_SearchSheet> createState() => _SearchSheetState();
+}
+
+class _SearchSheetState extends State<_SearchSheet> {
+  final TextEditingController _ctrl = TextEditingController();
+  String _query = '';
+  Timer? _debounce;
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final q = _query.toLowerCase().trim();
+
+    final matchedCanteens = q.isEmpty
+        ? widget.canteens
+        : widget.canteens
+            .where((c) =>
+                c.name.toLowerCase().contains(q) ||
+                c.description.toLowerCase().contains(q))
+            .toList();
+
+    final matchedItems = q.isEmpty
+        ? <MenuItem>[]
+        : widget.allItems
+            .where((i) =>
+                i.name.toLowerCase().contains(q) ||
+                i.category.toLowerCase().contains(q))
+            .take(10)
+            .toList();
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.90,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (_, controller) => DecoratedBox(
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkBg : AppColors.bg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          children: <Widget>[
+            // Handle
+            Container(
+              margin: const EdgeInsets.only(top: 10),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkBorder : AppColors.divider,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // Search field
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.darkCard : Colors.white,
+                  borderRadius: BorderRadius.circular(50),
+                  boxShadow: const <BoxShadow>[
+                    BoxShadow(
+                      color: AppColors.shadowPink,
+                      blurRadius: 12,
+                      offset: Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: TextField(
+                  controller: _ctrl,
+                  autofocus: true,
+                  onChanged: (v) {
+                    _debounce?.cancel();
+                    _debounce = Timer(
+                      const Duration(milliseconds: 300),
+                      () {
+                        if (mounted) setState(() => _query = v);
+                      },
+                    );
+                  },
+                  style: AppTypography.body.copyWith(
+                    color: isDark
+                        ? AppColors.darkTextPrimary
+                        : AppColors.textPrimary,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Search canteens, dishes…',
+                    hintStyle: AppTypography.body.copyWith(
+                      color: isDark
+                          ? AppColors.darkTextMuted
+                          : AppColors.textMuted,
+                    ),
+                    prefixIcon: Icon(Icons.search_rounded,
+                        color: isDark
+                            ? AppColors.darkTextMuted
+                            : AppColors.textMuted),
+                    suffixIcon: _query.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded),
+                            onPressed: () {
+                              _ctrl.clear();
+                              setState(() => _query = '');
+                            },
+                          )
+                        : null,
+                    border: InputBorder.none,
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 14),
+                  ),
+                ),
+              ),
+            ),
+            // Results
+            Expanded(
+              child: ListView(
+                controller: controller,
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                children: <Widget>[
+                  if (matchedCanteens.isNotEmpty) ...<Widget>[
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8, top: 4),
+                      child: Text('Canteens',
+                          style: AppTypography.labelSm.copyWith(
+                            color: isDark
+                                ? AppColors.darkTextMuted
+                                : AppColors.textMuted,
+                            letterSpacing: 0.8,
+                          )),
+                    ),
+                    ...matchedCanteens.map((c) => ListTile(
+                          leading: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color:
+                                  AppColors.primary.withValues(alpha: 0.10),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.storefront_rounded,
+                                color: AppColors.primary, size: 20),
+                          ),
+                          title: Text(c.name,
+                              style: AppTypography.label.copyWith(
+                                color: isDark
+                                    ? AppColors.darkTextPrimary
+                                    : AppColors.textPrimary,
+                              )),
+                          subtitle: Text(
+                            c.description.isEmpty
+                                ? 'Campus canteen'
+                                : c.description,
+                            style: AppTypography.caption.copyWith(
+                              color: isDark
+                                  ? AppColors.darkTextMuted
+                                  : AppColors.textMuted,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          trailing: Icon(Icons.arrow_forward_ios_rounded,
+                              size: 14,
+                              color: isDark
+                                  ? AppColors.darkTextMuted
+                                  : AppColors.textMuted),
+                          onTap: () {
+                            Navigator.of(context).pop();
+                            widget.onOpenMenu(c);
+                          },
+                        )),
+                  ],
+                  if (matchedItems.isNotEmpty) ...<Widget>[
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8, top: 12),
+                      child: Text('Dishes',
+                          style: AppTypography.labelSm.copyWith(
+                            color: isDark
+                                ? AppColors.darkTextMuted
+                                : AppColors.textMuted,
+                            letterSpacing: 0.8,
+                          )),
+                    ),
+                    ...matchedItems.map((item) => ListTile(
+                          leading: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color:
+                                  AppColors.accent.withValues(alpha: 0.10),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.lunch_dining_rounded,
+                                color: AppColors.accent, size: 20),
+                          ),
+                          title: Text(item.name,
+                              style: AppTypography.label.copyWith(
+                                color: isDark
+                                    ? AppColors.darkTextPrimary
+                                    : AppColors.textPrimary,
+                              )),
+                          subtitle: Text(item.category,
+                              style: AppTypography.caption.copyWith(
+                                color: isDark
+                                    ? AppColors.darkTextMuted
+                                    : AppColors.textMuted,
+                              )),
+                          trailing: Text(
+                            '₹${item.price.toStringAsFixed(0)}',
+                            style: AppTypography.priceSm.copyWith(
+                              color: isDark
+                                  ? AppColors.primaryOnDark
+                                  : AppColors.primary,
+                            ),
+                          ),
+                        )),
+                  ],
+                  if (matchedCanteens.isEmpty && matchedItems.isEmpty && q.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 40),
+                      child: Center(
+                        child: Text('No results for "$_query"',
+                            style: AppTypography.body.copyWith(
+                              color: isDark
+                                  ? AppColors.darkTextMuted
+                                  : AppColors.textMuted,
+                            )),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Filter Sheet ──────────────────────────────────────────────────────────────
+
+class _FilterSheet extends StatefulWidget {
+  const _FilterSheet();
+
+  @override
+  State<_FilterSheet> createState() => _FilterSheetState();
+}
+
+class _FilterSheetState extends State<_FilterSheet> {
+  bool _vegOnly = false;
+  bool _openOnly = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkBg : AppColors.bg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          // Handle
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkBorder : AppColors.divider,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          Text('Filters',
+              style: AppTypography.heading3.copyWith(
+                color: isDark
+                    ? AppColors.darkTextPrimary
+                    : AppColors.textPrimary,
+              )),
+          const SizedBox(height: 20),
+          // Vegetarian toggle
+          _FilterRow(
+            isDark: isDark,
+            icon: Icons.eco_rounded,
+            iconColor: AppColors.success,
+            label: 'Vegetarian only',
+            subtitle: 'Show only veg items',
+            value: _vegOnly,
+            onChanged: (v) => setState(() => _vegOnly = v),
+          ),
+          const SizedBox(height: 12),
+          // Open now toggle
+          _FilterRow(
+            isDark: isDark,
+            icon: Icons.storefront_rounded,
+            iconColor: AppColors.primary,
+            label: 'Open now',
+            subtitle: 'Show only open canteens',
+            value: _openOnly,
+            onChanged: (v) => setState(() => _openOnly = v),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.of(context)
+                  .pop<({bool vegOnly, bool openOnly})>(
+                    (vegOnly: _vegOnly, openOnly: _openOnly),
+                  ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: const StadiumBorder(),
+                minimumSize: const Size(0, 50),
+              ),
+              child: const Text('Apply Filters'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterRow extends StatelessWidget {
+  const _FilterRow({
+    required this.isDark,
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+  final bool isDark;
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+              color: AppColors.shadowPink,
+              blurRadius: 10,
+              offset: Offset(0, 3)),
+        ],
+      ),
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 18, color: iconColor),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(label,
+                    style: AppTypography.label.copyWith(
+                      color: isDark
+                          ? AppColors.darkTextPrimary
+                          : AppColors.textPrimary,
+                    )),
+                Text(subtitle,
+                    style: AppTypography.caption.copyWith(
+                      color: isDark
+                          ? AppColors.darkTextMuted
+                          : AppColors.textMuted,
+                    )),
+              ],
+            ),
+          ),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeThumbColor: AppColors.primary,
+            trackColor: WidgetStateProperty.resolveWith((s) {
+              if (s.contains(WidgetState.selected)) {
+                return AppColors.primary.withValues(alpha: 0.30);
+              }
+              return null;
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ── Skeleton ──────────────────────────────────────────────────────────────────
 
 class _HomeSkeleton extends StatelessWidget {
@@ -1115,36 +1803,36 @@ class _HomeSkeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-      children: <Widget>[
+      children: const <Widget>[
         ShimmerLoader(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               ShimmerBox(width: double.infinity, height: 110, radius: 20),
-              const SizedBox(height: 24),
+              SizedBox(height: 24),
               ShimmerBox(width: 160, height: 20, radius: 8),
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               Row(
                 children: <Widget>[
                   Expanded(
                       child: ShimmerBox(
                           width: double.infinity, height: 100, radius: 16)),
-                  const SizedBox(width: 10),
+                  SizedBox(width: 10),
                   Expanded(
                       child: ShimmerBox(
                           width: double.infinity, height: 100, radius: 16)),
-                  const SizedBox(width: 10),
+                  SizedBox(width: 10),
                   Expanded(
                       child: ShimmerBox(
                           width: double.infinity, height: 100, radius: 16)),
                 ],
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: 24),
               ShimmerBox(width: 140, height: 20, radius: 8),
-              const SizedBox(height: 12),
-              const SkeletonCanteenCard(),
-              const SizedBox(height: 14),
-              const SkeletonCanteenCard(),
+              SizedBox(height: 12),
+              SkeletonCanteenCard(),
+              SizedBox(height: 14),
+              SkeletonCanteenCard(),
             ],
           ),
         ),

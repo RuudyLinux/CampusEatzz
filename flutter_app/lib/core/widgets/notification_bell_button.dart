@@ -6,11 +6,16 @@ import '../../features/notifications/notifications_screen.dart';
 import '../../state/notification_provider.dart';
 
 class NotificationBellButton extends StatelessWidget {
-  const NotificationBellButton({super.key});
+  const NotificationBellButton({super.key, this.iconColor});
+
+  /// Null = inherit from nearest IconTheme (set by the parent header widget).
+  final Color? iconColor;
 
   @override
   Widget build(BuildContext context) {
     final unread = context.watch<NotificationProvider>().unreadCount;
+    final effectiveColor =
+        iconColor ?? IconTheme.of(context).color ?? Colors.white;
 
     return IconButton(
       tooltip: 'Notifications',
@@ -22,7 +27,7 @@ class NotificationBellButton extends StatelessWidget {
       icon: Stack(
         clipBehavior: Clip.none,
         children: <Widget>[
-          const Icon(Icons.notifications_none_rounded, color: Colors.white),
+          Icon(Icons.notifications_outlined, color: effectiveColor),
           if (unread > 0)
             Positioned(
               right: -2,
@@ -34,7 +39,8 @@ class NotificationBellButton extends StatelessWidget {
                   borderRadius: BorderRadius.circular(9),
                   border: Border.all(color: Colors.white, width: 1),
                 ),
-                constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                constraints:
+                    const BoxConstraints(minWidth: 14, minHeight: 14),
                 child: Text(
                   unread > 99 ? '99+' : unread.toString(),
                   textAlign: TextAlign.center,

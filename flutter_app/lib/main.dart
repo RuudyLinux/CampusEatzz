@@ -20,6 +20,8 @@ import 'state/chat_provider.dart';
 import 'state/notification_provider.dart';
 import 'state/orders_provider.dart';
 import 'state/recommendation_provider.dart';
+import 'state/saved_canteens_provider.dart';
+import 'state/theme_provider.dart';
 import 'state/wallet_provider.dart';
 
 void main() {
@@ -50,6 +52,12 @@ class CampusEatzzApp extends StatelessWidget {
         ChangeNotifierProvider<AuthProvider>(
           create: (context) => AuthProvider(context.read<AuthService>(), context.read<AppPreferences>()),
         ),
+        ChangeNotifierProvider<ThemeProvider>(
+          create: (context) => ThemeProvider(context.read<AppPreferences>()),
+        ),
+        ChangeNotifierProvider<SavedCanteensProvider>(
+          create: (context) => SavedCanteensProvider(context.read<AppPreferences>()),
+        ),
         ChangeNotifierProvider<CartProvider>(
           create: (context) => CartProvider(context.read<AppPreferences>()),
         ),
@@ -78,18 +86,20 @@ class CampusEatzzApp extends StatelessWidget {
           },
         ),
       ],
-      child: MaterialApp(
-        title: 'CampusEatzz',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.build(),
-        darkTheme: AppTheme.buildDark(),
-        themeMode: ThemeMode.system,
-        builder: (context, child) {
-          return _NotificationActionHost(
-            child: child ?? const SizedBox.shrink(),
-          );
-        },
-        home: const BootstrapScreen(),
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, _) => MaterialApp(
+          title: 'CampusEatzz',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.build(),
+          darkTheme: AppTheme.buildDark(),
+          themeMode: themeProvider.mode,
+          builder: (context, child) {
+            return _NotificationActionHost(
+              child: child ?? const SizedBox.shrink(),
+            );
+          },
+          home: const BootstrapScreen(),
+        ),
       ),
     );
   }
