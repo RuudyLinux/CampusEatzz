@@ -698,7 +698,19 @@ class _CanteenCard extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => onTap(canteen),
+        onTap: () {
+          if (canteen.isUnderMaintenance) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('This canteen is under maintenance — try again later.'),
+                backgroundColor: Color(0xFFD97706),
+                duration: Duration(seconds: 2),
+              ),
+            );
+            return;
+          }
+          onTap(canteen);
+        },
         borderRadius: BorderRadius.circular(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

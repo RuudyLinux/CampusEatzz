@@ -89,6 +89,7 @@ class _MenuScreenState extends State<MenuScreen> {
     final showCheckoutBar = cart.items.isNotEmpty &&
         widget.canteenId != null &&
         cart.activeCanteenId == widget.canteenId;
+    final isMaintenance = canteen?.isUnderMaintenance ?? false;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.darkBg : AppColors.bg,
@@ -154,6 +155,34 @@ class _MenuScreenState extends State<MenuScreen> {
                   ),
                 )
               else ...<Widget>[
+                // ── Maintenance banner ────────────────────────────────
+                if (isMaintenance)
+                  SliverToBoxAdapter(
+                    child: Container(
+                      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF3CD),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFD97706)),
+                      ),
+                      child: const Row(
+                        children: <Widget>[
+                          Icon(Icons.construction_rounded,
+                              color: Color(0xFFD97706), size: 20),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'This canteen is currently under maintenance. Ordering is temporarily unavailable.',
+                              style: TextStyle(
+                                  color: Color(0xFF92400E), fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 // Category chips (sticky via SliverPersistentHeader)
                 SliverPersistentHeader(
                   pinned: true,
@@ -186,7 +215,11 @@ class _MenuScreenState extends State<MenuScreen> {
                         final item = visibleRows[index];
                         return AnimatedReveal(
                           delayMs: 60 + index * 30,
-                          child: _MenuCard(item: item, isDark: isDark),
+                          child: _MenuCard(
+                            item: item,
+                            isDark: isDark,
+                            isMaintenance: isMaintenance,
+                          ),
                         );
                       },
                       childCount:
@@ -487,10 +520,15 @@ class _CategoryHeaderDelegate extends SliverPersistentHeaderDelegate {
 // ── Menu Card ─────────────────────────────────────────────────────────────────
 
 class _MenuCard extends StatelessWidget {
-  const _MenuCard({required this.item, required this.isDark});
+  const _MenuCard({
+    required this.item,
+    required this.isDark,
+    this.isMaintenance = false,
+  });
 
   final MenuItem item;
   final bool isDark;
+  final bool isMaintenance;
 
   @override
   Widget build(BuildContext context) {
@@ -641,7 +679,11 @@ class _MenuCard extends StatelessWidget {
                               ),
                             ),
                             const Spacer(),
-                            _AddButton(item: item, isDark: isDark),
+                            _AddButton(
+                              item: item,
+                              isDark: isDark,
+                              isMaintenance: isMaintenance,
+                            ),
                           ],
                         ),
                       ],
@@ -660,16 +702,22 @@ class _MenuCard extends StatelessWidget {
 // ── Add to Cart button — always pink ─────────────────────────────────────────
 
 class _AddButton extends StatelessWidget {
-  const _AddButton({required this.item, required this.isDark});
+  const _AddButton({
+    required this.item,
+    required this.isDark,
+    this.isMaintenance = false,
+  });
 
   final MenuItem item;
   final bool isDark;
+  final bool isMaintenance;
 
   @override
   Widget build(BuildContext context) {
     return ElevatedButton.icon(
-      onPressed: item.isAvailable
-          ? () async {
+      onPressed: isMaintenance || !item.isAvailable
+          ? null
+          : () async {
               final cart = context.read<CartProvider>();
               final messenger = ScaffoldMessenger.of(context);
               if (cart.hasCanteenConflict(item)) {
@@ -705,10 +753,15 @@ class _AddButton extends StatelessWidget {
                 content: Text('${item.name} added'),
                 duration: const Duration(seconds: 1),
               ));
-            }
-          : null,
+            },
       icon: const Icon(Icons.add_rounded, size: 16),
-      label: Text(item.isAvailable ? 'Add' : 'Sold Out'),
+      label: Text(
+        isMaintenance
+            ? 'Unavailable'
+            : item.isAvailable
+                ? 'Add'
+                : 'Sold Out',
+      ),
       style: ElevatedButton.styleFrom(
         // Override global dark button: use pink for Add to Cart
         backgroundColor:
