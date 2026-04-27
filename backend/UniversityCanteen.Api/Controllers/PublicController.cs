@@ -105,8 +105,10 @@ public sealed class PublicController(
                     COALESCE(c.description, '') AS Description,
                     COALESCE(c.image_url, '') AS ImageUrl,
                     COALESCE(c.status, 'active') AS Status,
-                    COALESCE(c.display_order, 0) AS DisplayOrder
+                    COALESCE(c.display_order, 0) AS DisplayOrder,
+                    COALESCE(mm.is_active, 0) AS IsUnderMaintenance
                 FROM canteens c
+                LEFT JOIN maintenance_mode mm ON mm.canteen_id = c.id
                 WHERE COALESCE(c.status, 'active') = 'active'
                 ORDER BY c.display_order ASC, c.id ASC;
                 """,
@@ -125,7 +127,8 @@ public sealed class PublicController(
                         description = r.Description,
                         imageUrl = ToAbsoluteImageUrl(r.ImageUrl),
                         status = r.Status,
-                        displayOrder = r.DisplayOrder
+                        displayOrder = r.DisplayOrder,
+                        isUnderMaintenance = r.IsUnderMaintenance
                     }),
                     total = rows.Count
                 }
@@ -197,6 +200,7 @@ public sealed class PublicController(
         public string ImageUrl { get; init; } = string.Empty;
         public string Status { get; init; } = "active";
         public int DisplayOrder { get; init; }
+        public bool IsUnderMaintenance { get; init; }
     }
 
     private sealed class PublicSettingRow
