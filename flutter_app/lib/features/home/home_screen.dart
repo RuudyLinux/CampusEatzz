@@ -120,7 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
     var filteredCanteens = canteenState.canteens;
     if (_filterOpenOnly) {
       filteredCanteens = filteredCanteens
-          .where((c) => c.status.toLowerCase() == 'open')
+          .where((c) => c.isOpen && !c.isUnderMaintenance)
           .toList(growable: false);
     }
     if (_filterVegOnly) {
@@ -681,7 +681,8 @@ class _CanteenCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final saved = context.watch<SavedCanteensProvider>();
     final isSaved = saved.isSaved(canteen.id);
-    final isOpen = canteen.status.toLowerCase() == 'open';
+    final isMaintenance = canteen.isUnderMaintenance;
+    final isOpen = !isMaintenance && canteen.isOpen;
 
     return Container(
       decoration: BoxDecoration(
@@ -724,7 +725,7 @@ class _CanteenCard extends StatelessWidget {
                                 ? AppColors.darkTextMuted
                                 : AppColors.textMuted),
                       ),
-                // Status pill
+                // Status pill — Maintenance (yellow) / Open (green) / Closed (red)
                 Positioned(
                   top: 12,
                   left: 12,
@@ -732,16 +733,30 @@ class _CanteenCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: isOpen ? AppColors.success : AppColors.danger,
+                      color: isMaintenance
+                          ? const Color(0xFFD97706)
+                          : isOpen
+                              ? AppColors.success
+                              : AppColors.danger,
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
-                        const Icon(Icons.circle, size: 6, color: Colors.white),
+                        Icon(
+                          isMaintenance
+                              ? Icons.construction_rounded
+                              : Icons.circle,
+                          size: isMaintenance ? 10 : 6,
+                          color: Colors.white,
+                        ),
                         const SizedBox(width: 4),
                         Text(
-                          isOpen ? 'Open' : 'Closed',
+                          isMaintenance
+                              ? 'Maintenance'
+                              : isOpen
+                                  ? 'Open'
+                                  : 'Closed',
                           style: AppTypography.labelSm
                               .copyWith(color: Colors.white),
                         ),

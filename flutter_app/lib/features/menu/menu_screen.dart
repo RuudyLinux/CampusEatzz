@@ -306,18 +306,24 @@ class _CanteenHero extends StatelessWidget {
                   ),
                 ),
               const SizedBox(height: 10),
-              // Status chip
+              // Status chip — Maintenance (yellow) / Open (green) / Closed (red)
               Row(
                 children: <Widget>[
                   _StatChip(
-                    icon: Icons.circle,
-                    label: canteen?.status.toLowerCase() == 'open'
-                        ? 'Open'
-                        : 'Closed',
-                    iconColor: canteen?.status.toLowerCase() == 'open'
-                        ? const Color(0xFF4CAF50)
-                        : AppColors.danger,
-                    iconSize: 8,
+                    icon: (canteen?.isUnderMaintenance ?? false)
+                        ? Icons.construction_rounded
+                        : Icons.circle,
+                    label: (canteen?.isUnderMaintenance ?? false)
+                        ? 'Maintenance'
+                        : (canteen?.isOpen ?? false)
+                            ? 'Open'
+                            : 'Closed',
+                    iconColor: (canteen?.isUnderMaintenance ?? false)
+                        ? const Color(0xFFD97706)
+                        : (canteen?.isOpen ?? false)
+                            ? const Color(0xFF4CAF50)
+                            : AppColors.danger,
+                    iconSize: (canteen?.isUnderMaintenance ?? false) ? 10 : 8,
                   ),
                 ],
               ),
