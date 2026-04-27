@@ -146,10 +146,12 @@
                 AdminApi.request("/api/admin/canteen-admins")
             ]);
 
-            canteensCache = (canteensResult.data && canteensResult.data.canteens) || [];
+            const cd = (canteensResult && canteensResult.data) || {};
+            canteensCache = cd.canteens || (Array.isArray(cd) ? cd : []);
             fillCanteens();
 
-            const admins = (adminsResult.data && adminsResult.data.admins) || [];
+            const ad = (adminsResult && adminsResult.data) || {};
+            const admins = ad.admins || (Array.isArray(ad) ? ad : []);
             window.__admins = admins;
             render(admins);
             if (countEl) countEl.textContent = String(admins.length);

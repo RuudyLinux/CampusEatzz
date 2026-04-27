@@ -77,8 +77,9 @@
 
     async function loadSettings() {
         const response = await AdminApi.request("/api/admin/settings");
-        const values = response && response.data && response.data.values ? response.data.values : {};
-        state.settings = Object.assign({}, values || {});
+        const raw = (response && response.data) || {};
+        const values = raw.values || (typeof raw === "object" && !Array.isArray(raw) ? raw : {});
+        state.settings = Object.assign({}, values);
 
         settingKeys.forEach(function(key) {
             setInputValue("setting-" + key, state.settings[key] || "");
@@ -114,24 +115,19 @@
                 }
             }
 
-            for (let i = 0; i < settingKeys.length; i += 1) {
-                const key = settingKeys[i];
+            const savePromises = settingKeys.map(function(key) {
                 const input = document.getElementById("setting-" + key);
                 const value = input ? String(input.value || "").trim() : "";
-
-                const saveResult = await AdminApi.request("/api/admin/settings", {
+                return AdminApi.request("/api/admin/settings", {
                     method: "PUT",
-                    body: JSON.stringify({
-                        settingKey: key,
-                        settingValue: value
-                    })
+                    body: JSON.stringify({ settingKey: key, settingValue: value })
+                }).then(function(saveResult) {
+                    const savedValue = saveResult && saveResult.data && typeof saveResult.data.settingValue === "string"
+                        ? saveResult.data.settingValue : value;
+                    state.settings[key] = savedValue;
                 });
-
-                const savedValue = saveResult && saveResult.data && typeof saveResult.data.settingValue === "string"
-                    ? saveResult.data.settingValue
-                    : value;
-                state.settings[key] = savedValue;
-            }
+            });
+            await Promise.all(savePromises);
 
             const brandingValues = Object.assign({}, state.settings);
             if (typeof AdminApi.setBrandingValues === "function") {

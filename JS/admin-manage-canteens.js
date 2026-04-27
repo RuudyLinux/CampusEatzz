@@ -157,7 +157,8 @@
         document.getElementById("canteenName").value = item.name || "";
         document.getElementById("canteenDescription").value = item.description || "";
         document.getElementById("canteenImageUrl").value = item.imageUrl || "";
-        document.getElementById("canteenActive").checked = String(item.status || "active") === "active";
+        const s = String(item.status || "").toLowerCase();
+        document.getElementById("canteenActive").checked = s === "open" || s === "active";
         resetImageSelection();
         updateImagePreview();
         document.getElementById("canteenModal").classList.remove("hidden");
@@ -176,7 +177,8 @@
     function render(canteens) {
         if (!grid) return;
         grid.innerHTML = canteens.map(function(c) {
-            const isActive = String(c.status || "active") === "active";
+            const s = String(c.status || "").toLowerCase();
+            const isActive = s === "open" || s === "active";
             const displayImage = withCacheBust(getDisplayImageUrl(c));
             const fallbackImage = createPlaceholderImage(c && c.name);
             return `
@@ -206,7 +208,7 @@
             if (loading) loading.classList.remove("hidden");
             const result = await AdminApi.request("/api/admin/canteens");
             const data = (result && result.data) || {};
-            const canteens = data.canteens || [];
+            const canteens = data.canteens || (Array.isArray(data) ? data : []);
             render(canteens);
             if (countEl) countEl.textContent = String(data.total || canteens.length || 0);
         } catch (error) {
@@ -311,7 +313,7 @@
                             name: String(payload.name || "").trim(),
                             description: String(payload.description || "").trim(),
                             imageUrl: payload.imageUrl ? buildApiUrl(String(payload.imageUrl)) : "",
-                            status: payload.isActive ? "active" : "deactive"
+                            status: payload.isActive ? "open" : "closed"
                         }
                     };
 
