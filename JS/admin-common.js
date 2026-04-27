@@ -2,9 +2,10 @@
     const BRAND_CACHE_KEY = "appSettingsCache";
     const BRAND_SHARED_CACHE_KEY = "appSettingsSharedCache";
     const BRAND_VERSION_KEY = "appSettingsVersion";
-    const BRAND_CACHE_TTL_MS = 5 * 60 * 1000;
+    const BRAND_CACHE_TTL_MS = 30 * 60 * 1000;
     const BRAND_NAME_FALLBACK = "CampusEatzz";
     const BRAND_FETCH_TIMEOUT_MS = 3000;
+    const REQUEST_CANDIDATE_TIMEOUT_MS = 4000;
 
     function appendLocalBackendCandidates(candidates) {
         const protocol = String(global.location && global.location.protocol || "http:").toLowerCase();
@@ -116,7 +117,10 @@
     }
 
     const API_CANDIDATES = getApiCandidates();
-    let activeApiBase = API_CANDIDATES.length > 0 ? API_CANDIDATES[0] : "";
+    let activeApiBase = (function() {
+        var stored = String(localStorage.getItem("apiBaseUrl") || "").trim().replace(/\/$/, "");
+        return stored || (API_CANDIDATES.length > 0 ? API_CANDIDATES[0] : "");
+    }());
 
     function getOrderedApiCandidates() {
         const ordered = [];
@@ -329,7 +333,7 @@
             const url = candidate ? (candidate + "/" + normalizedPath) : ("/" + normalizedPath);
 
             try {
-                const response = await fetch(url, finalOptions);
+                const response = await fetchWithTimeout(url, finalOptions, REQUEST_CANDIDATE_TIMEOUT_MS);
                 const body = await parseJsonSafe(response);
 
                 if (response.ok) {
