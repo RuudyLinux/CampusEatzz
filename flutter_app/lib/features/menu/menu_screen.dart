@@ -130,11 +130,6 @@ class _MenuScreenState extends State<MenuScreen> {
                 ),
               ),
 
-              // ── Pre-order bar ─────────────────────────────────────────
-              SliverToBoxAdapter(
-                child: _PreOrderBar(isDark: isDark),
-              ),
-
               // ── Loading / error / content ─────────────────────────────
               if (canteenState.loadingMenu && menuRows.isEmpty)
                 const SliverFillRemaining(
@@ -249,7 +244,7 @@ class _CanteenHero extends StatelessWidget {
                 height: double.infinity,
                 borderRadius: BorderRadius.zero,
               )
-            : Container(
+            : ColoredBox(
                 color: isDark
                     ? AppColors.darkSurface
                     : AppColors.primary.withValues(alpha: 0.85),
@@ -311,25 +306,15 @@ class _CanteenHero extends StatelessWidget {
                   ),
                 ),
               const SizedBox(height: 10),
-              // Stats row
+              // Status chip
               Row(
                 children: <Widget>[
                   _StatChip(
-                    icon: Icons.star_rounded,
-                    label: '4.5',
-                    iconColor: const Color(0xFFFFC107),
-                  ),
-                  const SizedBox(width: 10),
-                  _StatChip(
-                    icon: Icons.timer_outlined,
-                    label: '10–20 min',
-                    iconColor: Colors.white,
-                  ),
-                  const SizedBox(width: 10),
-                  _StatChip(
                     icon: Icons.circle,
-                    label: canteen?.status == 'open' ? 'Open' : 'Closed',
-                    iconColor: canteen?.status == 'open'
+                    label: canteen?.status.toLowerCase() == 'open'
+                        ? 'Open'
+                        : 'Closed',
+                    iconColor: canteen?.status.toLowerCase() == 'open'
                         ? const Color(0xFF4CAF50)
                         : AppColors.danger,
                     iconSize: 8,
@@ -413,69 +398,6 @@ class _StatChip extends StatelessWidget {
   }
 }
 
-// ── Pre-order bar ─────────────────────────────────────────────────────────────
-
-class _PreOrderBar extends StatelessWidget {
-  const _PreOrderBar({required this.isDark});
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    final now = DateTime.now().add(const Duration(minutes: 15));
-    final hour = now.hour > 12 ? now.hour - 12 : now.hour == 0 ? 12 : now.hour;
-    final minute = now.minute.toString().padLeft(2, '0');
-    final period = now.hour >= 12 ? 'PM' : 'AM';
-    final timeStr = '$hour:$minute $period';
-
-    return Container(
-      color: isDark ? AppColors.darkCard : Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: isDark ? 0.15 : 0.08),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: <Widget>[
-            const Icon(
-              Icons.access_time_rounded,
-              size: 18,
-              color: AppColors.primary,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: RichText(
-                text: TextSpan(
-                  style: AppTypography.bodySm.copyWith(
-                    color: isDark
-                        ? AppColors.darkTextPrimary
-                        : AppColors.textPrimary,
-                  ),
-                  children: <InlineSpan>[
-                    const TextSpan(text: 'Pre-order for pickup at '),
-                    TextSpan(
-                      text: timeStr,
-                      style: AppTypography.bodySm.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const Icon(
-              Icons.chevron_right_rounded,
-              size: 18,
-              color: AppColors.primary,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 // ── Category header (sticky) ──────────────────────────────────────────────────
 
@@ -572,11 +494,11 @@ class _MenuCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: isDark ? AppColors.darkCard : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: <BoxShadow>[
+          boxShadow: const <BoxShadow>[
             BoxShadow(
               color: AppColors.shadowPink,
               blurRadius: 16,
-              offset: const Offset(0, 4),
+              offset: Offset(0, 4),
             ),
           ],
         ),
@@ -891,14 +813,14 @@ class _MenuSkeleton extends StatelessWidget {
     return ShimmerLoader(
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-        children: <Widget>[
+        children: const <Widget>[
           ShimmerBox(width: double.infinity, height: 50, radius: 50),
-          const SizedBox(height: 16),
-          const SkeletonMenuCard(),
-          const SizedBox(height: 14),
-          const SkeletonMenuCard(),
-          const SizedBox(height: 14),
-          const SkeletonMenuCard(),
+          SizedBox(height: 16),
+          SkeletonMenuCard(),
+          SizedBox(height: 14),
+          SkeletonMenuCard(),
+          SizedBox(height: 14),
+          SkeletonMenuCard(),
         ],
       ),
     );
