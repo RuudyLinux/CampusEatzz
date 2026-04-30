@@ -449,6 +449,24 @@ static async Task EnsureCoreSchemaAsync(
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         """,
         """
+        CREATE TABLE IF NOT EXISTS refund_requests (
+            id INT NOT NULL AUTO_INCREMENT,
+            order_id INT NOT NULL,
+            user_id INT NOT NULL,
+            amount DECIMAL(10,2) NOT NULL,
+            reason VARCHAR(500) NOT NULL,
+            status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+            admin_notes TEXT NULL,
+            processed_at TIMESTAMP NULL DEFAULT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uq_refund_requests_order (order_id),
+            KEY ix_refund_requests_user (user_id),
+            KEY ix_refund_requests_status (status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+        """,
+        """
         CREATE TABLE IF NOT EXISTS chatbot_messages (
             id BIGINT NOT NULL AUTO_INCREMENT,
             conversation_id VARCHAR(100) NOT NULL,

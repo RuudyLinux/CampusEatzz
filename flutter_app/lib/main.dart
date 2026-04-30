@@ -20,6 +20,7 @@ import 'state/chat_provider.dart';
 import 'state/notification_provider.dart';
 import 'state/orders_provider.dart';
 import 'state/recommendation_provider.dart';
+import 'state/refund_provider.dart';
 import 'state/saved_canteens_provider.dart';
 import 'state/theme_provider.dart';
 import 'state/wallet_provider.dart';
@@ -69,6 +70,9 @@ class CampusEatzzApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<OrdersProvider>(
           create: (context) => OrdersProvider(context.read<CustomerService>()),
+        ),
+        ChangeNotifierProvider<RefundProvider>(
+          create: (context) => RefundProvider(context.read<CustomerService>()),
         ),
         ChangeNotifierProvider<ChatProvider>(
           create: (context) => ChatProvider(context.read<ChatService>()),

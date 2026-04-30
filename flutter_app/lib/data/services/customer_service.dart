@@ -1,5 +1,6 @@
 import '../models/cart_item.dart';
 import '../models/order_models.dart';
+import '../models/refund_models.dart';
 import '../models/wallet_models.dart';
 import 'api_client.dart';
 
@@ -168,6 +169,50 @@ class CustomerService {
 
     final body = _asMap(response.data);
     _ensureSuccess(body, fallback: 'Unable to submit feedback');
+  }
+
+  Future<RequestRefundResult> requestRefund({
+    required String identifier,
+    required String orderRef,
+    required String reason,
+  }) async {
+    final response = await _apiClient.request(
+      'api/customer/orders/$orderRef/refund',
+      method: 'POST',
+      data: <String, dynamic>{
+        'identifier': identifier,
+        'reason': reason,
+      },
+    );
+
+    final body = _asMap(response.data);
+    _ensureSuccess(body, fallback: 'Unable to request refund');
+
+    return RequestRefundResult.fromJson(_asMap(body['data']));
+  }
+
+  Future<RefundInfo?> getRefundStatus({
+    required String identifier,
+    required String orderRef,
+  }) async {
+    try {
+      final response = await _apiClient.request(
+        'api/customer/orders/$orderRef/refund',
+        queryParameters: <String, dynamic>{
+          'identifier': identifier,
+        },
+        method: 'GET',
+      );
+
+      final body = _asMap(response.data);
+      if (body['success'] != true) return null;
+
+      final data = body['data'];
+      if (data == null) return null;
+      return RefundInfo.fromJson(_asMap(data));
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> submitContactMessage({

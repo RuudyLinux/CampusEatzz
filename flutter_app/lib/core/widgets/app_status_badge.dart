@@ -13,6 +13,7 @@ enum AppStatus {
   cancelled,
   paid,
   unpaid,
+  refunded,
   active,
   inactive,
 }
@@ -32,6 +33,8 @@ extension _AppStatusProps on AppStatus {
         return 'Completed';
       case AppStatus.cancelled:
         return 'Cancelled';
+      case AppStatus.refunded:
+        return 'Refunded';
       case AppStatus.paid:
         return 'Paid';
       case AppStatus.unpaid:
@@ -61,6 +64,8 @@ extension _AppStatusProps on AppStatus {
       case AppStatus.unpaid:
       case AppStatus.inactive:
         return AppColors.danger;
+      case AppStatus.refunded:
+        return AppColors.info;
     }
   }
 
@@ -83,6 +88,8 @@ extension _AppStatusProps on AppStatus {
       case AppStatus.unpaid:
       case AppStatus.inactive:
         return isDark ? AppColors.dangerBgDark : AppColors.dangerBg;
+      case AppStatus.refunded:
+        return AppColors.infoBg;
     }
   }
 }
@@ -121,6 +128,8 @@ class AppStatusBadge extends StatelessWidget {
         return AppStatus.cancelled;
       case 'paid':
         return AppStatus.paid;
+      case 'refunded':
+        return AppStatus.refunded;
       case 'unpaid':
         return AppStatus.unpaid;
       case 'active':
