@@ -7,7 +7,6 @@
       "Bash(netstat -ano)",
       "Bash(findstr \":5266 \\\\|:5112 \")",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5000/api/maintenance/status)",
-      "Bash(curl -s -X POST http://localhost:5000/api/canteen-admin/login -H \"Content-Type: application/json\" -d \"{\\\\\"email\\\\\":\\\\\"chirag@teatcenter.com\\\\\",\\\\\"password\\\\\":\\\\\"admin123\\\\\"}\")",
       "Bash(git -C \"d:/#practicals/FCampusEatzz\" status)",
       "Bash(git -C \"d:/#practicals/FCampusEatzz\" log --oneline -5)",
       "Bash(git -C \"d:/#practicals/FCampusEatzz\" add backend/UniversityCanteen.Api/Program.cs)",
@@ -20,7 +19,8 @@
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(s['service']['id'], s['service']['name'], s['service']['updatedAt']\\) for s in data]\")"
     ]
   }
 }

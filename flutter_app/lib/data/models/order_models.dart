@@ -198,7 +198,25 @@ double _asDouble(dynamic value) {
 
 DateTime? _toDate(dynamic value) {
   if (value is String && value.trim().isNotEmpty) {
-    return DateTime.tryParse(value.trim());
+    final raw = value.trim();
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) {
+      return null;
+    }
+    if (parsed.isUtc) {
+      return parsed;
+    }
+    // Server dates are UTC but often serialized without timezone info.
+    return DateTime.utc(
+      parsed.year,
+      parsed.month,
+      parsed.day,
+      parsed.hour,
+      parsed.minute,
+      parsed.second,
+      parsed.millisecond,
+      parsed.microsecond,
+    );
   }
   return null;
 }

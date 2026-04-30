@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('id'\\), d.get\\('status'\\), d.get\\('createdAt'\\)\\)\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('id'\\), d.get\\('status'\\)\\)\")",
+      "Bash(flutter analyze *)"
+    ]
+  }
+}

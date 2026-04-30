@@ -81,7 +81,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
             child: state.isLoading
                 ? const SkeletonScreen(itemCount: 5)
                 : state.orders.isEmpty
-                    ? AppEmptyState(
+                    ? const AppEmptyState(
                         icon: Icons.receipt_long_outlined,
                         title: 'No Orders Yet',
                         subtitle:

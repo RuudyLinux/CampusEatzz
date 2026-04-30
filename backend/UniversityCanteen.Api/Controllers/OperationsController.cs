@@ -2,6 +2,7 @@ using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using System.Data.Common;
 using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -426,6 +427,264 @@ public sealed class OperationsController(
         {
             logger.LogError(ex, "Failed to fetch wallet transactions.");
             return StatusCode(StatusCodes.Status500InternalServerError, Failure("Internal server error while fetching wallet transactions."));
+        }
+    }
+
+    [HttpGet("admin/refunds")]
+    [ResponseCache(Duration = 15, Location = ResponseCacheLocation.Any)]
+    public async Task<IActionResult> GetAdminRefunds(
+        [FromQuery] string? status,
+        [FromQuery] string? search,
+        [FromQuery] int limit = 50,
+        [FromQuery] int offset = 0,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedStatus = NormalizeRefundStatus(status);
+        var normalizedSearch = (search ?? string.Empty).Trim();
+        var normalizedLimit = Math.Clamp(limit, 1, 200);
+        var normalizedOffset = Math.Max(offset, 0);
+
+        try
+        {
+            using var connection = dbConnectionFactory.CreateConnection();
+
+            if (!await EnsureAdminAccessAsync(connection, cancellationToken))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, Failure("You are not authorized to access refund data."));
+            }
+
+            var rows = (await connection.QueryAsync<AdminRefundRow>(new CommandDefinition(
+                """
+                SELECT
+                    rr.id AS Id,
+                    rr.order_id AS OrderId,
+                    rr.user_id AS UserId,
+                    rr.amount AS Amount,
+                    rr.reason AS Reason,
+                    rr.status AS Status,
+                    COALESCE(rr.admin_notes, '') AS AdminNotes,
+                    rr.created_at AS CreatedAt,
+                    rr.processed_at AS ProcessedAt,
+                    o.order_number AS OrderNumber,
+                    COALESCE(o.payment_method, 'cash') AS PaymentMethod,
+                    COALESCE(o.payment_status, 'pending') AS PaymentStatus,
+                    COALESCE(o.order_status, 'pending') AS OrderStatus,
+                    COALESCE(u.first_name, '') AS FirstName,
+                    COALESCE(u.last_name, '') AS LastName,
+                    COALESCE(u.email, '') AS Email
+                FROM refund_requests rr
+                INNER JOIN orders o ON o.id = rr.order_id
+                INNER JOIN users u ON u.id = rr.user_id
+                WHERE (@status = '' OR rr.status = @status)
+                  AND (
+                      @search = ''
+                      OR o.order_number LIKE CONCAT('%', @search, '%')
+                      OR COALESCE(u.email, '') LIKE CONCAT('%', @search, '%')
+                      OR COALESCE(u.first_name, '') LIKE CONCAT('%', @search, '%')
+                      OR COALESCE(u.last_name, '') LIKE CONCAT('%', @search, '%')
+                      OR COALESCE(rr.reason, '') LIKE CONCAT('%', @search, '%')
+                  )
+                ORDER BY rr.created_at DESC
+                LIMIT @limit OFFSET @offset;
+                """,
+                new
+                {
+                    status = normalizedStatus,
+                    search = normalizedSearch,
+                    limit = normalizedLimit,
+                    offset = normalizedOffset
+                },
+                cancellationToken: cancellationToken))).ToList();
+
+            var stats = await connection.QuerySingleAsync<AdminRefundStatsRow>(new CommandDefinition(
+                """
+                SELECT
+                    COUNT(1) AS TotalCount,
+                    COALESCE(SUM(CASE WHEN rr.status = 'pending' THEN 1 ELSE 0 END), 0) AS PendingCount,
+                    COALESCE(SUM(CASE WHEN rr.status = 'approved' THEN 1 ELSE 0 END), 0) AS ApprovedCount,
+                    COALESCE(SUM(CASE WHEN rr.status = 'rejected' THEN 1 ELSE 0 END), 0) AS RejectedCount,
+                    COALESCE(SUM(rr.amount), 0.00) AS TotalAmount,
+                    COALESCE(SUM(CASE WHEN rr.status = 'pending' THEN rr.amount ELSE 0 END), 0.00) AS PendingAmount,
+                    COALESCE(SUM(CASE WHEN rr.status = 'approved' THEN rr.amount ELSE 0 END), 0.00) AS ApprovedAmount
+                FROM refund_requests rr
+                INNER JOIN orders o ON o.id = rr.order_id
+                INNER JOIN users u ON u.id = rr.user_id
+                WHERE (@status = '' OR rr.status = @status)
+                  AND (
+                      @search = ''
+                      OR o.order_number LIKE CONCAT('%', @search, '%')
+                      OR COALESCE(u.email, '') LIKE CONCAT('%', @search, '%')
+                      OR COALESCE(u.first_name, '') LIKE CONCAT('%', @search, '%')
+                      OR COALESCE(u.last_name, '') LIKE CONCAT('%', @search, '%')
+                      OR COALESCE(rr.reason, '') LIKE CONCAT('%', @search, '%')
+                  );
+                """,
+                new
+                {
+                    status = normalizedStatus,
+                    search = normalizedSearch
+                },
+                cancellationToken: cancellationToken));
+
+            var refunds = rows.Select(row => new
+            {
+                id = row.Id,
+                orderId = row.OrderId,
+                orderNumber = row.OrderNumber,
+                userId = row.UserId,
+                customerName = BuildAdminRefundCustomerName(row),
+                customerEmail = row.Email,
+                amount = RoundMoney(row.Amount),
+                reason = row.Reason,
+                status = row.Status,
+                adminNotes = row.AdminNotes,
+                paymentMethod = NormalizePaymentMethodForUi(row.PaymentMethod),
+                paymentStatus = NormalizePaymentStatusForUi(row.PaymentStatus),
+                orderStatus = row.OrderStatus,
+                createdAt = row.CreatedAt,
+                processedAt = row.ProcessedAt
+            }).ToList();
+
+            return Ok(Success("Refund requests fetched successfully.", new
+            {
+                refunds,
+                count = refunds.Count,
+                limit = normalizedLimit,
+                offset = normalizedOffset,
+                stats = new
+                {
+                    total = stats.TotalCount,
+                    pending = stats.PendingCount,
+                    approved = stats.ApprovedCount,
+                    rejected = stats.RejectedCount,
+                    totalAmount = RoundMoney(stats.TotalAmount),
+                    pendingAmount = RoundMoney(stats.PendingAmount),
+                    approvedAmount = RoundMoney(stats.ApprovedAmount)
+                }
+            }));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to fetch admin refunds.");
+            return StatusCode(StatusCodes.Status500InternalServerError, Failure("Internal server error while fetching refunds."));
+        }
+    }
+
+    [HttpPatch("admin/refunds/{refundId:int}")]
+    public async Task<IActionResult> UpdateAdminRefundStatus(
+        int refundId,
+        [FromBody] UpdateAdminRefundRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (refundId <= 0)
+        {
+            return BadRequest(Failure("Valid refund id is required."));
+        }
+
+        var normalizedStatus = NormalizeRefundStatus(request.Status);
+        if (string.IsNullOrWhiteSpace(normalizedStatus) || normalizedStatus == "pending")
+        {
+            return BadRequest(Failure("Status must be approved or rejected."));
+        }
+
+        var adminNotes = string.IsNullOrWhiteSpace(request.AdminNotes)
+            ? null
+            : request.AdminNotes.Trim();
+
+        try
+        {
+            using var connection = dbConnectionFactory.CreateConnection();
+            if (!await EnsureAdminAccessAsync(connection, cancellationToken))
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, Failure("You are not authorized to update refunds."));
+            }
+
+            if (connection is not DbConnection dbConnection)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, Failure("Database connection is not transaction-capable."));
+            }
+
+            await dbConnection.OpenAsync(cancellationToken);
+
+            var refund = await dbConnection.QuerySingleOrDefaultAsync<AdminRefundLookupRow>(new CommandDefinition(
+                """
+                SELECT
+                    rr.id AS Id,
+                    rr.order_id AS OrderId,
+                    rr.user_id AS UserId,
+                    rr.amount AS Amount,
+                    rr.status AS Status,
+                    o.order_number AS OrderNumber,
+                    COALESCE(o.payment_method, 'cash') AS PaymentMethod,
+                    COALESCE(o.payment_status, 'pending') AS PaymentStatus
+                FROM refund_requests rr
+                INNER JOIN orders o ON o.id = rr.order_id
+                WHERE rr.id = @refundId
+                LIMIT 1;
+                """,
+                new { refundId },
+                cancellationToken: cancellationToken));
+
+            if (refund is null)
+            {
+                return NotFound(Failure("Refund request not found."));
+            }
+
+            if (!string.Equals(refund.Status, "pending", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest(Failure("Refund request already processed."));
+            }
+
+            await using var transaction = await dbConnection.BeginTransactionAsync(cancellationToken);
+
+            await dbConnection.ExecuteAsync(new CommandDefinition(
+                """
+                UPDATE refund_requests
+                SET status = @status,
+                    admin_notes = @adminNotes,
+                    processed_at = UTC_TIMESTAMP(),
+                    updated_at = UTC_TIMESTAMP()
+                WHERE id = @id;
+                """,
+                new
+                {
+                    id = refund.Id,
+                    status = normalizedStatus,
+                    adminNotes
+                },
+                transaction: transaction,
+                cancellationToken: cancellationToken));
+
+            if (normalizedStatus == "approved")
+            {
+                await dbConnection.ExecuteAsync(new CommandDefinition(
+                    """
+                    UPDATE orders
+                    SET payment_status = 'refunded',
+                        updated_at = UTC_TIMESTAMP()
+                    WHERE id = @orderId
+                      AND LOWER(COALESCE(payment_status, '')) = 'paid';
+                    """,
+                    new { orderId = refund.OrderId },
+                    transaction: transaction,
+                    cancellationToken: cancellationToken));
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+
+            return Ok(Success("Refund request updated.", new
+            {
+                refundId = refund.Id,
+                orderId = refund.OrderId,
+                status = normalizedStatus,
+                processedAt = DateTime.UtcNow,
+                adminNotes
+            }));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to update refund request {RefundId}.", refundId);
+            return StatusCode(StatusCodes.Status500InternalServerError, Failure("Internal server error while updating refund."));
         }
     }
 
@@ -943,6 +1202,17 @@ public sealed class OperationsController(
         };
     }
 
+    private static string NormalizeRefundStatus(string? value)
+    {
+        return (value ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "pending" => "pending",
+            "approved" => "approved",
+            "rejected" => "rejected",
+            _ => string.Empty
+        };
+    }
+
     private static string NormalizePaymentMethodForUi(string value)
     {
         return (value ?? string.Empty).Trim().ToLowerInvariant() switch
@@ -1100,6 +1370,55 @@ public sealed class OperationsController(
         public string Email { get; init; } = string.Empty;
     }
 
+    private sealed class AdminRefundRow
+    {
+        public int Id { get; init; }
+        public int OrderId { get; init; }
+        public int UserId { get; init; }
+        public decimal Amount { get; init; }
+        public string Reason { get; init; } = string.Empty;
+        public string Status { get; init; } = string.Empty;
+        public string AdminNotes { get; init; } = string.Empty;
+        public DateTime CreatedAt { get; init; }
+        public DateTime? ProcessedAt { get; init; }
+        public string OrderNumber { get; init; } = string.Empty;
+        public string PaymentMethod { get; init; } = string.Empty;
+        public string PaymentStatus { get; init; } = string.Empty;
+        public string OrderStatus { get; init; } = string.Empty;
+        public string FirstName { get; init; } = string.Empty;
+        public string LastName { get; init; } = string.Empty;
+        public string Email { get; init; } = string.Empty;
+    }
+
+    private sealed class AdminRefundStatsRow
+    {
+        public int TotalCount { get; init; }
+        public int PendingCount { get; init; }
+        public int ApprovedCount { get; init; }
+        public int RejectedCount { get; init; }
+        public decimal TotalAmount { get; init; }
+        public decimal PendingAmount { get; init; }
+        public decimal ApprovedAmount { get; init; }
+    }
+
+    private sealed class AdminRefundLookupRow
+    {
+        public int Id { get; init; }
+        public int OrderId { get; init; }
+        public int UserId { get; init; }
+        public decimal Amount { get; init; }
+        public string Status { get; init; } = string.Empty;
+        public string OrderNumber { get; init; } = string.Empty;
+        public string PaymentMethod { get; init; } = string.Empty;
+        public string PaymentStatus { get; init; } = string.Empty;
+    }
+
+    private static string BuildAdminRefundCustomerName(AdminRefundRow row)
+    {
+        var combined = $"{row.FirstName} {row.LastName}".Trim();
+        return string.IsNullOrWhiteSpace(combined) ? "Unknown" : combined;
+    }
+
     public sealed class UpdateCanteenOrderStatusRequest
     {
         public string Status { get; init; } = string.Empty;
@@ -1107,5 +1426,11 @@ public sealed class OperationsController(
         public int? ChangedBy { get; init; }
         public string? Notes { get; init; }
         public int? CanteenId { get; init; }
+    }
+
+    public sealed class UpdateAdminRefundRequest
+    {
+        public string Status { get; init; } = string.Empty;
+        public string? AdminNotes { get; init; }
     }
 }
