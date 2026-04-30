@@ -2,6 +2,7 @@ class RefundInfo {
   const RefundInfo({
     required this.id,
     required this.orderId,
+    this.orderNumber = '',
     required this.amount,
     required this.reason,
     required this.status,
@@ -12,6 +13,7 @@ class RefundInfo {
 
   final int id;
   final int orderId;
+  final String orderNumber;
   final double amount;
   final String reason;
   final String status; // pending, approved, rejected
@@ -27,6 +29,7 @@ class RefundInfo {
     return RefundInfo(
       id: _asInt(json['refundId']),
       orderId: _asInt(json['orderId']),
+      orderNumber: (json['orderNumber'] ?? '').toString(),
       amount: _asDouble(json['amount']),
       reason: (json['reason'] ?? '').toString(),
       status: (json['status'] ?? '').toString(),

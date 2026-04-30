@@ -9,12 +9,30 @@ class RefundProvider extends ChangeNotifier {
   final CustomerService _service;
 
   bool _loading = false;
+  bool _loadingList = false;
   String? _error;
   RequestRefundResult? _lastResult;
+  List<RefundInfo> _refunds = const <RefundInfo>[];
 
   bool get isLoading => _loading;
+  bool get isLoadingList => _loadingList;
   String? get error => _error;
   RequestRefundResult? get lastResult => _lastResult;
+  List<RefundInfo> get refunds => _refunds;
+
+  Future<void> loadRefunds(String identifier) async {
+    _loadingList = true;
+    notifyListeners();
+
+    try {
+      _refunds = await _service.getRefunds(identifier);
+    } catch (_) {
+      _refunds = const <RefundInfo>[];
+    } finally {
+      _loadingList = false;
+      notifyListeners();
+    }
+  }
 
   Future<RequestRefundResult> requestRefund({
     required String identifier,

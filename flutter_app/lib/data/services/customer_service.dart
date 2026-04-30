@@ -171,6 +171,27 @@ class CustomerService {
     _ensureSuccess(body, fallback: 'Unable to submit feedback');
   }
 
+  Future<List<RefundInfo>> getRefunds(String identifier, {int limit = 20}) async {
+    final response = await _apiClient.request(
+      'api/customer/refunds',
+      queryParameters: <String, dynamic>{
+        'identifier': identifier,
+        'limit': limit,
+      },
+      method: 'GET',
+    );
+
+    final body = _asMap(response.data);
+    _ensureSuccess(body, fallback: 'Unable to load refunds');
+
+    final data = _asMap(body['data']);
+    final rows = (data['refunds'] is List) ? (data['refunds'] as List) : const [];
+    return rows
+        .whereType<Map>()
+        .map((e) => RefundInfo.fromJson(Map<String, dynamic>.from(e)))
+        .toList(growable: false);
+  }
+
   Future<RequestRefundResult> requestRefund({
     required String identifier,
     required String orderRef,

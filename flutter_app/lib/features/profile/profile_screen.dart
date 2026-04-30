@@ -15,6 +15,7 @@ import '../../state/wallet_provider.dart';
 import '../auth/login_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../orders/orders_screen.dart';
+import '../orders/refund_history_screen.dart';
 import '../wallet/wallet_screen.dart';
 import 'saved_canteens_screen.dart';
 
@@ -194,6 +195,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                           _MenuItem(
+                            icon: Icons.undo_rounded,
+                            iconColor: const Color(0xFF2C9E68),
+                            title: 'My Refunds',
+                            subtitle: 'Track refund requests',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                  builder: (_) => const RefundHistoryScreen()),
+                            ),
+                          ),
+                          _MenuItem(
                             icon: Icons.storefront_rounded,
                             iconColor: const Color(0xFFE91E63),
                             title: 'Saved canteens',
@@ -329,11 +340,11 @@ class _AvatarCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkCard : Colors.white,
         borderRadius: BorderRadius.circular(24),
-        boxShadow: <BoxShadow>[
+        boxShadow: const <BoxShadow>[
           BoxShadow(
             color: AppColors.shadowPink,
             blurRadius: 20,
-            offset: const Offset(0, 4),
+            offset: Offset(0, 4),
           ),
         ],
       ),
@@ -654,15 +665,15 @@ class _MenuGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return DecoratedBox(
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkCard : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: <BoxShadow>[
+        boxShadow: const <BoxShadow>[
           BoxShadow(
             color: AppColors.shadowPink,
             blurRadius: 16,
-            offset: const Offset(0, 4),
+            offset: Offset(0, 4),
           ),
         ],
       ),
@@ -780,11 +791,11 @@ class _DarkModeRow extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkCard : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: <BoxShadow>[
+        boxShadow: const <BoxShadow>[
           BoxShadow(
             color: AppColors.shadowPink,
             blurRadius: 16,
-            offset: const Offset(0, 4),
+            offset: Offset(0, 4),
           ),
         ],
       ),

@@ -663,6 +663,68 @@ public sealed class CustomerController(
         }
     }
 
+    [HttpGet("refunds")]
+    public async Task<IActionResult> GetRefunds(
+        [FromQuery] string identifier,
+        [FromQuery] int limit = 20,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(identifier))
+            return BadRequest(Failure("Identifier is required."));
+
+        var normalizedLimit = Math.Clamp(limit, 1, 50);
+
+        try
+        {
+            using var connection = dbConnectionFactory.CreateConnection();
+
+            var user = await FindUserByIdentifier(connection, identifier.Trim(), cancellationToken);
+            if (user is null)
+                return NotFound(Failure("User not found."));
+
+            var rows = await connection.QueryAsync<RefundListRow>(new CommandDefinition(
+                """
+                SELECT
+                    rr.id AS Id,
+                    rr.order_id AS OrderId,
+                    o.order_number AS OrderNumber,
+                    rr.amount AS Amount,
+                    rr.reason AS Reason,
+                    rr.status AS Status,
+                    COALESCE(rr.admin_notes, '') AS AdminNotes,
+                    rr.created_at AS CreatedAt,
+                    rr.processed_at AS ProcessedAt
+                FROM refund_requests rr
+                INNER JOIN orders o ON o.id = rr.order_id
+                WHERE rr.user_id = @userId
+                ORDER BY rr.created_at DESC
+                LIMIT @limit;
+                """,
+                new { userId = user.Id, limit = normalizedLimit },
+                cancellationToken: cancellationToken));
+
+            var items = rows.Select(r => new
+            {
+                refundId = r.Id,
+                orderId = r.OrderId,
+                orderNumber = r.OrderNumber,
+                amount = r.Amount,
+                reason = r.Reason,
+                status = r.Status,
+                adminNotes = r.AdminNotes,
+                createdAt = r.CreatedAt,
+                processedAt = r.ProcessedAt
+            }).ToList();
+
+            return Ok(Success("Refunds fetched.", new { refunds = items, total = items.Count }));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to fetch refunds for identifier {Identifier}", identifier);
+            return StatusCode(StatusCodes.Status500InternalServerError, Failure("Internal server error while fetching refunds."));
+        }
+    }
+
     [HttpPost("orders/{orderRef}/refund")]
     public async Task<IActionResult> RequestRefund(
         [FromRoute] string orderRef,
@@ -1388,6 +1450,19 @@ public sealed class CustomerController(
         public string PaymentMethod { get; init; } = string.Empty;
         public string PaymentStatus { get; init; } = string.Empty;
         public string OrderStatus { get; init; } = string.Empty;
+    }
+
+    private sealed class RefundListRow
+    {
+        public int Id { get; init; }
+        public int OrderId { get; init; }
+        public string OrderNumber { get; init; } = string.Empty;
+        public decimal Amount { get; init; }
+        public string Reason { get; init; } = string.Empty;
+        public string Status { get; init; } = string.Empty;
+        public string AdminNotes { get; init; } = string.Empty;
+        public DateTime CreatedAt { get; init; }
+        public DateTime? ProcessedAt { get; init; }
     }
 
     private sealed class RefundStatusRow
