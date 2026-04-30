@@ -663,6 +663,187 @@ public sealed class CustomerController(
         }
     }
 
+    [HttpPost("orders/{orderRef}/cancel")]
+    public async Task<IActionResult> CancelOrder(
+        [FromRoute] string orderRef,
+        [FromBody] CancelOrderRequest request,
+        CancellationToken cancellationToken)
+    {
+        var identifier = request.Identifier?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(identifier))
+            return BadRequest(Failure("Identifier is required."));
+
+        if (string.IsNullOrWhiteSpace(orderRef))
+            return BadRequest(Failure("Order reference is required."));
+
+        try
+        {
+            using var connection = dbConnectionFactory.CreateConnection();
+            if (connection is not DbConnection dbConnection)
+                return StatusCode(StatusCodes.Status500InternalServerError, Failure("Database connection is not transaction-capable."));
+
+            await dbConnection.OpenAsync(cancellationToken);
+
+            var user = await FindUserByIdentifier(dbConnection, identifier, cancellationToken);
+            if (user is null)
+                return NotFound(Failure("User not found."));
+
+            var order = await dbConnection.QuerySingleOrDefaultAsync<CancelOrderLookupRow>(new CommandDefinition(
+                """
+                SELECT
+                    id AS Id,
+                    order_number AS OrderNumber,
+                    final_amount AS Amount,
+                    payment_method AS PaymentMethod,
+                    payment_status AS PaymentStatus,
+                    order_status AS OrderStatus,
+                    created_at AS CreatedAt
+                FROM orders
+                WHERE user_id = @userId
+                  AND (order_number = @orderRef OR CAST(id AS CHAR) = @orderRef)
+                LIMIT 1;
+                """,
+                new { userId = user.Id, orderRef },
+                cancellationToken: cancellationToken));
+
+            if (order is null)
+                return NotFound(Failure("Order not found."));
+
+            if (!string.Equals(order.OrderStatus, "pending", StringComparison.OrdinalIgnoreCase))
+                return BadRequest(Failure("Only pending orders can be cancelled."));
+
+            var secondsElapsed = (DateTime.UtcNow - order.CreatedAt).TotalSeconds;
+            if (secondsElapsed > 60)
+                return BadRequest(Failure("Cancellation window has expired. Orders can only be cancelled within 1 minute of placing."));
+
+            var isWalletPayment = string.Equals(order.PaymentMethod, "online", StringComparison.OrdinalIgnoreCase);
+            var isUpiPayment = string.Equals(order.PaymentMethod, "upi", StringComparison.OrdinalIgnoreCase);
+            var isPaid = string.Equals(order.PaymentStatus, "paid", StringComparison.OrdinalIgnoreCase);
+
+            await using var transaction = await dbConnection.BeginTransactionAsync(cancellationToken);
+
+            var newPaymentStatus = (isWalletPayment && isPaid) ? "refunded" : order.PaymentStatus;
+
+            await dbConnection.ExecuteAsync(new CommandDefinition(
+                """
+                UPDATE orders
+                SET order_status = 'cancelled',
+                    payment_status = @paymentStatus,
+                    updated_at = UTC_TIMESTAMP()
+                WHERE id = @orderId;
+                """,
+                new { orderId = order.Id, paymentStatus = newPaymentStatus },
+                transaction: transaction,
+                cancellationToken: cancellationToken));
+
+            await dbConnection.ExecuteAsync(new CommandDefinition(
+                """
+                INSERT INTO order_status_history
+                    (order_id, previous_status, new_status, changed_by, notes, created_at)
+                VALUES
+                    (@orderId, 'pending', 'cancelled', @userId, 'Cancelled by customer within 1-minute window', UTC_TIMESTAMP());
+                """,
+                new { orderId = order.Id, userId = user.Id },
+                transaction: transaction,
+                cancellationToken: cancellationToken));
+
+            decimal? newWalletBalance = null;
+            var refundStatus = "none";
+
+            if (isPaid)
+            {
+                if (isWalletPayment)
+                {
+                    await EnsureWalletExists(dbConnection, user.Id, cancellationToken, transaction);
+
+                    await dbConnection.ExecuteAsync(new CommandDefinition(
+                        "UPDATE wallets SET balance = balance + @amount WHERE user_id = @userId;",
+                        new { userId = user.Id, amount = order.Amount },
+                        transaction: transaction,
+                        cancellationToken: cancellationToken));
+
+                    var txnId = BuildWalletTransactionId("RF");
+                    await dbConnection.ExecuteAsync(new CommandDefinition(
+                        """
+                        INSERT INTO wallet_transactions
+                            (user_id, transaction_id, amount, type, status, payment_gateway, description, order_id, created_at)
+                        VALUES
+                            (@userId, @transactionId, @amount, 'credit', 'completed', 'refund', @description, @orderId, UTC_TIMESTAMP());
+                        """,
+                        new
+                        {
+                            userId = user.Id,
+                            transactionId = txnId,
+                            amount = order.Amount,
+                            description = $"Auto-refund: cancelled order {order.OrderNumber}",
+                            orderId = order.Id
+                        },
+                        transaction: transaction,
+                        cancellationToken: cancellationToken));
+
+                    await dbConnection.ExecuteAsync(new CommandDefinition(
+                        """
+                        INSERT IGNORE INTO refund_requests
+                            (order_id, user_id, amount, reason, status, processed_at, created_at, updated_at)
+                        VALUES
+                            (@orderId, @userId, @amount, 'Order cancelled by customer', 'approved', UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP());
+                        """,
+                        new { orderId = order.Id, userId = user.Id, amount = order.Amount },
+                        transaction: transaction,
+                        cancellationToken: cancellationToken));
+
+                    newWalletBalance = await dbConnection.ExecuteScalarAsync<decimal?>(new CommandDefinition(
+                        "SELECT COALESCE(balance, 0.00) FROM wallets WHERE user_id = @userId LIMIT 1;",
+                        new { userId = user.Id },
+                        transaction: transaction,
+                        cancellationToken: cancellationToken));
+
+                    refundStatus = "refunded";
+                }
+                else if (isUpiPayment)
+                {
+                    await dbConnection.ExecuteAsync(new CommandDefinition(
+                        """
+                        INSERT IGNORE INTO refund_requests
+                            (order_id, user_id, amount, reason, status, created_at, updated_at)
+                        VALUES
+                            (@orderId, @userId, @amount, 'Order cancelled by customer', 'pending', UTC_TIMESTAMP(), UTC_TIMESTAMP());
+                        """,
+                        new { orderId = order.Id, userId = user.Id, amount = order.Amount },
+                        transaction: transaction,
+                        cancellationToken: cancellationToken));
+
+                    refundStatus = "pending";
+                }
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+
+            var message = isWalletPayment && isPaid
+                ? $"Order cancelled. ₹{order.Amount:0.00} refunded to your wallet."
+                : isUpiPayment && isPaid
+                    ? "Order cancelled. Refund will be processed within 3–5 business days."
+                    : "Order cancelled successfully.";
+
+            return Ok(Success(message, new
+            {
+                orderId = order.Id,
+                orderNumber = order.OrderNumber,
+                status = "cancelled",
+                refundStatus,
+                walletBalance = newWalletBalance.HasValue
+                    ? Math.Round(newWalletBalance.Value, 2, MidpointRounding.AwayFromZero)
+                    : (decimal?)null
+            }));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to cancel order {OrderRef}", orderRef);
+            return StatusCode(StatusCodes.Status500InternalServerError, Failure("Internal server error while cancelling order."));
+        }
+    }
+
     [HttpGet("refunds")]
     public async Task<IActionResult> GetRefunds(
         [FromQuery] string identifier,
@@ -1434,6 +1615,22 @@ public sealed class CustomerController(
         public string OrderRef { get; init; } = string.Empty;
         public int Rating { get; init; }
         public string ReviewText { get; init; } = string.Empty;
+    }
+
+    public sealed class CancelOrderRequest
+    {
+        public string Identifier { get; init; } = string.Empty;
+    }
+
+    private sealed class CancelOrderLookupRow
+    {
+        public int Id { get; init; }
+        public string OrderNumber { get; init; } = string.Empty;
+        public decimal Amount { get; init; }
+        public string PaymentMethod { get; init; } = string.Empty;
+        public string PaymentStatus { get; init; } = string.Empty;
+        public string OrderStatus { get; init; } = string.Empty;
+        public DateTime CreatedAt { get; init; }
     }
 
     public sealed class RefundRequest

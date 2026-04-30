@@ -40,6 +40,35 @@ class RefundInfo {
   }
 }
 
+class CancelOrderResult {
+  const CancelOrderResult({
+    required this.orderId,
+    required this.orderNumber,
+    required this.status,
+    required this.refundStatus,
+    this.walletBalance,
+  });
+
+  final int orderId;
+  final String orderNumber;
+  final String status;
+  final String refundStatus; // 'refunded', 'pending', 'none'
+  final double? walletBalance;
+
+  bool get walletRefunded => refundStatus == 'refunded';
+  bool get upiRefundPending => refundStatus == 'pending';
+
+  factory CancelOrderResult.fromJson(Map<String, dynamic> json) {
+    return CancelOrderResult(
+      orderId: _asInt(json['orderId']),
+      orderNumber: (json['orderNumber'] ?? '').toString(),
+      status: (json['status'] ?? '').toString(),
+      refundStatus: (json['refundStatus'] ?? 'none').toString(),
+      walletBalance: json['walletBalance'] == null ? null : _asDouble(json['walletBalance']),
+    );
+  }
+}
+
 class RequestRefundResult {
   const RequestRefundResult({
     required this.refundId,

@@ -171,6 +171,24 @@ class CustomerService {
     _ensureSuccess(body, fallback: 'Unable to submit feedback');
   }
 
+  Future<CancelOrderResult> cancelOrder({
+    required String identifier,
+    required String orderRef,
+  }) async {
+    final response = await _apiClient.request(
+      'api/customer/orders/$orderRef/cancel',
+      method: 'POST',
+      data: <String, dynamic>{
+        'identifier': identifier,
+      },
+    );
+
+    final body = _asMap(response.data);
+    _ensureSuccess(body, fallback: 'Unable to cancel order');
+
+    return CancelOrderResult.fromJson(_asMap(body['data']));
+  }
+
   Future<List<RefundInfo>> getRefunds(String identifier, {int limit = 20}) async {
     final response = await _apiClient.request(
       'api/customer/refunds',

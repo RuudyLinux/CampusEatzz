@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -15,6 +17,7 @@ import '../../data/models/refund_models.dart';
 import '../../state/auth_provider.dart';
 import '../../state/orders_provider.dart';
 import '../../state/refund_provider.dart';
+import '../../state/wallet_provider.dart';
 import '../auth/login_screen.dart';
 import 'refund_request_screen.dart';
 
@@ -119,7 +122,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   order: order,
                   isDark: isDark,
                   userIdentifier: user.identifier,
-                  onRefundSubmitted: _refresh,
+                  onOrderChanged: _refresh,
                 );
               },
             ),
@@ -130,57 +133,135 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 }
 
-class _OrderBody extends StatelessWidget {
+// ── Order Body (StatefulWidget for countdown timer) ───────────────────────────
+
+class _OrderBody extends StatefulWidget {
   const _OrderBody({
     required this.order,
     required this.isDark,
     required this.userIdentifier,
-    required this.onRefundSubmitted,
+    required this.onOrderChanged,
   });
 
   final OrderDetails order;
   final bool isDark;
   final String userIdentifier;
-  final VoidCallback onRefundSubmitted;
+  final VoidCallback onOrderChanged;
+
+  @override
+  State<_OrderBody> createState() => _OrderBodyState();
+}
+
+class _OrderBodyState extends State<_OrderBody> {
+  Timer? _countdownTimer;
+  int _secondsRemaining = 0;
+  bool _cancelling = false;
+
+  bool get _isPending =>
+      widget.order.status.toLowerCase() == 'pending';
+
+  bool get _isOnlinePayment =>
+      widget.order.paymentMethod.toLowerCase() == 'online' ||
+      widget.order.paymentMethod.toLowerCase() == 'wallet';
+
+  bool get _isCash =>
+      widget.order.paymentMethod.toLowerCase() == 'cash';
+
+  bool get _canCancel =>
+      _isPending && _secondsRemaining > 0;
 
   bool get _refundEligible =>
-      order.status.toLowerCase() == 'cancelled' &&
-      order.paymentStatus.toLowerCase() == 'paid';
+      widget.order.status.toLowerCase() == 'cancelled' &&
+      widget.order.paymentStatus.toLowerCase() == 'paid' &&
+      !_isCash;
 
   bool get _alreadyRefunded =>
-      order.paymentStatus.toLowerCase() == 'refunded';
+      widget.order.paymentStatus.toLowerCase() == 'refunded';
+
+  @override
+  void initState() {
+    super.initState();
+    _initCountdown();
+  }
+
+  void _initCountdown() {
+    if (!_isPending || widget.order.createdAt == null) return;
+
+    final elapsed =
+        DateTime.now().difference(widget.order.createdAt!.toLocal()).inSeconds;
+    final remaining = 60 - elapsed;
+
+    if (remaining <= 0) {
+      _secondsRemaining = 0;
+      return;
+    }
+
+    _secondsRemaining = remaining;
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      setState(() {
+        _secondsRemaining--;
+        if (_secondsRemaining <= 0) {
+          _secondsRemaining = 0;
+          t.cancel();
+        }
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _countdownTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: <Widget>[
+        // Cancellation window banner
+        if (_isPending) ...<Widget>[
+          AnimatedReveal(
+            delayMs: 0,
+            child: _CancelWindowBanner(
+              secondsRemaining: _secondsRemaining,
+              isDark: widget.isDark,
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+
         // Order info card
         AnimatedReveal(
           delayMs: 60,
           child: _SectionCard(
             title: 'Order Info',
-            isDark: isDark,
+            isDark: widget.isDark,
             child: Column(
               children: <Widget>[
                 _InfoRow(
                     label: 'Order Number',
-                    value: order.orderNumber,
-                    isDark: isDark),
+                    value: widget.order.orderNumber,
+                    isDark: widget.isDark),
                 _InfoRow(
                     label: 'Date',
-                    value: formatDateTime(order.createdAt),
-                    isDark: isDark),
+                    value: formatDateTime(widget.order.createdAt),
+                    isDark: widget.isDark),
                 _InfoRow(
                   label: 'Order Status',
-                  isDark: isDark,
-                  valueWidget:
-                      AppStatusBadge.fromString(order.status, small: true),
+                  isDark: widget.isDark,
+                  valueWidget: AppStatusBadge.fromString(widget.order.status,
+                      small: true),
                 ),
                 _InfoRow(
                   label: 'Payment',
-                  isDark: isDark,
-                  valueWidget: AppStatusBadge.fromString(order.paymentStatus,
+                  isDark: widget.isDark,
+                  valueWidget: AppStatusBadge.fromString(
+                      widget.order.paymentStatus,
                       small: true),
                 ),
               ],
@@ -194,9 +275,9 @@ class _OrderBody extends StatelessWidget {
           delayMs: 120,
           child: _SectionCard(
             title: 'Ordered Items',
-            isDark: isDark,
+            isDark: widget.isDark,
             child: Column(
-              children: order.items.map((item) {
+              children: widget.order.items.map((item) {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Row(
@@ -216,13 +297,13 @@ class _OrderBody extends StatelessWidget {
                             : Container(
                                 width: 48,
                                 height: 48,
-                                color: isDark
+                                color: widget.isDark
                                     ? AppColors.darkSurface
                                     : AppColors.bgSoft,
                                 child: Icon(
                                   Icons.fastfood_rounded,
                                   size: 22,
-                                  color: isDark
+                                  color: widget.isDark
                                       ? AppColors.darkTextMuted
                                       : AppColors.textMuted,
                                 ),
@@ -236,7 +317,7 @@ class _OrderBody extends StatelessWidget {
                             Text(
                               item.itemName,
                               style: AppTypography.label.copyWith(
-                                color: isDark
+                                color: widget.isDark
                                     ? AppColors.darkTextPrimary
                                     : AppColors.textPrimary,
                               ),
@@ -244,7 +325,7 @@ class _OrderBody extends StatelessWidget {
                             Text(
                               '× ${item.quantity}',
                               style: AppTypography.caption.copyWith(
-                                color: isDark
+                                color: widget.isDark
                                     ? AppColors.darkTextMuted
                                     : AppColors.textMuted,
                               ),
@@ -255,7 +336,7 @@ class _OrderBody extends StatelessWidget {
                       Text(
                         formatInr(item.totalPrice),
                         style: AppTypography.priceSm.copyWith(
-                          color: isDark
+                          color: widget.isDark
                               ? AppColors.darkTextPrimary
                               : AppColors.textPrimary,
                         ),
@@ -274,27 +355,29 @@ class _OrderBody extends StatelessWidget {
           delayMs: 180,
           child: _SectionCard(
             title: 'Summary',
-            isDark: isDark,
+            isDark: widget.isDark,
             child: Column(
               children: <Widget>[
                 _InfoRow(
                     label: 'Subtotal',
-                    value: formatInr(order.subtotal),
-                    isDark: isDark),
+                    value: formatInr(widget.order.subtotal),
+                    isDark: widget.isDark),
                 _InfoRow(
                     label: 'Tax',
-                    value: formatInr(order.tax),
-                    isDark: isDark),
+                    value: formatInr(widget.order.tax),
+                    isDark: widget.isDark),
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Divider(
-                    color: isDark ? AppColors.darkDivider : AppColors.divider,
+                    color: widget.isDark
+                        ? AppColors.darkDivider
+                        : AppColors.divider,
                   ),
                 ),
                 _InfoRow(
                     label: 'Total',
-                    value: formatInr(order.total),
-                    isDark: isDark,
+                    value: formatInr(widget.order.total),
+                    isDark: widget.isDark,
                     bold: true),
               ],
             ),
@@ -302,15 +385,15 @@ class _OrderBody extends StatelessWidget {
         ),
 
         // Status history
-        if (order.statusHistory.isNotEmpty) ...<Widget>[
+        if (widget.order.statusHistory.isNotEmpty) ...<Widget>[
           const SizedBox(height: 12),
           AnimatedReveal(
             delayMs: 240,
             child: _SectionCard(
               title: 'Status History',
-              isDark: isDark,
+              isDark: widget.isDark,
               child: Column(
-                children: order.statusHistory.map((entry) {
+                children: widget.order.statusHistory.map((entry) {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: Row(
@@ -319,7 +402,7 @@ class _OrderBody extends StatelessWidget {
                           width: 8,
                           height: 8,
                           decoration: BoxDecoration(
-                            color: isDark
+                            color: widget.isDark
                                 ? AppColors.primaryOnDark
                                 : AppColors.primary,
                             shape: BoxShape.circle,
@@ -330,7 +413,7 @@ class _OrderBody extends StatelessWidget {
                           child: Text(
                             titleCase(entry.status),
                             style: AppTypography.body.copyWith(
-                              color: isDark
+                              color: widget.isDark
                                   ? AppColors.darkTextPrimary
                                   : AppColors.textPrimary,
                             ),
@@ -339,7 +422,7 @@ class _OrderBody extends StatelessWidget {
                         Text(
                           formatDateTime(entry.createdAt),
                           style: AppTypography.caption.copyWith(
-                            color: isDark
+                            color: widget.isDark
                                 ? AppColors.darkTextMuted
                                 : AppColors.textMuted,
                           ),
@@ -353,29 +436,307 @@ class _OrderBody extends StatelessWidget {
           ),
         ],
 
-        // Refund section
+        // ── Cancel Order section (within 1-min window) ─────────────────
+        if (_canCancel) ...<Widget>[
+          const SizedBox(height: 12),
+          AnimatedReveal(
+            delayMs: 300,
+            child: _CancelOrderCard(
+              order: widget.order,
+              isDark: widget.isDark,
+              cancelling: _cancelling,
+              isOnlinePayment: _isOnlinePayment,
+              onCancel: _handleCancel,
+            ),
+          ),
+        ],
+
+        // ── Refund section ──────────────────────────────────────────────
         const SizedBox(height: 12),
         AnimatedReveal(
-          delayMs: 300,
+          delayMs: 320,
           child: _alreadyRefunded
-              ? _RefundedBanner(isDark: isDark, total: order.total)
+              ? _RefundedBanner(
+                  isDark: widget.isDark, total: widget.order.total)
               : _refundEligible
                   ? _RefundSection(
-                      order: order,
-                      isDark: isDark,
-                      userIdentifier: userIdentifier,
-                      onRefundSubmitted: onRefundSubmitted,
+                      order: widget.order,
+                      isDark: widget.isDark,
+                      userIdentifier: widget.userIdentifier,
+                      onRefundSubmitted: widget.onOrderChanged,
                     )
-                  : const SizedBox.shrink(),
+                  : _ExistingRefundStatus(
+                      orderRef: widget.order.orderNumber,
+                      userIdentifier: widget.userIdentifier,
+                      isDark: widget.isDark,
+                    ),
         ),
+      ],
+    );
+  }
 
-        // Existing refund status (if pending/rejected)
-        if (!_alreadyRefunded && !_refundEligible)
-          _ExistingRefundStatus(
-            orderRef: order.orderNumber,
-            userIdentifier: userIdentifier,
-            isDark: isDark,
+  Future<void> _handleCancel() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => _CancelConfirmDialog(
+        order: widget.order,
+        isDark: widget.isDark,
+        isOnlinePayment: _isOnlinePayment,
+        isCash: _isCash,
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    setState(() => _cancelling = true);
+
+    try {
+      final auth = context.read<AuthProvider>();
+      final wallet = context.read<WalletProvider>();
+      final refund = context.read<RefundProvider>();
+
+      final result = await context.read<OrdersProvider>().cancelOrder(
+            identifier: auth.session!.identifier,
+            orderRef: widget.order.orderNumber,
+          );
+
+      if (result.walletBalance != null) {
+        wallet.applyLocalBalance(result.walletBalance!);
+      }
+
+      if (!mounted) return;
+
+      String msg;
+      if (result.walletRefunded) {
+        msg = 'Order cancelled. ${formatInr(widget.order.total)} refunded to wallet!';
+      } else if (result.upiRefundPending) {
+        msg = 'Order cancelled. Refund processing in 3–5 days.';
+      } else {
+        msg = 'Order cancelled successfully.';
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+
+      // Reload refund state then refresh order
+      await refund.loadRefunds(auth.session!.identifier);
+      widget.onOrderChanged();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: AppColors.danger,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      setState(() => _cancelling = false);
+    }
+  }
+}
+
+// ── Cancel Window Banner ──────────────────────────────────────────────────────
+
+class _CancelWindowBanner extends StatelessWidget {
+  const _CancelWindowBanner({
+    required this.secondsRemaining,
+    required this.isDark,
+  });
+
+  final int secondsRemaining;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final isUrgent = secondsRemaining <= 15;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: secondsRemaining > 0
+            ? (isUrgent
+                ? (isDark ? AppColors.dangerBgDark : AppColors.dangerBg)
+                : (isDark ? AppColors.warningBgDark : AppColors.warningBg))
+            : (isDark ? AppColors.darkSurface : AppColors.bgSoft),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: secondsRemaining > 0
+              ? (isUrgent
+                  ? AppColors.danger.withValues(alpha: 0.4)
+                  : AppColors.warning.withValues(alpha: 0.4))
+              : (isDark ? AppColors.darkBorder : AppColors.divider),
+        ),
+      ),
+      child: Row(
+        children: <Widget>[
+          Icon(
+            secondsRemaining > 0
+                ? Icons.timer_outlined
+                : Icons.timer_off_outlined,
+            size: 18,
+            color: secondsRemaining > 0
+                ? (isUrgent ? AppColors.danger : AppColors.warning)
+                : (isDark ? AppColors.darkTextMuted : AppColors.textMuted),
           ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              secondsRemaining > 0
+                  ? 'Cancel window closes in ${secondsRemaining}s'
+                  : 'Cancellation window expired',
+              style: AppTypography.caption.copyWith(
+                color: secondsRemaining > 0
+                    ? (isUrgent ? AppColors.danger : AppColors.warning)
+                    : (isDark
+                        ? AppColors.darkTextMuted
+                        : AppColors.textMuted),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Cancel Order Card ─────────────────────────────────────────────────────────
+
+class _CancelOrderCard extends StatelessWidget {
+  const _CancelOrderCard({
+    required this.order,
+    required this.isDark,
+    required this.cancelling,
+    required this.isOnlinePayment,
+    required this.onCancel,
+  });
+
+  final OrderDetails order;
+  final bool isDark;
+  final bool cancelling;
+  final bool isOnlinePayment;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: AppColors.danger.withValues(alpha: 0.25),
+        ),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: AppColors.shadowPink,
+            blurRadius: 10,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              const Icon(Icons.cancel_outlined,
+                  size: 18, color: AppColors.danger),
+              const SizedBox(width: 8),
+              Text(
+                'Cancel Order',
+                style:
+                    AppTypography.label.copyWith(color: AppColors.danger),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            isOnlinePayment
+                ? 'Cancel now and ${formatInr(order.total)} will be refunded to your wallet instantly.'
+                : 'Cancel this cash order (no payment was made).',
+            style: AppTypography.caption.copyWith(
+              color:
+                  isDark ? AppColors.darkTextMuted : AppColors.textMuted,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: cancelling ? null : onCancel,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.danger,
+                side: const BorderSide(color: AppColors.danger),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(9)),
+              ),
+              child: cancelling
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: AppColors.danger),
+                    )
+                  : const Text('Cancel Order'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Cancel Confirm Dialog ─────────────────────────────────────────────────────
+
+class _CancelConfirmDialog extends StatelessWidget {
+  const _CancelConfirmDialog({
+    required this.order,
+    required this.isDark,
+    required this.isOnlinePayment,
+    required this.isCash,
+  });
+
+  final OrderDetails order;
+  final bool isDark;
+  final bool isOnlinePayment;
+  final bool isCash;
+
+  @override
+  Widget build(BuildContext context) {
+    final String body;
+    if (isOnlinePayment) {
+      body =
+          '${formatInr(order.total)} will be refunded to your CampusWallet instantly.';
+    } else if (isCash) {
+      body = 'This is a cash order. No payment to refund.';
+    } else {
+      body =
+          'Your refund of ${formatInr(order.total)} will be processed within 3–5 business days.';
+    }
+
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Text('Cancel order?', style: AppTypography.heading3),
+      content: Text(body, style: AppTypography.body),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Keep Order'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, true),
+          style:
+              TextButton.styleFrom(foregroundColor: AppColors.danger),
+          child: const Text('Yes, Cancel'),
+        ),
       ],
     );
   }
@@ -392,7 +753,7 @@ class _RefundedBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isDark ? AppColors.successBgDark : AppColors.successBg,
         borderRadius: BorderRadius.circular(12),
@@ -403,7 +764,7 @@ class _RefundedBanner extends StatelessWidget {
       child: Row(
         children: <Widget>[
           const Icon(Icons.check_circle_rounded,
-              color: AppColors.success, size: 24),
+              color: AppColors.success, size: 22),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -416,7 +777,7 @@ class _RefundedBanner extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${formatInr(total)} has been credited to your wallet.',
+                  '${formatInr(total)} credited to your wallet.',
                   style: AppTypography.caption.copyWith(
                       color: AppColors.success.withValues(alpha: 0.8)),
                 ),
@@ -471,7 +832,7 @@ class _RefundPromptCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isDark ? AppColors.warningBgDark : AppColors.warningBg,
         borderRadius: BorderRadius.circular(12),
@@ -485,7 +846,7 @@ class _RefundPromptCard extends StatelessWidget {
           Row(
             children: <Widget>[
               const Icon(Icons.receipt_long_rounded,
-                  color: AppColors.warning, size: 20),
+                  color: AppColors.warning, size: 18),
               const SizedBox(width: 8),
               Text(
                 'Eligible for Refund',
@@ -496,9 +857,10 @@ class _RefundPromptCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'This order was cancelled. You can request a refund of ${formatInr(order.total)}.',
+            'This order was cancelled. Request a refund of ${formatInr(order.total)}.',
             style: AppTypography.caption.copyWith(
-              color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
+              color:
+                  isDark ? AppColors.darkTextMuted : AppColors.textMuted,
             ),
           ),
           const SizedBox(height: 12),
@@ -597,8 +959,8 @@ class _ExistingRefundStatus extends StatelessWidget {
           decoration: BoxDecoration(
             color: bgColor,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-                color: iconColor.withValues(alpha: 0.3)),
+            border:
+                Border.all(color: iconColor.withValues(alpha: 0.3)),
           ),
           child: Row(
             children: <Widget>[

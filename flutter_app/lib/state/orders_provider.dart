@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../data/models/cart_item.dart';
 import '../data/models/order_models.dart';
+import '../data/models/refund_models.dart';
 import '../data/services/customer_service.dart';
 
 class OrdersProvider extends ChangeNotifier {
@@ -37,6 +38,13 @@ class OrdersProvider extends ChangeNotifier {
     required String orderRef,
   }) {
     return _service.getOrderDetails(identifier: identifier, orderRef: orderRef);
+  }
+
+  Future<CancelOrderResult> cancelOrder({
+    required String identifier,
+    required String orderRef,
+  }) {
+    return _service.cancelOrder(identifier: identifier, orderRef: orderRef);
   }
 
   Future<PlaceOrderResult> placeOrder({
