@@ -155,12 +155,18 @@ class AppStatusBadge extends StatelessWidget {
         vertical: small ? 3 : 4,
       ),
       decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(20),
+        // Glass chip: semi-transparent fill, thin border
+        color: bg.withValues(alpha: isDark ? 0.55 : 0.45),
+        borderRadius: BorderRadius.circular(9999),
+        border: Border.all(
+          color: fg.withValues(alpha: 0.25),
+          width: 1,
+        ),
       ),
       child: Text(
         status.label,
-        style: (small ? AppTypography.labelSm : AppTypography.label).copyWith(color: fg),
+        style: (small ? AppTypography.labelSm : AppTypography.label)
+            .copyWith(color: fg),
       ),
     );
   }

@@ -55,17 +55,17 @@ class _ShimmerLoaderState extends State<ShimmerLoader> with SingleTickerProvider
                       AppColors.darkCard,
                     ]
                   : <Color>[
-                      AppColors.border.withValues(alpha: 0.6),
-                      AppColors.bgSoft,
-                      Colors.white,
-                      AppColors.bgSoft,
-                      AppColors.border.withValues(alpha: 0.6),
+                      AppColors.surfaceHighest,
+                      AppColors.surfaceHigh,
+                      Colors.white.withValues(alpha: 0.85),
+                      AppColors.surfaceHigh,
+                      AppColors.surfaceHighest,
                     ],
               stops: const <double>[0.0, 0.25, 0.5, 0.75, 1.0],
               transform: _SlidingGradientTransform(slidePercent: _animation.value),
             ).createShader(bounds);
           },
-          child: child!,
+          child: child,
         );
       },
       child: widget.child,
@@ -106,7 +106,7 @@ class ShimmerBox extends StatelessWidget {
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: isDark ? AppColors.darkCard : AppColors.bgSoft,
+        color: isDark ? AppColors.darkCard : AppColors.surfaceHighest,
         borderRadius: BorderRadius.circular(radius),
       ),
     );
@@ -121,14 +121,14 @@ class SkeletonCanteenCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ShimmerLoader(
+    return const ShimmerLoader(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           ShimmerBox(width: double.infinity, height: 180, radius: 16),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           ShimmerBox(width: 160, height: 16, radius: 8),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           ShimmerBox(width: 220, height: 12, radius: 6),
         ],
       ),
@@ -142,16 +142,16 @@ class SkeletonMenuCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ShimmerLoader(
+    return const ShimmerLoader(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           ShimmerBox(width: double.infinity, height: 160, radius: 14),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           ShimmerBox(width: 180, height: 16, radius: 8),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           ShimmerBox(width: double.infinity, height: 12, radius: 6),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: <Widget>[
@@ -171,23 +171,23 @@ class SkeletonListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ShimmerLoader(
+    return const ShimmerLoader(
       child: Row(
         children: <Widget>[
-          const ShimmerBox(width: 44, height: 44, radius: 22),
-          const SizedBox(width: 12),
+          ShimmerBox(width: 44, height: 44, radius: 22),
+          SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 ShimmerBox(width: double.infinity, height: 14, radius: 7),
-                const SizedBox(height: 6),
+                SizedBox(height: 6),
                 ShimmerBox(width: 140, height: 11, radius: 5),
               ],
             ),
           ),
-          const SizedBox(width: 12),
-          const ShimmerBox(width: 60, height: 14, radius: 7),
+          SizedBox(width: 12),
+          ShimmerBox(width: 60, height: 14, radius: 7),
         ],
       ),
     );

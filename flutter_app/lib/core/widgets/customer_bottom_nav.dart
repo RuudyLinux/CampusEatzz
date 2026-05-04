@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
 import '../constants/app_colors.dart';
@@ -66,89 +68,127 @@ class CustomerBottomNav extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final currentIndex = CustomerTab.values.indexOf(current);
 
-    // Dark pill nav (screenshot style) — light variant in dark mode stays readable
-    final navBg = isDark ? AppColors.darkCardRaised : AppColors.textPrimary;
-    final unselectedColor = isDark
-        ? AppColors.darkTextMuted
-        : Colors.white.withValues(alpha: 0.55);
-
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-        child: Container(
-          height: 64,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          decoration: BoxDecoration(
-            color: navBg,
-            borderRadius: BorderRadius.circular(40),
-            boxShadow: <BoxShadow>[
-              BoxShadow(
-                color: AppColors.textPrimary.withValues(alpha: 0.30),
-                blurRadius: 24,
-                spreadRadius: 2,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Row(
-            children: List<Widget>.generate(_items.length, (index) {
-              final item = _items[index];
-              final selected = index == currentIndex;
-
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    if (selected) return;
-                    final destination =
-                        _destinationForTab(CustomerTab.values[index]);
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute<void>(builder: (_) => destination),
-                      (route) => false,
-                    );
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOutCubic,
-                    margin: const EdgeInsets.symmetric(horizontal: 3),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? AppColors.primary.withValues(alpha: isDark ? 0.22 : 0.18)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(32),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        Icon(
-                          selected ? item.activeIcon : item.icon,
-                          size: 20,
-                          color: selected ? AppColors.primaryOnDark : unselectedColor,
-                        ),
-                        AnimatedSize(
-                          duration: const Duration(milliseconds: 200),
-                          curve: Curves.easeOutCubic,
-                          child: selected
-                              ? Padding(
-                                  padding: const EdgeInsets.only(left: 6),
-                                  child: Text(
-                                    item.label,
-                                    style: AppTypography.labelSm.copyWith(
-                                      color: AppColors.primaryOnDark,
-                                      letterSpacing: 0.1,
-                                    ),
-                                  ),
-                                )
-                              : const SizedBox.shrink(),
-                        ),
-                      ],
-                    ),
-                  ),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(40),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Container(
+              height: 64,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              decoration: BoxDecoration(
+                // Glass fill: white 45% light / darkCard 55% dark
+                color: isDark
+                    ? AppColors.darkCard.withValues(alpha: 0.75)
+                    : Colors.white.withValues(alpha: 0.60),
+                borderRadius: BorderRadius.circular(40),
+                border: Border.all(
+                  // Top/left bevel — white 20%
+                  color: isDark
+                      ? AppColors.glassBevelBottom
+                      : AppColors.glassBevelTop,
+                  width: 1,
                 ),
-              );
-            }),
+                boxShadow: const <BoxShadow>[
+                  // Ambient occlusion — spec: 0 20px 40px rgba(0,0,0,0.04)
+                  BoxShadow(
+                    color: AppColors.glassShadow,
+                    blurRadius: 40,
+                    spreadRadius: 0,
+                    offset: Offset(0, 20),
+                  ),
+                  BoxShadow(
+                    color: AppColors.shadowMintTint,
+                    blurRadius: 20,
+                    spreadRadius: 0,
+                    offset: Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: List<Widget>.generate(_items.length, (index) {
+                  final item = _items[index];
+                  final selected = index == currentIndex;
+
+                  return Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        if (selected) return;
+                        final destination =
+                            _destinationForTab(CustomerTab.values[index]);
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute<void>(builder: (_) => destination),
+                          (route) => false,
+                        );
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 220),
+                        curve: Curves.easeOutCubic,
+                        margin: const EdgeInsets.symmetric(horizontal: 3),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          // Selected pill: mint at 15% — glass highlight
+                          color: selected
+                              ? (isDark
+                                  ? AppColors.primaryOnDark.withValues(alpha: 0.18)
+                                  : AppColors.primary.withValues(alpha: 0.12))
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(32),
+                          border: selected
+                              ? Border.all(
+                                  color: isDark
+                                      ? AppColors.primaryOnDark
+                                          .withValues(alpha: 0.25)
+                                      : AppColors.primary.withValues(alpha: 0.20),
+                                  width: 1,
+                                )
+                              : null,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            Icon(
+                              selected ? item.activeIcon : item.icon,
+                              size: 20,
+                              color: selected
+                                  ? (isDark
+                                      ? AppColors.primaryOnDark
+                                      : AppColors.primary)
+                                  : (isDark
+                                      ? AppColors.darkTextMuted
+                                      : AppColors.textMuted),
+                            ),
+                            AnimatedSize(
+                              duration: const Duration(milliseconds: 200),
+                              curve: Curves.easeOutCubic,
+                              child: selected
+                                  ? Padding(
+                                      padding: const EdgeInsets.only(left: 6),
+                                      child: Text(
+                                        item.label,
+                                        style: AppTypography.labelSm.copyWith(
+                                          color: isDark
+                                              ? AppColors.primaryOnDark
+                                              : AppColors.primary,
+                                          letterSpacing: 0.1,
+                                        ),
+                                      ),
+                                    )
+                                  : const SizedBox.shrink(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
           ),
         ),
       ),
