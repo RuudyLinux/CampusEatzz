@@ -158,13 +158,27 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
                               (route) => false,
                             );
                           },
-                          icon: const Icon(Icons.restaurant_menu),
+                          icon: const Icon(Icons.home_rounded),
+                          label: const Text('Go to Home'),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      AnimatedReveal(
+                        delayMs: 230,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute<void>(builder: (_) => const HomeScreen()),
+                              (route) => false,
+                            );
+                          },
+                          icon: const Icon(Icons.restaurant_menu_rounded),
                           label: const Text('Order More'),
                         ),
                       ),
                       const SizedBox(height: 8),
                       AnimatedReveal(
-                        delayMs: 240,
+                        delayMs: 260,
                         child: OutlinedButton.icon(
                           onPressed: () {
                             Navigator.of(context).pushAndRemoveUntil(
