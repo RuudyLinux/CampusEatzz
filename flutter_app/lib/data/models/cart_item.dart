@@ -8,6 +8,7 @@ class CartItem {
     required this.quantity,
     required this.imageUrl,
     required this.canteenId,
+    this.description = '',
   });
 
   final int menuItemId;
@@ -16,6 +17,7 @@ class CartItem {
   final int quantity;
   final String imageUrl;
   final int? canteenId;
+  final String description;
 
   double get lineTotal => price * quantity;
 
@@ -29,6 +31,7 @@ class CartItem {
       quantity: quantity ?? this.quantity,
       imageUrl: imageUrl,
       canteenId: canteenId,
+      description: description,
     );
   }
 
@@ -40,6 +43,7 @@ class CartItem {
       quantity: 1,
       imageUrl: item.imageUrl,
       canteenId: item.canteenId,
+      description: item.description,
     );
   }
 
@@ -51,6 +55,7 @@ class CartItem {
       'quantity': quantity,
       'imageUrl': imageUrl,
       'canteenId': canteenId,
+      'description': description,
     };
   }
 
@@ -62,6 +67,7 @@ class CartItem {
       quantity: _asInt(json['quantity'] ?? 1),
       imageUrl: (json['imageUrl'] ?? json['image'] ?? '').toString(),
       canteenId: _optionalInt(json['canteenId']),
+      description: (json['description'] ?? '').toString(),
     );
   }
 }

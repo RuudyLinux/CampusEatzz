@@ -11,9 +11,16 @@ class CartProvider extends ChangeNotifier {
 
   final List<CartItem> _items = <CartItem>[];
   bool _initialized = false;
+  bool _isParcel = false;
 
   List<CartItem> get items => List<CartItem>.unmodifiable(_items);
   bool get initialized => _initialized;
+  bool get isParcel => _isParcel;
+
+  void setParcel(bool value) {
+    _isParcel = value;
+    notifyListeners();
+  }
 
   int get totalItems => _items.fold<int>(0, (sum, item) => sum + item.quantity);
   double get subtotal => _items.fold<double>(0, (sum, item) => sum + item.lineTotal);
@@ -98,6 +105,7 @@ class CartProvider extends ChangeNotifier {
 
   Future<void> clear() async {
     _items.clear();
+    _isParcel = false;
     await _preferences.clearCart();
     notifyListeners();
   }

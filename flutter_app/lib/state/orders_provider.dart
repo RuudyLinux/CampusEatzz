@@ -54,6 +54,7 @@ class OrdersProvider extends ChangeNotifier {
     int? canteenId,
     String? customerName,
     String? customerPhone,
+    String orderType = 'takeaway',
   }) {
     return _service.placeOrder(
       identifier: identifier,
@@ -62,6 +63,7 @@ class OrdersProvider extends ChangeNotifier {
       canteenId: canteenId,
       customerName: customerName,
       customerPhone: customerPhone,
+      orderType: orderType,
     );
   }
 }

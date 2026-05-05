@@ -125,6 +125,7 @@ class CustomerService {
     int? canteenId,
     String? customerName,
     String? customerPhone,
+    String orderType = 'takeaway',
   }) async {
     final response = await _apiClient.request(
       'api/customer/orders',
@@ -134,7 +135,7 @@ class CustomerService {
         'canteenId': canteenId,
         'customerName': customerName,
         'customerPhone': customerPhone,
-        'orderType': 'takeaway',
+        'orderType': orderType,
         'paymentMethod': paymentMethod,
         'items': cartItems
             .map((item) => <String, dynamic>{

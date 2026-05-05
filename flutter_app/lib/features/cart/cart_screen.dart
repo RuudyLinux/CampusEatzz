@@ -124,6 +124,19 @@ class _CartItemCard extends StatelessWidget {
                           : AppColors.textPrimary,
                     ),
                   ),
+                  if ((item.description as String).isNotEmpty) ...<Widget>[
+                    const SizedBox(height: 2),
+                    Text(
+                      item.description as String,
+                      style: AppTypography.caption.copyWith(
+                        color: isDark
+                            ? AppColors.darkTextMuted
+                            : AppColors.textMuted,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                   const SizedBox(height: 3),
                   Text(
                     formatInr(item.price),
@@ -277,6 +290,9 @@ class _OrderSummaryCard extends StatelessWidget {
               isDark: isDark,
               bold: true,
             ),
+            const SizedBox(height: 14),
+            // ── Parcel toggle ─────────────────────────────────────────
+            _ParcelToggle(isDark: isDark),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
@@ -338,6 +354,75 @@ class _SummaryRow extends StatelessWidget {
         const Spacer(),
         Text(value, style: style),
       ],
+    );
+  }
+}
+
+// ── Parcel Toggle ─────────────────────────────────────────────────────────────
+
+class _ParcelToggle extends StatelessWidget {
+  const _ParcelToggle({required this.isDark});
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final cart = context.watch<CartProvider>();
+    return GestureDetector(
+      onTap: () => context.read<CartProvider>().setParcel(!cart.isParcel),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: cart.isParcel
+              ? AppColors.primary.withValues(alpha: isDark ? 0.20 : 0.10)
+              : (isDark ? AppColors.darkSurface : AppColors.surfaceRaised),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: cart.isParcel
+                ? (isDark ? AppColors.primaryOnDark : AppColors.primary)
+                    .withValues(alpha: 0.50)
+                : (isDark ? AppColors.darkBorder : AppColors.border),
+          ),
+        ),
+        child: Row(
+          children: <Widget>[
+            Icon(
+              Icons.takeout_dining_rounded,
+              size: 20,
+              color: cart.isParcel
+                  ? (isDark ? AppColors.primaryOnDark : AppColors.primary)
+                  : (isDark ? AppColors.darkTextMuted : AppColors.textMuted),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    'Food Parcel',
+                    style: AppTypography.label.copyWith(
+                      color: cart.isParcel
+                          ? (isDark ? AppColors.primaryOnDark : AppColors.primary)
+                          : (isDark ? AppColors.darkTextPrimary : AppColors.textPrimary),
+                    ),
+                  ),
+                  Text(
+                    'Pack my order for takeaway',
+                    style: AppTypography.caption.copyWith(
+                      color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Switch(
+              value: cart.isParcel,
+              onChanged: (v) => context.read<CartProvider>().setParcel(v),
+              activeThumbColor: isDark ? AppColors.primaryOnDark : AppColors.primary,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

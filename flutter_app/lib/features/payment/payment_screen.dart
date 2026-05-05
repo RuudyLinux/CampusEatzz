@@ -98,6 +98,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         canteenId: cart.activeCanteenId,
         customerName: session.name,
         customerPhone: session.contact,
+        orderType: cart.isParcel ? 'parcel' : 'takeaway',
       );
 
       if (result.walletBalance != null) {
