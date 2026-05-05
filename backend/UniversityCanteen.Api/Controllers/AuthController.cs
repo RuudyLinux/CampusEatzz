@@ -606,6 +606,16 @@ public sealed class AuthController(
         DateTime expiryUtc,
         CancellationToken cancellationToken)
     {
+        if (connection is System.Data.Common.DbConnection dbConnection
+            && dbConnection.State != System.Data.ConnectionState.Open)
+        {
+            await dbConnection.OpenAsync(cancellationToken);
+        }
+        else if (connection.State != System.Data.ConnectionState.Open)
+        {
+            connection.Open();
+        }
+
         using var transaction = connection.BeginTransaction();
 
         await connection.ExecuteAsync(new CommandDefinition(
