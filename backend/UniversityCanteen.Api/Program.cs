@@ -266,6 +266,12 @@ static async Task EnsureCoreSchemaAsync(
         "ALTER TABLE menu_items ADD COLUMN preparation_time INT NOT NULL DEFAULT 0;",
         "ALTER TABLE menu_items ADD COLUMN display_order INT NOT NULL DEFAULT 0;",
         "ALTER TABLE menu_items ADD COLUMN description TEXT NULL;",
+        // order_items needs item_name (used by CustomerController insert)
+        "ALTER TABLE order_items ADD COLUMN item_name VARCHAR(255) NULL;",
+        // orders needs delivery_address (used by CustomerController insert)
+        "ALTER TABLE orders ADD COLUMN delivery_address VARCHAR(500) NULL;",
+        // orders needs UNIQUE constraint on order_number
+        "ALTER TABLE orders ADD UNIQUE KEY uq_orders_order_number (order_number);",
         // Ensure id has AUTO_INCREMENT (may be missing if DB was not seeded from full SQL file)
         "ALTER TABLE menu_items ADD PRIMARY KEY (id);",
         "ALTER TABLE menu_items MODIFY id INT NOT NULL AUTO_INCREMENT;",
@@ -480,6 +486,33 @@ static async Task EnsureCoreSchemaAsync(
                 FOREIGN KEY (conversation_id) REFERENCES chatbot_conversations(id)
                 ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS user_otps (
+            id INT NOT NULL AUTO_INCREMENT,
+            user_id INT NULL,
+            otp_code VARCHAR(10) NULL,
+            expires_at DATETIME NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY ix_user_otps_user (user_id),
+            CONSTRAINT fk_user_otps_user
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS user_activity_logs (
+            id INT NOT NULL AUTO_INCREMENT,
+            user_id INT NOT NULL,
+            table_name VARCHAR(100) NULL,
+            record_id INT NULL,
+            action_type VARCHAR(20) NULL,
+            activity_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY ix_user_activity_logs_user (user_id),
+            CONSTRAINT fk_user_activity_logs_user
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
         """
     };
 

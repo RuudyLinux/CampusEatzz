@@ -12,15 +12,21 @@ namespace UniversityCanteen.Api.Services;
 
 public sealed class JwtTokenService(IOptions<JwtOptions> jwtOptions) : IJwtTokenService
 {
-    private const string FallbackSecret = "UniversityCanteen-DefaultSecret-ChangeInProduction!";
-
     private readonly JwtOptions _jwtOptions = jwtOptions.Value;
 
     public static string ResolveSecret(string? configuredSecret)
     {
-        return string.IsNullOrWhiteSpace(configuredSecret)
-            ? FallbackSecret
-            : configuredSecret.Trim();
+        if (!string.IsNullOrWhiteSpace(configuredSecret))
+            return configuredSecret.Trim();
+
+        // Check env var override (set JWT_SECRET on Railway/Render)
+        var envSecret = Environment.GetEnvironmentVariable("JWT_SECRET")
+            ?? Environment.GetEnvironmentVariable("Jwt__Secret");
+        if (!string.IsNullOrWhiteSpace(envSecret))
+            return envSecret.Trim();
+
+        // Fallback for local dev only — override via JWT_SECRET in production
+        return "UniversityCanteen-Dev-Secret-NotForProduction-32chars!";
     }
 
     public AccessTokenResult GenerateAccessToken(SessionUserDto user)
