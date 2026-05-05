@@ -86,6 +86,7 @@ class AuthService {
       lastName: (data['lastName'] ?? '').toString(),
       contact: (data['contact'] ?? '').toString(),
       department: (data['department'] ?? '').toString(),
+      profileImageUrl: (data['profileImageUrl'] ?? '').toString(),
     );
   }
 
@@ -113,6 +114,9 @@ class AuthService {
       lastName: (data['lastName'] ?? current.lastName).toString(),
       contact: (data['contact'] ?? current.contact).toString(),
       department: (data['department'] ?? current.department).toString(),
+      profileImageUrl: data['profileImageUrl'] != null
+          ? data['profileImageUrl'].toString()
+          : current.profileImageUrl,
     );
   }
 }

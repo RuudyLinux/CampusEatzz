@@ -15,4 +15,5 @@ public sealed class SessionUserDto
     public int? CanteenId { get; init; }
     public string? CanteenName { get; init; }
     public string? ImageUrl { get; init; }
+    public string? ProfileImageUrl { get; init; }
 }

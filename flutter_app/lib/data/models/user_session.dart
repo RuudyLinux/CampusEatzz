@@ -10,6 +10,7 @@ class UserSession {
     this.lastName = '',
     this.contact = '',
     this.department = '',
+    this.profileImageUrl = '',
   });
 
   final int id;
@@ -22,6 +23,7 @@ class UserSession {
   final String lastName;
   final String contact;
   final String department;
+  final String profileImageUrl;
 
   String get identifier {
     if (universityId.trim().isNotEmpty) {
@@ -45,6 +47,7 @@ class UserSession {
       'lastName': lastName,
       'contact': contact,
       'department': department,
+      'profileImageUrl': profileImageUrl,
     };
   }
 
@@ -60,6 +63,7 @@ class UserSession {
       lastName: (json['lastName'] ?? '').toString(),
       contact: (json['contact'] ?? '').toString(),
       department: (json['department'] ?? '').toString(),
+      profileImageUrl: (json['profileImageUrl'] ?? '').toString(),
     );
   }
 
@@ -74,6 +78,7 @@ class UserSession {
     String? lastName,
     String? contact,
     String? department,
+    String? profileImageUrl,
   }) {
     return UserSession(
       id: id ?? this.id,
@@ -86,6 +91,7 @@ class UserSession {
       lastName: lastName ?? this.lastName,
       contact: contact ?? this.contact,
       department: department ?? this.department,
+      profileImageUrl: profileImageUrl ?? this.profileImageUrl,
     );
   }
 }

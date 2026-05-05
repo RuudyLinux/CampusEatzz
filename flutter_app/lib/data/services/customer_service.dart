@@ -1,3 +1,7 @@
+import 'dart:typed_data';
+
+import 'package:dio/dio.dart';
+
 import '../models/cart_item.dart';
 import '../models/order_models.dart';
 import '../models/refund_models.dart';
@@ -252,6 +256,43 @@ class CustomerService {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Uploads profile image bytes and returns the relative URL from the server.
+  Future<String> uploadProfileImage({
+    required String identifier,
+    required String fileName,
+    required Uint8List bytes,
+  }) async {
+    final formData = FormData.fromMap(<String, dynamic>{
+      'identifier': identifier,
+      'file': MultipartFile.fromBytes(
+        bytes,
+        filename: fileName,
+        contentType: DioMediaType('image', _imageSubtype(fileName)),
+      ),
+    });
+
+    final response = await _apiClient.request(
+      'api/customer/profile/upload-image',
+      method: 'POST',
+      data: formData,
+    );
+
+    final body = _asMap(response.data);
+    _ensureSuccess(body, fallback: 'Unable to upload profile image');
+    final data = _asMap(body['data']);
+    return (data['profileImageUrl'] ?? '').toString();
+  }
+
+  static String _imageSubtype(String fileName) {
+    final ext = fileName.split('.').last.toLowerCase();
+    return switch (ext) {
+      'jpg' || 'jpeg' => 'jpeg',
+      'png' => 'png',
+      'webp' => 'webp',
+      _ => 'jpeg',
+    };
   }
 
   Future<void> submitContactMessage({

@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/constants/api_config.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_typography.dart';
 import '../../core/constants/formatters.dart';
 import '../../core/widgets/animated_reveal.dart';
 import '../../core/widgets/app_empty_state.dart';
 import '../../core/widgets/customer_bottom_nav.dart';
+import '../../data/services/customer_service.dart';
 import '../../state/auth_provider.dart';
 import '../../state/cart_provider.dart';
 import '../../state/orders_provider.dart';
@@ -317,24 +320,82 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
 // ── Avatar Card ───────────────────────────────────────────────────────────────
 
-class _AvatarCard extends StatelessWidget {
+class _AvatarCard extends StatefulWidget {
   const _AvatarCard({required this.user, required this.isDark});
 
   final dynamic user;
   final bool isDark;
 
-  void _showDetails(BuildContext context) {
+  @override
+  State<_AvatarCard> createState() => _AvatarCardState();
+}
+
+class _AvatarCardState extends State<_AvatarCard> {
+  bool _uploading = false;
+
+  void _showDetails() {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _UserDetailsSheet(user: user, isDark: isDark),
+      builder: (_) => _UserDetailsSheet(user: widget.user, isDark: widget.isDark),
     );
+  }
+
+  Future<void> _pickAndUpload() async {
+    final picker = ImagePicker();
+    final XFile? picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1200,
+      imageQuality: 85,
+    );
+    if (picked == null || !mounted) return;
+
+    final auth = context.read<AuthProvider>();
+    final service = context.read<CustomerService>();
+    final session = auth.session;
+    if (session == null) return;
+
+    setState(() => _uploading = true);
+    try {
+      final bytes = await picked.readAsBytes();
+      final relUrl = await service.uploadProfileImage(
+        identifier: session.identifier,
+        fileName: picked.name.isNotEmpty ? picked.name : 'profile.jpg',
+        bytes: bytes,
+      );
+
+      await auth.updateProfileImage(relUrl);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile photo updated!')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final user = widget.user;
+    final isDark = widget.isDark;
     final initials = _initials(user.name as String);
+    final profileImageUrl = (user.profileImageUrl as String).trim();
+    final hasImage = profileImageUrl.isNotEmpty;
+
+    // Build absolute URL if relative
+    String? absoluteImageUrl;
+    if (hasImage) {
+      absoluteImageUrl = profileImageUrl.startsWith('http')
+          ? profileImageUrl
+          : '${ApiConfig.primaryBaseUrl}$profileImageUrl';
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -350,20 +411,76 @@ class _AvatarCard extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                initials,
-                style: AppTypography.heading2.copyWith(
-                  color: AppColors.primary,
+          // ── Avatar circle with camera overlay ──────────────────────
+          GestureDetector(
+            onTap: _uploading ? null : _pickAndUpload,
+            child: Stack(
+              children: <Widget>[
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.20),
+                      width: 2,
+                    ),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: hasImage && absoluteImageUrl != null
+                      ? Image.network(
+                          absoluteImageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Center(
+                            child: Text(
+                              initials,
+                              style: AppTypography.heading2.copyWith(
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        )
+                      : Center(
+                          child: Text(
+                            initials,
+                            style: AppTypography.heading2.copyWith(
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
                 ),
-              ),
+                // Camera badge
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isDark ? AppColors.darkCard : Colors.white,
+                        width: 2,
+                      ),
+                    ),
+                    child: _uploading
+                        ? const Padding(
+                            padding: EdgeInsets.all(3),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1.5,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.camera_alt_rounded,
+                            size: 11,
+                            color: Colors.white,
+                          ),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(width: 14),
@@ -383,8 +500,7 @@ class _AvatarCard extends StatelessWidget {
                 Text(
                   user.email as String,
                   style: AppTypography.bodySm.copyWith(
-                    color:
-                        isDark ? AppColors.darkTextMuted : AppColors.textMuted,
+                    color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
                   ),
                 ),
                 if ((user.universityId as String).isNotEmpty) ...<Widget>[
@@ -400,9 +516,9 @@ class _AvatarCard extends StatelessWidget {
               ],
             ),
           ),
-          // Open button — shows full user details
+          // Open details button
           GestureDetector(
-            onTap: () => _showDetails(context),
+            onTap: _showDetails,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(

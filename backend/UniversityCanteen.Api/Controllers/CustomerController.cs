@@ -1377,6 +1377,69 @@ public sealed class CustomerController(
         }
     }
 
+    // ── Profile Image Upload ─────────────────────────────────────────────────
+
+    [Authorize]
+    [HttpPost("profile/upload-image")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> UploadProfileImage(
+        [FromForm] string identifier,
+        IFormFile file,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(identifier))
+            return BadRequest(Failure("Identifier is required."));
+
+        if (file is null || file.Length == 0)
+            return BadRequest(Failure("No file uploaded."));
+
+        const long maxBytes = 5 * 1024 * 1024; // 5 MB
+        if (file.Length > maxBytes)
+            return BadRequest(Failure("File exceeds 5 MB limit."));
+
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (ext is not (".jpg" or ".jpeg" or ".png" or ".webp"))
+            return BadRequest(Failure("Unsupported file type. Use jpg, png, or webp."));
+
+        try
+        {
+            using var connection = dbConnectionFactory.CreateConnection();
+            var user = await FindUserByIdentifier(connection, identifier.Trim(), cancellationToken);
+            if (user is null)
+                return NotFound(Failure("User not found."));
+
+            // Save file
+            var uploadDir = Path.Combine("wwwroot", "uploads", "profile_images");
+            Directory.CreateDirectory(uploadDir);
+
+            var fileName = $"user_{user.Id}_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}{ext}";
+            var filePath = Path.Combine(uploadDir, fileName);
+
+            await using (var stream = System.IO.File.Create(filePath))
+            {
+                await file.CopyToAsync(stream, cancellationToken);
+            }
+
+            var relativeUrl = $"/uploads/profile_images/{fileName}";
+
+            // Persist to users table
+            await connection.ExecuteAsync(new CommandDefinition(
+                "UPDATE users SET profile_image_url = @url WHERE id = @id;",
+                new { url = relativeUrl, id = user.Id },
+                cancellationToken: cancellationToken));
+
+            return Ok(Success("Profile image uploaded successfully.", new
+            {
+                profileImageUrl = relativeUrl
+            }));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to upload profile image for identifier {Identifier}", identifier);
+            return StatusCode(StatusCodes.Status500InternalServerError, Failure("Internal server error while uploading image."));
+        }
+    }
+
     private static async Task<UserLookupRow?> FindUserByIdentifier(
         IDbConnection connection,
         string identifier,

@@ -636,7 +636,8 @@ public sealed class AuthController(
                 COALESCE(u.last_name, '') AS LastName,
                 COALESCE(u.contact, '') AS Contact,
                 COALESCE(u.department, '') AS Department,
-                COALESCE(u.status, '') AS Status
+                COALESCE(u.status, '') AS Status,
+                COALESCE(u.profile_image_url, '') AS ProfileImageUrl
             FROM users u
             WHERE u.email = @identifier
                OR CAST(u.id AS CHAR) = @identifier{enrollmentCondition}{universityIdCondition}

@@ -260,6 +260,7 @@ static async Task EnsureCoreSchemaAsync(
         "ALTER TABLE users ADD COLUMN IsLoggedIn TINYINT(1) NOT NULL DEFAULT 0;",
         "ALTER TABLE users MODIFY COLUMN OtpCode VARCHAR(255) NULL;",
         "ALTER TABLE canteen_admins ADD COLUMN image_url VARCHAR(500) NULL;",
+        "ALTER TABLE users ADD COLUMN profile_image_url VARCHAR(500) NULL;",
         "ALTER TABLE menu_items ADD COLUMN is_vegetarian TINYINT(1) NOT NULL DEFAULT 0;",
         "ALTER TABLE menu_items ADD COLUMN spice_level VARCHAR(20) NULL;",
         "ALTER TABLE menu_items ADD COLUMN preparation_time INT NOT NULL DEFAULT 0;",
