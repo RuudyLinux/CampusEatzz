@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -102,15 +104,7 @@ class _CanteenAdminShellScreenState extends State<CanteenAdminShellScreen> {
       body: DecoratedBox(
         decoration: BoxDecoration(
           gradient: isDark
-              ? const LinearGradient(
-                  colors: <Color>[
-                    AppColors.darkBg,
-                    AppColors.darkCard,
-                    AppColors.darkSurface,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
+              ? AppColors.darkBackgroundGradient
               : AppColors.backgroundGradient,
         ),
         child: Stack(
@@ -2193,54 +2187,35 @@ class _CreativeAdminCanvas extends StatelessWidget {
     return IgnorePointer(
       child: Stack(
         children: <Widget>[
+          // Blob 1 — top-right
           Positioned(
-            top: -48,
+            top: -60,
             right: -40,
-            child: Container(
-              width: 170,
-              height: 170,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: <Color>[
-                    AppColors.primary.withValues(alpha: isDark ? 0.18 : 0.26),
-                    AppColors.primary.withValues(alpha: isDark ? 0.01 : 0.02),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            top: 140,
-            left: -56,
-            child: Transform.rotate(
-              angle: -0.24,
+            child: ImageFiltered(
+              imageFilter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
               child: Container(
-                width: 150,
-                height: 150,
+                width: 220,
+                height: 220,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(34),
-                  gradient: LinearGradient(
-                    colors: <Color>[
-                      AppColors.accent.withValues(alpha: isDark ? 0.12 : 0.2),
-                      AppColors.accent.withValues(alpha: 0.01),
-                    ],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
+                  shape: BoxShape.circle,
+                  color: isDark ? AppColors.blobDark1 : AppColors.blobLight1,
                 ),
               ),
             ),
           ),
+          // Blob 2 — bottom-left
           Positioned(
-            bottom: 56,
-            right: -28,
-            child: Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.navy.withValues(alpha: isDark ? 0.12 : 0.07),
+            bottom: 60,
+            left: -50,
+            child: ImageFiltered(
+              imageFilter: ImageFilter.blur(sigmaX: 45, sigmaY: 45),
+              child: Container(
+                width: 180,
+                height: 180,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isDark ? AppColors.blobDark2 : AppColors.blobLight2,
+                ),
               ),
             ),
           ),
