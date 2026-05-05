@@ -7,16 +7,16 @@
     {
         var isActive = string.Equals(activePage, key, StringComparison.OrdinalIgnoreCase);
         return isActive
-            ? "flex items-center gap-1.5 px-3 py-2 text-sm xl:text-base rounded-lg bg-white/20 font-semibold border border-white/30 whitespace-nowrap transition"
-            : "flex items-center gap-1.5 px-3 py-2 text-sm xl:text-base rounded-lg hover:bg-white/10 whitespace-nowrap transition";
+            ? "nav-link-glass is-active flex items-center gap-1.5 px-3 py-2 text-sm xl:text-base rounded-full font-semibold whitespace-nowrap transition"
+            : "nav-link-glass flex items-center gap-1.5 px-3 py-2 text-sm xl:text-base rounded-full whitespace-nowrap transition";
     }
 
     string M(string key)
     {
         var isActive = string.Equals(activePage, key, StringComparison.OrdinalIgnoreCase);
         return isActive
-            ? "flex items-center gap-2 px-4 py-2.5 rounded-lg bg-white/20 font-semibold border border-white/30 transition"
-            : "flex items-center gap-2 px-4 py-2.5 rounded-lg hover:bg-white/10 transition";
+            ? "nav-link-glass is-active flex items-center gap-2 px-4 py-2.5 rounded-full font-semibold transition"
+            : "nav-link-glass flex items-center gap-2 px-4 py-2.5 rounded-full transition";
     }
 }
 
@@ -25,15 +25,15 @@
     .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 </style>
 
-<nav class="gradient-bg text-white shadow-lg sticky top-0 z-50">
+<nav class="admin-nav sticky top-0 z-50">
     <div class="container mx-auto px-4 xl:px-6">
         <div class="flex items-center justify-between py-2.5">
 
             <!-- Logo + Brand -->
             <a href='@Url.Action("AdminDashboard", "Home")' class="flex items-center gap-2.5 shrink-0">
                 <img src="~/assets/img/logo.png?v=2" alt="CampusEatzz"
-                     class="app-logo h-9 w-9 xl:h-10 xl:w-10 rounded-full object-cover shadow-sm ring-2 ring-white/30"
-                     onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22%3E%3Crect width=%22100%25%22 height=%22100%25%22 fill=%22%23b70049%22/%3E%3Ctext x=%2250%25%22 y=%2257%25%22 text-anchor=%22middle%22 fill=%22%23fff%22 font-size=%2215%22 font-family=%22Segoe UI,Arial%22%3ECE%3C/text%3E%3C/svg%3E'" />
+                     class="app-logo h-9 w-9 xl:h-10 xl:w-10 rounded-full object-cover ring-2 ring-white/70"
+                     onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22%3E%3Crect width=%22100%25%22 height=%22100%25%22 fill=%22%233c3c78%22/%3E%3Ctext x=%2250%25%22 y=%2257%25%22 text-anchor=%22middle%22 fill=%22%23fff%22 font-size=%2215%22 font-family=%22Segoe UI,Arial%22%3ECE%3C/text%3E%3C/svg%3E'" />
                 <span class="text-lg xl:text-xl font-bold app-name hidden sm:block">CampusEatzz</span>
             </a>
 
@@ -55,20 +55,20 @@
             <!-- Desktop Logout -->
             <div class="hidden lg:flex items-center shrink-0">
                 <button onclick="logout(); return false;"
-                        class="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-red-500/80 border border-white/20 hover:border-red-400 rounded-lg font-medium transition whitespace-nowrap">
+                        class="flex items-center gap-2 px-4 py-2 bg-white/50 hover:bg-red-500/80 border border-white/80 hover:border-red-400 rounded-full font-semibold transition whitespace-nowrap">
                     <i class="fas fa-right-from-bracket text-sm"></i>
                     <span>Logout</span>
                 </button>
             </div>
 
             <!-- Mobile Hamburger -->
-            <button onclick="toggleMobileMenu()" class="lg:hidden p-2 rounded-lg hover:bg-white/10 transition" aria-label="Toggle navigation">
+            <button onclick="toggleMobileMenu()" class="lg:hidden p-2 rounded-full hover:bg-white/60 transition" aria-label="Toggle navigation">
                 <i class="fas fa-bars text-xl"></i>
             </button>
         </div>
 
         <!-- Mobile Menu -->
-        <div id="mobileMenu" class="hidden lg:hidden pb-4 space-y-1 border-t border-white/20 pt-3">
+        <div id="mobileMenu" class="hidden lg:hidden pb-4 space-y-1 border-t border-white/70 pt-3">
             <a href='@Url.Action("AdminDashboard",          "Home")' class="@M("Dashboard")"><i class="fas fa-gauge-high w-4"></i>Dashboard</a>
             <a href='@Url.Action("AdminAllOrders",          "Home")' class="@M("Orders")"><i class="fas fa-shopping-bag w-4"></i>Orders</a>
             <a href='@Url.Action("AdminManageUsers",        "Home")' class="@M("Users")"><i class="fas fa-users w-4"></i>Users</a>
@@ -82,7 +82,7 @@
             <a href='@Url.Action("AdminSettings",           "Home")' class="@M("Settings")"><i class="fas fa-gear w-4"></i>Settings</a>
             <hr class="border-white/20 my-1">
             <a href="#" onclick="logout(); return false;"
-               class="flex items-center gap-2 px-4 py-2.5 rounded-lg hover:bg-red-500/70 transition text-white/80">
+               class="flex items-center gap-2 px-4 py-2.5 rounded-full hover:bg-red-500/70 transition">
                 <i class="fas fa-right-from-bracket w-4"></i>Logout
             </a>
         </div>
