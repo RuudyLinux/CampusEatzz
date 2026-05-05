@@ -258,6 +258,8 @@ static async Task EnsureCoreSchemaAsync(
         "ALTER TABLE canteen_admins ADD COLUMN image_url VARCHAR(500) NULL;",
         "ALTER TABLE users ADD COLUMN profile_image_url VARCHAR(500) NULL;",
         "ALTER TABLE users ADD COLUMN is_logged_in TINYINT(1) NOT NULL DEFAULT 0;",
+        "ALTER TABLE students ADD COLUMN password_hash VARCHAR(255) NULL;",
+        "ALTER TABLE university_staff ADD COLUMN password_hash VARCHAR(255) NULL;",
         "ALTER TABLE order_items ADD COLUMN item_name VARCHAR(255) NULL;",
         "ALTER TABLE orders ADD COLUMN delivery_address VARCHAR(500) NULL;",
         "ALTER TABLE menu_items ADD COLUMN is_vegetarian TINYINT(1) NOT NULL DEFAULT 0;",
@@ -564,6 +566,8 @@ static async Task EnsureCoreSchemaAsync(
                     });
             }
 
+            await EnsureAcademicPasswordHashSyncAsync(connection, logger);
+
             var adminPasswordHash = BCrypt.Net.BCrypt.HashPassword(seedAdminPassword);
 
             // Create configured admin user
@@ -654,6 +658,92 @@ static async Task EnsureCoreSchemaAsync(
             return;
         }
     }
+}
+
+static async Task EnsureAcademicPasswordHashSyncAsync(
+    System.Data.IDbConnection connection,
+    ILogger logger)
+{
+    var usersUniversityIdColumn = await ResolveExistingColumnNameAsync(
+        connection,
+        "users",
+        "UniversityId",
+        "university_id");
+
+    if (string.IsNullOrWhiteSpace(usersUniversityIdColumn))
+    {
+        logger.LogWarning(
+            "Skipping students/staff password_hash sync because users table has no UniversityId/university_id column.");
+        return;
+    }
+
+    await SyncPasswordHashForAcademicTableAsync(connection, logger, "students", usersUniversityIdColumn);
+    await SyncPasswordHashForAcademicTableAsync(connection, logger, "university_staff", usersUniversityIdColumn);
+}
+
+static async Task SyncPasswordHashForAcademicTableAsync(
+    System.Data.IDbConnection connection,
+    ILogger logger,
+    string tableName,
+    string usersUniversityIdColumn)
+{
+    var tableUniversityIdColumn = await ResolveExistingColumnNameAsync(
+        connection,
+        tableName,
+        "UniversityId",
+        "university_id");
+
+    if (string.IsNullOrWhiteSpace(tableUniversityIdColumn))
+    {
+        logger.LogWarning(
+            "Skipping password_hash sync for {TableName}: missing UniversityId/university_id column.",
+            tableName);
+        return;
+    }
+
+    var sql = $"""
+        UPDATE `{tableName}` t
+        JOIN `users` u
+            ON COALESCE(t.`{tableUniversityIdColumn}`, '') = COALESCE(u.`{usersUniversityIdColumn}`, '')
+        SET t.`password_hash` = u.`password_hash`
+        WHERE COALESCE(t.`password_hash`, '') = ''
+          AND COALESCE(u.`password_hash`, '') <> '';
+        """;
+
+    var affectedRows = await connection.ExecuteAsync(sql);
+    if (affectedRows > 0)
+    {
+        logger.LogInformation(
+            "Synced password_hash for {Count} rows in {TableName}.",
+            affectedRows,
+            tableName);
+    }
+}
+
+static async Task<string?> ResolveExistingColumnNameAsync(
+    System.Data.IDbConnection connection,
+    string tableName,
+    params string[] columnCandidates)
+{
+    foreach (var candidate in columnCandidates)
+    {
+        var exists = await connection.ExecuteScalarAsync<int>(
+            """
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = @tableName
+              AND COLUMN_NAME = @columnName;
+            """,
+            new { tableName, columnName = candidate });
+
+        if (exists > 0)
+        {
+            return candidate;
+        }
+    }
+
+    return null;
 }
 
 static string ResolveDatabaseConnectionString(IConfiguration configuration, bool isDevelopment)

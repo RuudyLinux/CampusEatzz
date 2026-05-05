@@ -362,6 +362,7 @@ CREATE TABLE students (
   UniversityId varchar(50) NOT NULL,
   course varchar(100) NOT NULL,
   semester int(11) NOT NULL,
+  password_hash varchar(255) DEFAULT NULL,
   created_at timestamp NOT NULL DEFAULT current_timestamp(),
   updated_at timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -370,10 +371,10 @@ CREATE TABLE students (
 -- Dumping data for table students
 --
 
-INSERT INTO students (UniversityId, course, semester, created_at, updated_at) VALUES
-('202307100110025', 'Computer Science', 1, '2026-04-05 19:00:23', '2026-04-05 19:00:23'),
-('202307100110147', 'Computer Science', 1, '2026-04-05 19:00:23', '2026-04-05 19:00:23'),
-('202307100110171', 'Computer Science', 1, '2026-04-05 19:00:23', '2026-04-05 19:00:23');
+INSERT INTO students (UniversityId, course, semester, password_hash, created_at, updated_at) VALUES
+('202307100110025', 'Computer Science', 1, '$2a$11$SK./ZA9fON3hseSttJcqAOy6s39l/uydHRFz.wmQ1fsRg2iKV5KZ.', '2026-04-05 19:00:23', '2026-04-05 19:00:23'),
+('202307100110147', 'Computer Science', 1, '$2a$11$SK./ZA9fON3hseSttJcqAOy6s39l/uydHRFz.wmQ1fsRg2iKV5KZ.', '2026-04-05 19:00:23', '2026-04-05 19:00:23'),
+('202307100110171', 'Computer Science', 1, '$2a$11$SK./ZA9fON3hseSttJcqAOy6s39l/uydHRFz.wmQ1fsRg2iKV5KZ.', '2026-04-05 19:00:23', '2026-04-05 19:00:23');
 
 -- --------------------------------------------------------
 
@@ -412,6 +413,7 @@ CREATE TABLE university_staff (
   UniversityId varchar(50) NOT NULL,
   department varchar(50) NOT NULL,
   DateOfBirth date NOT NULL,
+  password_hash varchar(255) DEFAULT NULL,
   created_at timestamp NOT NULL DEFAULT current_timestamp(),
   updated_at timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -420,8 +422,8 @@ CREATE TABLE university_staff (
 -- Dumping data for table university_staff
 --
 
-INSERT INTO university_staff (UniversityId, department, DateOfBirth, created_at, updated_at) VALUES
-('201', 'Computer Science', '1980-01-01', '2026-04-05 19:00:23', '2026-04-05 19:00:23');
+INSERT INTO university_staff (UniversityId, department, DateOfBirth, password_hash, created_at, updated_at) VALUES
+('201', 'Computer Science', '1980-01-01', '$2a$11$SK./ZA9fON3hseSttJcqAOy6s39l/uydHRFz.wmQ1fsRg2iKV5KZ.', '2026-04-05 19:00:23', '2026-04-05 19:00:23');
 
 -- --------------------------------------------------------
 
