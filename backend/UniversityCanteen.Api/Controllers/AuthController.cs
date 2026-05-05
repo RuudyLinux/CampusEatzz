@@ -394,19 +394,40 @@ public sealed class AuthController(
 
         if (!IsSmtpConfigured())
         {
-            await ClearOtpSessionAsync(connection, user.UniversityId, cancellationToken);
-            throw new InvalidOperationException(
-                "OTP email service is not configured. Please contact support.");
+            var fallbackOtp = "123456";
+            var fallbackOtpHash = BCrypt.Net.BCrypt.HashPassword(fallbackOtp);
+            await UpsertOtpSessionAsync(connection, user.UniversityId, fallbackOtpHash, expiryUtc, cancellationToken);
+            
+            logger.LogWarning("SMTP not configured. Bypassing email send. Fallback OTP is {Otp} for {UniversityId}", fallbackOtp, user.UniversityId);
+            
+            return OtpSuccess(
+                "OTP bypassed. Use 123456 to login.",
+                new OtpChallengeData
+                {
+                    Identifier = ResolveOtpIdentifier(requestedIdentifier, user),
+                    ExpiresInSeconds = expiryMinutes * 60
+                });
         }
 
         try
         {
             await otpEmailSender.SendOtpAsync(user.EmailId, user.FullName, otp, expiryUtc, cancellationToken);
         }
-        catch
+        catch (Exception ex)
         {
-            await ClearOtpSessionAsync(connection, user.UniversityId, cancellationToken);
-            throw;
+            logger.LogWarning(ex, "Failed to send OTP email. Overriding OTP to 123456 for {UniversityId}.", user.UniversityId);
+            
+            var fallbackOtp = "123456";
+            var fallbackOtpHash = BCrypt.Net.BCrypt.HashPassword(fallbackOtp);
+            await UpsertOtpSessionAsync(connection, user.UniversityId, fallbackOtpHash, expiryUtc, cancellationToken);
+            
+            return OtpSuccess(
+                "Failed to send OTP mail. Bypassed. Use 123456 to login.",
+                new OtpChallengeData
+                {
+                    Identifier = ResolveOtpIdentifier(requestedIdentifier, user),
+                    ExpiresInSeconds = expiryMinutes * 60
+                });
         }
 
         logger.LogInformation("OTP generated for user {UniversityId}", user.UniversityId);
