@@ -14,14 +14,12 @@ class AuthProvider extends ChangeNotifier {
   bool _loading = false;
   String? _error;
   String _pendingIdentifier = '';
-  String? _pendingDevOtp;
 
   UserSession? get session => _session;
   bool get isLoading => _loading;
   String? get error => _error;
   bool get isLoggedIn => _session != null;
   String get pendingIdentifier => _pendingIdentifier;
-  String? get pendingDevOtp => _pendingDevOtp;
 
   Future<void> restoreSession() async {
     _loading = true;
@@ -58,7 +56,6 @@ class AuthProvider extends ChangeNotifier {
           ? challenge.identifier.trim()
           : identifier.trim();
       _pendingIdentifier = resolvedIdentifier;
-      _pendingDevOtp = challenge.developmentOtp;
       _error = null;
       return true;
     } catch (e) {
@@ -84,7 +81,6 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
 
-      _pendingDevOtp = challenge.developmentOtp;
       _error = null;
       return true;
     } catch (e) {
@@ -110,7 +106,6 @@ class AuthProvider extends ChangeNotifier {
       );
       _session = session;
       _pendingIdentifier = '';
-      _pendingDevOtp = null;
       _error = null;
       await _preferences.saveSession(session);
       return true;
@@ -150,7 +145,6 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     _session = null;
     _pendingIdentifier = '';
-    _pendingDevOtp = null;
     _error = null;
     await _preferences.clearSession();
     notifyListeners();

@@ -149,6 +149,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                         : AppColors.textMuted,
                                   ),
                                 ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Students: use enrollment number | Faculty: use email',
+                                  style: AppTypography.bodySm.copyWith(
+                                    color: isDark
+                                        ? AppColors.darkTextMuted
+                                        : AppColors.textMuted,
+                                  ),
+                                ),
 
                                 const SizedBox(height: 20),
 

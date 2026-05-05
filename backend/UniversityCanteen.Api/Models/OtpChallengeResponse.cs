@@ -11,5 +11,4 @@ public sealed class OtpChallengeData
 {
     public string Identifier { get; init; } = string.Empty;
     public int ExpiresInSeconds { get; init; }
-    public string? DevelopmentOtp { get; init; }
 }

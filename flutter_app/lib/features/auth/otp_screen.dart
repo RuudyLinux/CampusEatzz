@@ -244,41 +244,6 @@ class _OtpScreenState extends State<OtpScreen> {
                                 }),
                               ),
 
-                              // Dev OTP banner
-                              if (auth.pendingDevOtp != null &&
-                                  auth.pendingDevOtp!.trim().isNotEmpty) ...<
-                                  Widget>[
-                                const SizedBox(height: 16),
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: isDark
-                                        ? AppColors.warningBgDark
-                                        : AppColors.warningBg,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color:
-                                          AppColors.warning.withValues(alpha: 0.40),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: <Widget>[
-                                      const Icon(Icons.developer_mode_rounded,
-                                          size: 16,
-                                          color: AppColors.warning),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Dev OTP: ${auth.pendingDevOtp}',
-                                        style: AppTypography.label.copyWith(
-                                          color: AppColors.warning,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-
                               const SizedBox(height: 20),
 
                               // Verify button
@@ -360,11 +325,12 @@ class _OtpBox extends StatelessWidget {
 
     return SizedBox(
       width: 44,
-      height: 52,
+      height: 56,
       child: TextField(
         controller: controller,
         focusNode: focusNode,
         textAlign: TextAlign.center,
+        textAlignVertical: TextAlignVertical.center,
         keyboardType: TextInputType.number,
         maxLength: 1,
         style: AppTypography.heading3.copyWith(

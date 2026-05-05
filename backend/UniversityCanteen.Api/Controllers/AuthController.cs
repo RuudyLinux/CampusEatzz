@@ -21,13 +21,11 @@ public sealed class AuthController(
     IOptions<JwtOptions> jwtOptions,
     IOptions<SmtpOptions> smtpOptions,
     IOtpEmailSender otpEmailSender,
-    ILogger<AuthController> logger,
-    IWebHostEnvironment environment) : ControllerBase
+    ILogger<AuthController> logger) : ControllerBase
 {
     private readonly JwtOptions _jwtOptions = jwtOptions.Value;
     private readonly OtpOptions _otpOptions = otpOptions.Value;
     private readonly SmtpOptions _smtpOptions = smtpOptions.Value;
-    private readonly bool _isDevelopment = environment.IsDevelopment();
 
     [HttpPost("login.php")]
     [HttpPost("auth/request-otp")]
@@ -50,6 +48,16 @@ public sealed class AuthController(
             if (user is null || !BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
             {
                 return Unauthorized(OtpFailure("Invalid email/enrollment number or password."));
+            }
+
+            if (IsStudentRole(user.Role) && LooksLikeEmail(identifier))
+            {
+                return BadRequest(OtpFailure("Students must login using enrollment number."));
+            }
+
+            if (IsStaffRole(user.Role) && !LooksLikeEmail(identifier))
+            {
+                return BadRequest(OtpFailure("Faculty must login using email."));
             }
 
             var challenge = await IssueOtp(connection, schema, user, identifier, cancellationToken);
@@ -384,34 +392,21 @@ public sealed class AuthController(
         await UpsertOtpSessionAsync(connection, user.UniversityId, otpHash, expiryUtc, cancellationToken);
         await MarkUserLoggedOutAsync(connection, schema, user.UniversityId, cancellationToken);
 
-        string? developmentOtp = null;
-        if (IsSmtpConfigured())
+        if (!IsSmtpConfigured())
         {
-            try
-            {
-                await otpEmailSender.SendOtpAsync(user.EmailId, user.FullName, otp, expiryUtc, cancellationToken);
-
-                if (_isDevelopment && _otpOptions.ExposeOtpInResponseInDevelopment)
-                {
-                    developmentOtp = otp;
-                    logger.LogInformation(
-                        "Development mode is enabled. Including OTP in response payload for identifier {Identifier}.",
-                        user.EmailId);
-                }
-            }
-            catch
-            {
-                await ClearOtpSessionAsync(connection, user.UniversityId, cancellationToken);
-
-                throw;
-            }
+            await ClearOtpSessionAsync(connection, user.UniversityId, cancellationToken);
+            throw new InvalidOperationException(
+                "OTP email service is not configured. Please contact support.");
         }
-        else
+
+        try
         {
-            developmentOtp = otp;
-            logger.LogWarning(
-                "SMTP is not configured. Returning development OTP for identifier {Identifier}.",
-                user.EmailId);
+            await otpEmailSender.SendOtpAsync(user.EmailId, user.FullName, otp, expiryUtc, cancellationToken);
+        }
+        catch
+        {
+            await ClearOtpSessionAsync(connection, user.UniversityId, cancellationToken);
+            throw;
         }
 
         logger.LogInformation("OTP generated for user {UniversityId}", user.UniversityId);
@@ -421,8 +416,7 @@ public sealed class AuthController(
             new OtpChallengeData
             {
                 Identifier = ResolveOtpIdentifier(requestedIdentifier, user),
-                ExpiresInSeconds = expiryMinutes * 60,
-                DevelopmentOtp = developmentOtp
+                ExpiresInSeconds = expiryMinutes * 60
             });
     }
 
@@ -443,6 +437,22 @@ public sealed class AuthController(
         }
 
         return new string(output);
+    }
+
+    private static bool LooksLikeEmail(string identifier)
+    {
+        return identifier.Contains('@', StringComparison.Ordinal);
+    }
+
+    private static bool IsStudentRole(string role)
+    {
+        return string.Equals(role, "student", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsStaffRole(string role)
+    {
+        return string.Equals(role, "staff", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(role, "faculty", StringComparison.OrdinalIgnoreCase);
     }
 
     private static async Task<UsersSchemaInfo> ResolveUsersSchema(

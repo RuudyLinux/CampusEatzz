@@ -31,7 +31,6 @@ class AuthService {
       success: success,
       message: (body['message'] ?? 'Unable to request OTP').toString(),
       identifier: responseIdentifier.isNotEmpty ? responseIdentifier : identifier.trim(),
-      developmentOtp: data['developmentOtp']?.toString(),
     );
   }
 
@@ -46,12 +45,10 @@ class AuthService {
     );
 
     final body = _asMap(response.data);
-    final data = _asMap(body['data']);
     return OtpChallenge(
       success: body['success'] == true,
       message: (body['message'] ?? 'Unable to resend OTP').toString(),
       identifier: identifier,
-      developmentOtp: data['developmentOtp']?.toString(),
     );
   }
 

@@ -96,6 +96,34 @@ public sealed class UniversityCanteenDbContext(IDbConnectionFactory connectionFa
         return users.FirstOrDefault();
     }
 
+    public async Task<UserCredentialSnapshot?> FindStaffCredentialByEmailAsync(string email, CancellationToken cancellationToken)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        var users = await connection.QueryAsync<UserCredentialSnapshot>(new CommandDefinition(
+            """
+            SELECT
+                u.id AS Id,
+                COALESCE(u.university_id, '') AS UniversityId,
+                COALESCE(u.email, '') AS Email,
+                COALESCE(u.password_hash, '') AS PasswordHash,
+                COALESCE(u.role, '') AS Role,
+                COALESCE(u.first_name, '') AS FirstName,
+                COALESCE(u.last_name, '') AS LastName,
+                COALESCE(u.contact, '') AS Contact,
+                COALESCE(u.department, '') AS Department,
+                COALESCE(u.status, '') AS Status
+            FROM users u
+            WHERE LOWER(COALESCE(u.email, '')) = LOWER(@email)
+              AND LOWER(COALESCE(u.role, '')) IN ('staff', 'faculty')
+              AND COALESCE(u.status, 'active') = 'active'
+            LIMIT 2;
+            """,
+            new { email },
+            cancellationToken: cancellationToken));
+
+        return users.FirstOrDefault();
+    }
+
     public async Task SaveRefreshTokenAsync(AuthRefreshToken refreshToken, CancellationToken cancellationToken)
     {
         using var connection = connectionFactory.CreateConnection();

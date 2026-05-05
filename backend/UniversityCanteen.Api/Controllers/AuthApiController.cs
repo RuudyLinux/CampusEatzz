@@ -189,20 +189,48 @@ public sealed class AuthApiController(
 
         try
         {
-            var student = await dbContext.FindStudentByUniversityIdAsync(identifier, cancellationToken);
-            UniversityStaff? universityStaff = null;
-
-            if (student is null)
+            if (LooksLikeEmail(identifier))
             {
-                universityStaff = await dbContext.FindUniversityStaffByUniversityIdAsync(identifier, cancellationToken);
+                var staffCredential = await dbContext.FindStaffCredentialByEmailAsync(identifier, cancellationToken);
+                if (staffCredential is null || !VerifyPassword(password, staffCredential.PasswordHash))
+                {
+                    return Unauthorized(Failure("Invalid user credentials"));
+                }
+
+                var staffProfile = await dbContext.FindUniversityStaffByUniversityIdAsync(staffCredential.UniversityId, cancellationToken);
+                if (staffProfile is null)
+                {
+                    return NotFound(Failure("No such user exists"));
+                }
+
+                var staffFullName = string.Join(' ', new[] { staffCredential.FirstName, staffCredential.LastName }
+                    .Where(value => !string.IsNullOrWhiteSpace(value)));
+
+                var staffSession = new SessionUserDto
+                {
+                    Id = staffCredential.Id,
+                    UniversityId = staffCredential.UniversityId,
+                    Name = string.IsNullOrWhiteSpace(staffFullName) ? staffCredential.Email : staffFullName,
+                    Email = staffCredential.Email,
+                    Role = "staff",
+                    FirstName = staffCredential.FirstName,
+                    LastName = staffCredential.LastName,
+                    Contact = staffCredential.Contact,
+                    Department = staffCredential.Department,
+                    Status = staffCredential.Status
+                };
+
+                var staffResponse = await BuildLoginResponseAsync(staffSession, "User login successful.", cancellationToken);
+                return Ok(staffResponse);
             }
 
-            if (student is null && universityStaff is null)
+            var student = await dbContext.FindStudentByUniversityIdAsync(identifier, cancellationToken);
+            if (student is null)
             {
                 return NotFound(Failure("No such user exists"));
             }
 
-            var expectedRole = student is not null ? "student" : "staff";
+            var expectedRole = "student";
             var credential = await dbContext.FindUserCredentialByUniversityIdAsync(identifier, cancellationToken);
 
             if (credential is null
@@ -237,6 +265,11 @@ public sealed class AuthApiController(
             logger.LogError(ex, "User login failed for identifier {Identifier}.", identifier);
             return StatusCode(StatusCodes.Status500InternalServerError, Failure("Internal server error during user login."));
         }
+    }
+
+    private static bool LooksLikeEmail(string identifier)
+    {
+        return identifier.Contains('@', StringComparison.Ordinal);
     }
 
     private async Task<ApiLoginResponse> BuildLoginResponseAsync(
