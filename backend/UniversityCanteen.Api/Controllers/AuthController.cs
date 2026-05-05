@@ -475,6 +475,8 @@ public sealed class AuthController(
         {
             var hasFirstName = await ColumnExistsByProbe(connection, "first_name", cancellationToken);
             var hasLastName = await ColumnExistsByProbe(connection, "last_name", cancellationToken);
+            var hasUniversityId = await ColumnExistsByProbe(connection, "UniversityId", cancellationToken);
+            var hasUniversityIdSnake = await ColumnExistsByProbe(connection, "university_id", cancellationToken);
 
             return new UsersSchemaInfo
             {
@@ -482,7 +484,8 @@ public sealed class AuthController(
                 KeyColumn = "id",
                 HasIsLoggedIn = await ColumnExistsByProbe(connection, "IsLoggedIn", cancellationToken),
                 HasEnrollmentNo = await ColumnExistsByProbe(connection, "enrollment_no", cancellationToken),
-                HasUniversityId = await ColumnExistsByProbe(connection, "UniversityId", cancellationToken),
+                HasUniversityId = hasUniversityId,
+                HasUniversityIdSnake = hasUniversityIdSnake,
                 HasNameColumns = hasFirstName || hasLastName
             };
         }
@@ -535,9 +538,13 @@ public sealed class AuthController(
             ? "\n               OR COALESCE(u.enrollment_no, '') = @identifier"
             : string.Empty;
 
-        var universityIdCondition = schema.HasUniversityId
-            ? "\n               OR COALESCE(u.UniversityId, '') = @identifier"
-            : string.Empty;
+        var universityIdCondition =
+            (schema.HasUniversityId
+                ? "\n               OR COALESCE(u.UniversityId, '') = @identifier"
+                : string.Empty)
+            + (schema.HasUniversityIdSnake
+                ? "\n               OR COALESCE(u.university_id, '') = @identifier"
+                : string.Empty);
 
         return $"""
             SELECT
@@ -713,14 +720,26 @@ public sealed class AuthController(
             ? "\n               OR COALESCE(u.enrollment_no, '') = @identifier"
             : string.Empty;
 
-        var universityIdCondition = schema.HasUniversityId
-            ? "\n               OR COALESCE(u.UniversityId, '') = @identifier"
-            : string.Empty;
+        var universityIdCondition =
+            (schema.HasUniversityId
+                ? "\n               OR COALESCE(u.UniversityId, '') = @identifier"
+                : string.Empty)
+            + (schema.HasUniversityIdSnake
+                ? "\n               OR COALESCE(u.university_id, '') = @identifier"
+                : string.Empty);
+
+        var universityIdSelectExpression = schema.HasUniversityId && schema.HasUniversityIdSnake
+            ? "COALESCE(u.UniversityId, u.university_id, CAST(u.id AS CHAR))"
+            : schema.HasUniversityId
+                ? "COALESCE(u.UniversityId, CAST(u.id AS CHAR))"
+                : schema.HasUniversityIdSnake
+                    ? "COALESCE(u.university_id, CAST(u.id AS CHAR))"
+                    : "CAST(u.id AS CHAR)";
 
         return $"""
             SELECT
                 u.id AS Id,
-                COALESCE(u.UniversityId, CAST(u.id AS CHAR)) AS UniversityId,
+                {universityIdSelectExpression} AS UniversityId,
                 COALESCE(u.email, '') AS Email,
                 COALESCE(u.role, '') AS Role,
                 COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''), u.email) AS Name,
@@ -919,6 +938,7 @@ public sealed class AuthController(
         public bool HasIsLoggedIn { get; init; }
         public bool HasEnrollmentNo { get; init; }
         public bool HasUniversityId { get; init; }
+        public bool HasUniversityIdSnake { get; init; }
         public bool HasNameColumns { get; init; }
     }
 
