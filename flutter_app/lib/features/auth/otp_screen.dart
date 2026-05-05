@@ -264,7 +264,7 @@ class _OtpScreenState extends State<OtpScreen> {
                                   ),
                                   child: Row(
                                     children: <Widget>[
-                                      Icon(Icons.developer_mode_rounded,
+                                      const Icon(Icons.developer_mode_rounded,
                                           size: 16,
                                           color: AppColors.warning),
                                       const SizedBox(width: 8),

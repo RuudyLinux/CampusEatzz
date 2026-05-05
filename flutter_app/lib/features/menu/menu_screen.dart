@@ -163,20 +163,22 @@ class _MenuScreenState extends State<MenuScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFF3CD),
+                        color: AppColors.warningBg,
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFD97706)),
+                        border: Border.all(color: AppColors.warning.withValues(alpha: 0.6)),
                       ),
-                      child: const Row(
+                      child: Row(
                         children: <Widget>[
-                          Icon(Icons.construction_rounded,
-                              color: Color(0xFFD97706), size: 20),
-                          SizedBox(width: 10),
+                          const Icon(Icons.construction_rounded,
+                              color: AppColors.warning, size: 20),
+                          const SizedBox(width: 10),
                           Expanded(
                             child: Text(
                               'This canteen is currently under maintenance. Ordering is temporarily unavailable.',
-                              style: TextStyle(
-                                  color: Color(0xFF92400E), fontSize: 13),
+                              style: AppTypography.bodySm.copyWith(
+                                color: AppColors.warning,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
                         ],

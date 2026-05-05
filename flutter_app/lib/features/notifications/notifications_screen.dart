@@ -225,15 +225,15 @@ class _NotificationGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return DecoratedBox(
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkCard : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: <BoxShadow>[
+        boxShadow: const <BoxShadow>[
           BoxShadow(
             color: AppColors.shadowPink,
             blurRadius: 16,
-            offset: const Offset(0, 4),
+            offset: Offset(0, 4),
           ),
         ],
       ),
@@ -278,9 +278,9 @@ class _NotificationRow extends StatelessWidget {
 
   static Color _iconColor(String type) => switch (type) {
         'order_update' => AppColors.primary,
-        'offer' => Color(0xFFFF9800),
+        'offer' => const Color(0xFFFF9800),
         'promotion' => AppColors.accent,
-        'wallet' => Color(0xFF4CAF50),
+        'wallet' => const Color(0xFF4CAF50),
         _ => AppColors.tabWallet,
       };
 

@@ -1,12 +1,12 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
 import '../constants/app_colors.dart';
 
+/// Liquid Glass blob background — matches handoff design.
 class AppBackdrop extends StatelessWidget {
-  const AppBackdrop({
-    super.key,
-    required this.child,
-  });
+  const AppBackdrop({super.key, required this.child});
 
   final Widget child;
 
@@ -17,48 +17,62 @@ class AppBackdrop extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: isDark
-            ? const LinearGradient(
-                colors: <Color>[AppColors.darkBg, AppColors.darkSurface, AppColors.darkBg],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              )
+            ? AppColors.darkBackgroundGradient
             : AppColors.backgroundGradient,
       ),
       child: Stack(
         children: <Widget>[
-          Positioned(
-            top: -56,
-            right: -42,
-            child: _orb(
-              170,
-              isDark
-                  ? const Color(0x1AFF4E7C)
-                  : const Color(0x1FB70049),
-            ),
+          _Blob(
+            top: -80, left: -40,
+            size: 300,
+            color: isDark ? AppColors.blobDark1 : AppColors.blobLight1,
           ),
-          Positioned(
-            bottom: -72,
-            left: -50,
-            child: _orb(
-              220,
-              isDark
-                  ? const Color(0x149A3669)
-                  : const Color(0x1A6149B2),
-            ),
+          _Blob(
+            bottom: -100, right: -50,
+            size: 280,
+            color: isDark ? AppColors.blobDark2 : AppColors.blobLight2,
           ),
           child,
         ],
       ),
     );
   }
+}
 
-  Widget _orb(double size, Color color) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
+class _Blob extends StatelessWidget {
+  const _Blob({
+    required this.size,
+    required this.color,
+    this.top,
+    this.bottom,
+    this.left,
+    this.right,
+  });
+
+  final double size;
+  final Color color;
+  final double? top;
+  final double? bottom;
+  final double? left;
+  final double? right;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: top,
+      bottom: bottom,
+      left: left,
+      right: right,
+      child: ImageFiltered(
+        imageFilter: ImageFilter.blur(sigmaX: 55, sigmaY: 55),
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: color,
+          ),
+        ),
       ),
     );
   }

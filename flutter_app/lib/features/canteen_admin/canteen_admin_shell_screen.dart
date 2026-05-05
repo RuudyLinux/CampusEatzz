@@ -99,7 +99,7 @@ class _CanteenAdminShellScreenState extends State<CanteenAdminShellScreen> {
           responsive: responsive,
         ),
       ),
-      body: Container(
+      body: DecoratedBox(
         decoration: BoxDecoration(
           gradient: isDark
               ? const LinearGradient(
@@ -281,7 +281,7 @@ class _DashboardTabState extends State<_DashboardTab> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Container(
+                      child: DecoratedBox(
                         decoration: BoxDecoration(
                           border: Border(left: BorderSide(color: statusColor, width: 4)),
                         ),
@@ -409,7 +409,7 @@ class _OrdersTabState extends State<_OrdersTab> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              const Text('Update Order Status', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              Text('Update Order Status', style: AppTypography.heading3),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 initialValue: nextStatus,
@@ -585,7 +585,7 @@ class _OrdersTabState extends State<_OrdersTab> {
                     elevation: 1.5,
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(14),
-                      child: Container(
+                      child: DecoratedBox(
                         decoration: BoxDecoration(
                           border: Border(
                             left: BorderSide(color: orderStatusColor, width: 4),
@@ -754,7 +754,7 @@ class _MenuItemsTabState extends State<_MenuItemsTab> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(item == null ? 'Add Menu Item' : 'Edit Menu Item',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                        style: AppTypography.heading3),
                     const SizedBox(height: 10),
                     TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Name')),
                     const SizedBox(height: 8),
@@ -2276,10 +2276,15 @@ class _AdminHeader extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Material(
-      elevation: 6,
-      child: Container(
+      elevation: 0,
+      child: DecoratedBox(
         decoration: BoxDecoration(
-          gradient: isDark ? AppColors.darkHeaderGradient : AppColors.headerGradient,
+          color: isDark ? AppColors.headerBgDark : AppColors.headerBgLight,
+          border: Border(
+            bottom: BorderSide(
+              color: isDark ? AppColors.darkGlassBorder : AppColors.glassBevelTop,
+            ),
+          ),
         ),
         child: SafeArea(
           bottom: false,
@@ -2296,11 +2301,19 @@ class _AdminHeader extends StatelessWidget {
                   width: responsive.headerLeadingSize,
                   height: responsive.headerLeadingSize,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
+                    color: isDark
+                        ? AppColors.darkGlassMid
+                        : Colors.white.withValues(alpha: 0.60),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+                    border: Border.all(
+                      color: isDark ? AppColors.darkGlassBorder : AppColors.glassBevelTop,
+                    ),
                   ),
-                  child: Icon(item.icon, color: Colors.white, size: responsive.headerLeadingIconSize),
+                  child: Icon(
+                    item.icon,
+                    color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                    size: responsive.headerLeadingIconSize,
+                  ),
                 ),
                 SizedBox(width: responsive.headerGap),
                 Expanded(
@@ -2311,7 +2324,7 @@ class _AdminHeader extends StatelessWidget {
                       Text(
                         item.label,
                         style: AppTypography.heading2.copyWith(
-                          color: Colors.white,
+                          color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
                           fontSize: responsive.compact ? 18 : 20,
                           letterSpacing: -0.3,
                         ),
@@ -2322,18 +2335,23 @@ class _AdminHeader extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.18),
+                              color: (isDark ? AppColors.darkSuccess : AppColors.success)
+                                  .withValues(alpha: 0.18),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: <Widget>[
-                                Icon(Icons.bolt_rounded, size: responsive.compact ? 9 : 10, color: AppColors.warning),
+                                Icon(
+                                  Icons.bolt_rounded,
+                                  size: responsive.compact ? 9 : 10,
+                                  color: isDark ? AppColors.darkSuccess : AppColors.success,
+                                ),
                                 const SizedBox(width: 3),
                                 Text(
                                   'Live',
                                   style: AppTypography.badge.copyWith(
-                                    color: Colors.white,
+                                    color: isDark ? AppColors.darkSuccess : AppColors.success,
                                     fontSize: responsive.compact ? 9 : 9.5,
                                   ),
                                 ),
@@ -2347,7 +2365,9 @@ class _AdminHeader extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: AppTypography.bodySm.copyWith(
-                                color: Colors.white.withValues(alpha: 0.9),
+                                color: isDark
+                                    ? AppColors.darkTextMuted
+                                    : AppColors.textMuted,
                                 fontSize: responsive.compact ? 11.5 : 12,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -2364,8 +2384,9 @@ class _AdminHeader extends StatelessWidget {
                   onPressed: onLogout,
                   style: IconButton.styleFrom(
                     minimumSize: Size.square(responsive.compact ? 38 : 42),
-                    backgroundColor: Colors.white.withValues(alpha: 0.16),
-                    foregroundColor: Colors.white,
+                    backgroundColor: (isDark ? AppColors.darkDanger : AppColors.danger)
+                        .withValues(alpha: 0.12),
+                    foregroundColor: isDark ? AppColors.darkDanger : AppColors.danger,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   icon: Icon(Icons.logout_rounded, size: responsive.compact ? 18 : 20),
@@ -2413,17 +2434,15 @@ class _AdminBottomNavBar extends StatelessWidget {
           ),
           decoration: BoxDecoration(
             color: isDark
-                ? AppColors.darkCard.withValues(alpha: 0.97)
-                : Colors.white.withValues(alpha: 0.97),
+                ? AppColors.navBgDark
+                : AppColors.navBgLight,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isDark
-                  ? AppColors.darkBorder
-                  : AppColors.border.withValues(alpha: 0.80),
+              color: isDark ? AppColors.darkGlassBorder : AppColors.glassBevelTop,
             ),
             boxShadow: <BoxShadow>[
               BoxShadow(
-                color: AppColors.navy.withValues(alpha: isDark ? 0.30 : 0.10),
+                color: Colors.black.withValues(alpha: isDark ? 0.30 : 0.10),
                 blurRadius: 18,
                 offset: const Offset(0, 5),
               ),

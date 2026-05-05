@@ -110,7 +110,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final canteenState = context.watch<CanteenProvider>();
-    final recState = context.watch<RecommendationProvider>();
+    context.watch<RecommendationProvider>();
     final session = context.watch<AuthProvider>().session;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final greeting = _greeting(session?.firstName.trim().isNotEmpty == true
@@ -188,53 +188,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     AnimatedReveal(
                         delayMs: 130, child: _FeatureRow(isDark: isDark)),
                     const SizedBox(height: 24),
-                    // AI Recommendations — "Recommended For You"
-                    if (recState.personal != null &&
-                        recState.personal!.items.isNotEmpty)
-                      AnimatedReveal(
-                        delayMs: 170,
-                        child: _RecommendationSection(
-                          section: recState.personal!,
-                          isDark: isDark,
-                          icon: Icons.auto_awesome_rounded,
-                          iconColor: AppColors.accent,
-                        ),
-                      ),
-                    if (recState.personal != null &&
-                        recState.personal!.items.isNotEmpty)
-                      const SizedBox(height: 24),
-                    // AI Recommendations — Trending Now
-                    if (recState.trending != null &&
-                        recState.trending!.items.isNotEmpty)
-                      AnimatedReveal(
-                        delayMs: 200,
-                        child: _RecommendationSection(
-                          section: recState.trending!,
-                          isDark: isDark,
-                          icon: Icons.local_fire_department_rounded,
-                          iconColor: AppColors.warning,
-                        ),
-                      ),
-                    if (recState.trending != null &&
-                        recState.trending!.items.isNotEmpty)
-                      const SizedBox(height: 24),
-                    // Budget Meals
-                    if (recState.budgetMeals != null &&
-                        recState.budgetMeals!.items.isNotEmpty)
-                      AnimatedReveal(
-                        delayMs: 230,
-                        child: _RecommendationSection(
-                          section: recState.budgetMeals!,
-                          isDark: isDark,
-                          icon: Icons.savings_rounded,
-                          iconColor: AppColors.success,
-                        ),
-                      ),
-                    if (recState.budgetMeals != null &&
-                        recState.budgetMeals!.items.isNotEmpty)
-                      const SizedBox(height: 24),
                     AnimatedReveal(
-                      delayMs: 260,
+                      delayMs: 170,
                       child: _CanteenSection(
                         key: _canteenSectionKey,
                         canteens: filteredCanteens,
@@ -244,14 +199,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 24),
                     AnimatedReveal(
-                        delayMs: 310,
+                        delayMs: 220,
                         child: _TrendingSection(
                           isDark: isDark,
                           items: canteenState.allItems.take(6).toList(),
                         )),
                     const SizedBox(height: 20),
                     AnimatedReveal(
-                      delayMs: 360,
+                      delayMs: 270,
                       child: _AiChatBannerSection(
                         isDark: isDark,
                         onTap: _openChatbot,
@@ -259,7 +214,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 16),
                     AnimatedReveal(
-                      delayMs: 400,
+                      delayMs: 310,
                       child: _ContactUsPromptSection(
                         isDark: isDark,
                         onTap: _openContactUs,
@@ -322,13 +277,16 @@ class _SearchBar extends StatelessWidget {
       child: Container(
         height: 52,
         decoration: BoxDecoration(
-          color: isDark ? AppColors.darkSurface : AppColors.surfaceRaised,
+          color: isDark ? AppColors.inputBgDark : AppColors.inputBgLight,
           borderRadius: BorderRadius.circular(50),
-          boxShadow: const <BoxShadow>[
+          border: Border.all(
+            color: isDark ? AppColors.darkGlassBorder : AppColors.inputBorderLight,
+          ),
+          boxShadow: <BoxShadow>[
             BoxShadow(
-              color: AppColors.shadowPink,
+              color: Colors.black.withValues(alpha: isDark ? 0.20 : 0.06),
               blurRadius: 12,
-              offset: Offset(0, 3),
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -356,10 +314,17 @@ class _SearchBar extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: AppColors.primary,
+                  color: Colors.white.withValues(alpha: isDark ? 0.15 : 0.60),
                   borderRadius: BorderRadius.circular(44),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: isDark ? 0.30 : 0.90),
+                  ),
                 ),
-                child: const Icon(Icons.tune_rounded, size: 18, color: Colors.white),
+                child: Icon(
+                  Icons.tune_rounded,
+                  size: 18,
+                  color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                ),
               ),
             ),
           ],
@@ -379,20 +344,29 @@ class _HeroBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cardBg = isDark ? AppColors.darkCard : Colors.white;
     final textColor = isDark ? AppColors.darkTextPrimary : AppColors.textPrimary;
     final mutedColor = isDark ? AppColors.darkTextMuted : AppColors.textMuted;
 
     return Container(
       decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: const <BoxShadow>[
+        gradient: isDark
+            ? AppColors.darkGlassPanelGradient
+            : AppColors.glassHeroGradient,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: isDark ? AppColors.darkGlassBorder : AppColors.glassBevelTop,
+          width: 1,
+        ),
+        boxShadow: <BoxShadow>[
           BoxShadow(
-            color: AppColors.shadowPink,
-            blurRadius: 20,
-            spreadRadius: 2,
-            offset: Offset(0, 6),
+            color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.08),
+            blurRadius: 32,
+            offset: const Offset(0, 8),
+          ),
+          BoxShadow(
+            color: Colors.white.withValues(alpha: 0.12),
+            blurRadius: 0,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
@@ -400,12 +374,15 @@ class _HeroBanner extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          // Label chip
+          // Label chip — glass pill
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.10),
+              color: Colors.white.withValues(alpha: isDark ? 0.15 : 0.60),
               borderRadius: BorderRadius.circular(50),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: isDark ? 0.25 : 0.80),
+              ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -413,16 +390,16 @@ class _HeroBanner extends StatelessWidget {
                 Container(
                   width: 6,
                   height: 6,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppColors.primary,
+                    color: isDark ? AppColors.primaryOnDark : AppColors.primary,
                   ),
                 ),
                 const SizedBox(width: 5),
                 Text(
                   'CAMPUS CANTEENS',
                   style: AppTypography.labelSm.copyWith(
-                    color: AppColors.primary,
+                    color: isDark ? AppColors.primaryOnDark : AppColors.primary,
                     letterSpacing: 0.8,
                     fontSize: 10,
                   ),
@@ -430,39 +407,45 @@ class _HeroBanner extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 12),
-          // Big headline
-          RichText(
-            text: TextSpan(
-              style: AppTypography.heading1.copyWith(color: textColor),
-              children: <InlineSpan>[
-                const TextSpan(text: 'Taste the '),
-                TextSpan(
-                  text: 'Difference',
-                  style: AppTypography.heading1.copyWith(
-                    color: AppColors.primary,
-                  ),
-                ),
-                const TextSpan(text: '\nwith Campus Food'),
-              ],
+          const SizedBox(height: 14),
+          Text(
+            'Hungry? 🍽️\nCampus food is a tap away',
+            style: AppTypography.heading1.copyWith(
+              color: textColor,
+              height: 1.2,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Text(
-            'Order your favorite meals — fast, easy, and cashless.',
+            'Order from your favourite campus canteen',
             style: AppTypography.bodySm.copyWith(color: mutedColor),
           ),
           const SizedBox(height: 18),
-          // CTA pill button — taps scroll to canteen section
           GestureDetector(
             onTap: onBrowse,
-            child: DecoratedBox(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: BoxDecoration(
-                color: AppColors.textPrimary,
-                borderRadius: BorderRadius.circular(50),
+                gradient: LinearGradient(
+                  colors: <Color>[
+                    Colors.white.withValues(alpha: isDark ? 0.22 : 0.80),
+                    Colors.white.withValues(alpha: isDark ? 0.08 : 0.50),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: isDark ? 0.40 : 0.90),
+                ),
                 boxShadow: <BoxShadow>[
                   BoxShadow(
-                    color: AppColors.textPrimary.withValues(alpha: 0.25),
+                    color: Colors.white.withValues(alpha: 0.35),
+                    blurRadius: 0,
+                    offset: const Offset(0, 2),
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.20 : 0.08),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -471,20 +454,12 @@ class _HeroBanner extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: const BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
+                  Text(
+                    'Browse Canteens →',
+                    style: AppTypography.label.copyWith(
+                      color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
                     ),
-                    child: const Icon(Icons.arrow_forward_rounded,
-                        size: 18, color: Colors.white),
                   ),
-                  const SizedBox(width: 14),
-                  Text('Browse Canteens',
-                      style: AppTypography.label.copyWith(color: Colors.white)),
-                  const SizedBox(width: 20),
                 ],
               ),
             ),
@@ -684,15 +659,26 @@ class _CanteenCard extends StatelessWidget {
     final isMaintenance = canteen.isUnderMaintenance;
     final isOpen = !isMaintenance && canteen.isOpen;
 
+    final statusColor = isMaintenance
+        ? AppColors.warning
+        : isOpen
+            ? (isDark ? AppColors.darkSuccess : AppColors.success)
+            : (isDark ? AppColors.darkDanger : AppColors.danger);
+
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? AppColors.darkCard : Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: const <BoxShadow>[
+        gradient: isDark
+            ? AppColors.darkGlassCardGradient
+            : AppColors.glassCardGradient,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: isDark ? AppColors.darkGlassBorder : AppColors.glassBevelTop,
+        ),
+        boxShadow: <BoxShadow>[
           BoxShadow(
-            color: AppColors.shadowPink,
-            blurRadius: 16,
-            offset: Offset(0, 4),
+            color: Colors.black.withValues(alpha: isDark ? 0.20 : 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -701,17 +687,13 @@ class _CanteenCard extends StatelessWidget {
         onTap: () {
           if (canteen.isUnderMaintenance) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('This canteen is under maintenance — try again later.'),
-                backgroundColor: Color(0xFFD97706),
-                duration: Duration(seconds: 2),
-              ),
+              const SnackBar(content: Text('This canteen is under maintenance — try again later.')),
             );
             return;
           }
           onTap(canteen);
         },
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -722,85 +704,87 @@ class _CanteenCard extends StatelessWidget {
                     ? NetworkFoodImage(
                         imageUrl: canteen.imageUrl,
                         fallbackAsset: 'assets/images/Restaurants.jpg',
-                        height: 190,
+                        height: 170,
                         borderRadius: BorderRadius.zero,
                       )
                     : Container(
                         width: double.infinity,
-                        height: 190,
+                        height: 170,
                         color: isDark
-                            ? AppColors.darkSurface
-                            : AppColors.surfaceRaised,
+                            ? AppColors.darkGlassFill
+                            : AppColors.glassMid,
                         child: Icon(Icons.storefront_rounded,
                             size: 60,
                             color: isDark
                                 ? AppColors.darkTextMuted
                                 : AppColors.textMuted),
                       ),
-                // Status pill — Maintenance (yellow) / Open (green) / Closed (red)
+                // Glass gradient overlay
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: <Color>[
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.40),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        stops: const <double>[0.4, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+                // Status badge — glass pill
                 Positioned(
-                  top: 12,
+                  top: 10,
                   left: 12,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: isMaintenance
-                          ? const Color(0xFFD97706)
-                          : isOpen
-                              ? AppColors.success
-                              : AppColors.danger,
+                      color: statusColor.withValues(alpha: 0.22),
                       borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: statusColor.withValues(alpha: 0.55)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
                         Icon(
-                          isMaintenance
-                              ? Icons.construction_rounded
-                              : Icons.circle,
+                          isMaintenance ? Icons.construction_rounded : Icons.circle,
                           size: isMaintenance ? 10 : 6,
-                          color: Colors.white,
+                          color: statusColor,
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          isMaintenance
-                              ? 'Maintenance'
-                              : isOpen
-                                  ? 'Open'
-                                  : 'Closed',
-                          style: AppTypography.labelSm
-                              .copyWith(color: Colors.white),
+                          isMaintenance ? 'Maintenance' : isOpen ? 'Open' : 'Closed',
+                          style: AppTypography.labelSm.copyWith(color: statusColor),
                         ),
                       ],
                     ),
                   ),
                 ),
-                // Heart / save button
+                // Heart — glass circle
                 Positioned(
                   top: 10,
                   right: 10,
                   child: GestureDetector(
                     onTap: () => saved.toggle(canteen.id),
                     child: Container(
-                      width: 36,
-                      height: 36,
+                      width: 34,
+                      height: 34,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.90),
+                        color: Colors.white.withValues(alpha: isDark ? 0.15 : 0.65),
                         shape: BoxShape.circle,
-                        boxShadow: <BoxShadow>[
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.10),
-                            blurRadius: 6,
-                          ),
-                        ],
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: isDark ? 0.30 : 0.80),
+                        ),
                       ),
                       child: Icon(
-                        isSaved
-                            ? Icons.favorite_rounded
-                            : Icons.favorite_border_rounded,
-                        size: 18,
-                        color: isSaved ? AppColors.primary : AppColors.textMuted,
+                        isSaved ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                        size: 16,
+                        color: isSaved
+                            ? (isDark ? AppColors.darkDanger : AppColors.danger)
+                            : Colors.white,
                       ),
                     ),
                   ),
@@ -816,9 +800,7 @@ class _CanteenCard extends StatelessWidget {
                   Text(
                     canteen.name,
                     style: AppTypography.heading3.copyWith(
-                      color: isDark
-                          ? AppColors.darkTextPrimary
-                          : AppColors.textPrimary,
+                      color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -826,10 +808,8 @@ class _CanteenCard extends StatelessWidget {
                     canteen.description.isEmpty
                         ? 'Fresh campus meals and snacks'
                         : canteen.description,
-                    style: AppTypography.body.copyWith(
-                      color: isDark
-                          ? AppColors.darkTextMuted
-                          : AppColors.textMuted,
+                    style: AppTypography.bodySm.copyWith(
+                      color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -837,23 +817,18 @@ class _CanteenCard extends StatelessWidget {
                   const SizedBox(height: 10),
                   Row(
                     children: <Widget>[
-                      Icon(Icons.restaurant_menu_rounded,
-                          size: 14,
-                          color: isDark
-                              ? AppColors.primaryOnDark
-                              : AppColors.primary),
-                      const SizedBox(width: 5),
-                      Text('View Menu',
-                          style: AppTypography.label.copyWith(
-                              color: isDark
-                                  ? AppColors.primaryOnDark
-                                  : AppColors.primary)),
+                      Text(
+                        'View Menu',
+                        style: AppTypography.label.copyWith(
+                          color: isDark ? AppColors.primaryOnDark : AppColors.primary,
+                        ),
+                      ),
                       const Spacer(),
-                      Icon(Icons.arrow_forward_rounded,
-                          size: 16,
-                          color: isDark
-                              ? AppColors.primaryOnDark
-                              : AppColors.primary),
+                      Icon(
+                        Icons.arrow_forward_rounded,
+                        size: 16,
+                        color: isDark ? AppColors.primaryOnDark : AppColors.primary,
+                      ),
                     ],
                   ),
                 ],
@@ -979,86 +954,9 @@ class _TrendingSection extends StatelessWidget {
   }
 }
 
-// ── AI Recommendation Section ─────────────────────────────────────────────────
-
-class _RecommendationSection extends StatelessWidget {
-  const _RecommendationSection({
-    required this.section,
-    required this.isDark,
-    required this.icon,
-    required this.iconColor,
-  });
-
-  final RecommendationSection section;
-  final bool isDark;
-  final IconData icon;
-  final Color iconColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Row(
-          children: <Widget>[
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: isDark ? 0.18 : 0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, size: 16, color: iconColor),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    section.title,
-                    style: AppTypography.heading3.copyWith(
-                      color: isDark
-                          ? AppColors.darkTextPrimary
-                          : AppColors.textPrimary,
-                    ),
-                  ),
-                  Text(
-                    section.subtitle,
-                    style: AppTypography.caption.copyWith(
-                      color: isDark
-                          ? AppColors.darkTextMuted
-                          : AppColors.textMuted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 222,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: section.items.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              final item = section.items[index];
-              return _RecommendationCard(
-                item: item,
-                isDark: isDark,
-                iconColor: iconColor,
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 // ── Recommendation Card ───────────────────────────────────────────────────────
 
+// ignore: unused_element
 class _RecommendationCard extends StatelessWidget {
   const _RecommendationCard({
     required this.item,
@@ -1173,7 +1071,7 @@ class _RecommendationCard extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           item.reason,
-                          style: TextStyle(
+                          style: AppTypography.caption.copyWith(
                             fontSize: 9,
                             color: iconColor,
                             height: 1.3,
@@ -1268,76 +1166,66 @@ class _AiChatBannerSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: isDark
-                  ? <Color>[
-                      AppColors.accent.withValues(alpha: 0.3),
-                      AppColors.primary.withValues(alpha: 0.2),
-                    ]
-                  : <Color>[
-                      AppColors.accent.withValues(alpha: 0.08),
-                      AppColors.primary.withValues(alpha: 0.06),
-                    ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: isDark
+              ? AppColors.darkGlassCardGradient
+              : AppColors.glassHeroGradient,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: isDark ? AppColors.darkGlassBorder : AppColors.glassBevelTop,
+          ),
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.20 : 0.06),
+              blurRadius: 20,
+              offset: const Offset(0, 6),
             ),
-          ),
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: <Widget>[
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  gradient: isDark
-                      ? AppColors.darkHeaderGradient
-                      : AppColors.primaryGradient,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.smart_toy_rounded,
-                  color: Colors.white,
-                  size: 26,
+          ],
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: isDark ? 0.12 : 0.55),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: isDark ? 0.22 : 0.80),
                 ),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      'Ask CampusEatzz AI',
-                      style: AppTypography.heading3.copyWith(
-                        color: isDark
-                            ? AppColors.darkTextPrimary
-                            : AppColors.textPrimary,
-                      ),
+              child: Icon(
+                Icons.smart_toy_rounded,
+                color: isDark ? AppColors.darkTextPrimary : AppColors.primary,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    'AI Food Assistant',
+                    style: AppTypography.heading3.copyWith(
+                      color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      '"Suggest food under ₹100" or "What\'s popular today?"',
-                      style: AppTypography.caption.copyWith(
-                        color: isDark
-                            ? AppColors.darkTextMuted
-                            : AppColors.textMuted,
-                      ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Get personalized recommendations →',
+                    style: AppTypography.caption.copyWith(
+                      color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              Icon(
-                Icons.arrow_forward_rounded,
-                size: 18,
-                color: isDark ? AppColors.primaryOnDark : AppColors.primary,
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

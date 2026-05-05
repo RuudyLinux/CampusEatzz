@@ -134,7 +134,7 @@ class _CartItemCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   // Qty stepper
-                  Container(
+                  DecoratedBox(
                     decoration: BoxDecoration(
                       color: isDark
                           ? AppColors.darkSurface

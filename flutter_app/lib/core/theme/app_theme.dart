@@ -16,7 +16,7 @@ class AppTheme {
       brightness: brightness,
     ).copyWith(
       primary: isDark ? AppColors.primaryOnDark : AppColors.primary,
-      onPrimary: Colors.white,
+      onPrimary: isDark ? AppColors.darkBg : Colors.white,
       primaryContainer: AppColors.primaryContainer,
       onPrimaryContainer: AppColors.onPrimaryContainer,
       inversePrimary: AppColors.inversePrimary,
@@ -30,121 +30,91 @@ class AppTheme {
       onSurface: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
       onSurfaceVariant: isDark ? AppColors.darkTextMuted : AppColors.textSecondary,
       surfaceContainerHighest: isDark ? AppColors.darkSurface : AppColors.surfaceRaised,
-      error: AppColors.danger,
+      error: isDark ? AppColors.darkDanger : AppColors.danger,
       onError: Colors.white,
-      errorContainer: AppColors.dangerBg,
-      onErrorContainer: AppColors.danger,
+      errorContainer: isDark ? AppColors.dangerBgDark : AppColors.dangerBg,
+      onErrorContainer: isDark ? AppColors.darkDanger : AppColors.danger,
       outline: isDark ? AppColors.darkBorder : AppColors.border,
       outlineVariant: isDark ? AppColors.darkDivider : AppColors.divider,
     );
 
     final base = isDark ? ThemeData.dark(useMaterial3: true) : ThemeData.light(useMaterial3: true);
 
-    // Manrope for headings, Inter for body
-    final textTheme = GoogleFonts.interTextTheme(base.textTheme).copyWith(
-      displayLarge: GoogleFonts.manrope(
-        fontWeight: FontWeight.w700,
-        fontSize: 48,
-        letterSpacing: -0.96,
-        height: 1.2,
+    // Plus Jakarta Sans for everything
+    final textTheme = GoogleFonts.plusJakartaSansTextTheme(base.textTheme).copyWith(
+      displayLarge: GoogleFonts.plusJakartaSans(
+        fontWeight: FontWeight.w800, fontSize: 48, letterSpacing: -0.96, height: 1.2,
         color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
       ),
-      displayMedium: GoogleFonts.manrope(
-        fontWeight: FontWeight.w700,
-        fontSize: 40,
-        letterSpacing: -0.5,
-        height: 1.2,
+      displayMedium: GoogleFonts.plusJakartaSans(
+        fontWeight: FontWeight.w800, fontSize: 40, letterSpacing: -0.5, height: 1.2,
         color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
       ),
-      displaySmall: GoogleFonts.manrope(
-        fontWeight: FontWeight.w700,
-        fontSize: 32,
-        letterSpacing: -0.32,
-        height: 1.2,
+      displaySmall: GoogleFonts.plusJakartaSans(
+        fontWeight: FontWeight.w800, fontSize: 32, letterSpacing: -0.32, height: 1.2,
         color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
       ),
-      headlineLarge: GoogleFonts.manrope(
-        fontWeight: FontWeight.w600,
-        fontSize: 32,
-        letterSpacing: -0.32,
-        height: 1.3,
+      headlineLarge: GoogleFonts.plusJakartaSans(
+        fontWeight: FontWeight.w800, fontSize: 28, letterSpacing: -0.5, height: 1.3,
         color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
       ),
-      headlineMedium: GoogleFonts.manrope(
-        fontWeight: FontWeight.w600,
-        fontSize: 24,
-        letterSpacing: -0.12,
-        height: 1.4,
+      headlineMedium: GoogleFonts.plusJakartaSans(
+        fontWeight: FontWeight.w800, fontSize: 22, letterSpacing: -0.3, height: 1.4,
         color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
       ),
-      headlineSmall: GoogleFonts.manrope(
-        fontWeight: FontWeight.w600,
-        fontSize: 18,
-        height: 1.4,
+      headlineSmall: GoogleFonts.plusJakartaSans(
+        fontWeight: FontWeight.w700, fontSize: 18, height: 1.4,
         color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
       ),
-      titleLarge: GoogleFonts.manrope(
-        fontWeight: FontWeight.w600,
-        fontSize: 18,
-        height: 1.4,
+      titleLarge: GoogleFonts.plusJakartaSans(
+        fontWeight: FontWeight.w700, fontSize: 17, height: 1.4,
         color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
       ),
-      titleMedium: GoogleFonts.inter(
-        fontWeight: FontWeight.w600,
-        fontSize: 16,
-        letterSpacing: 0.1,
+      titleMedium: GoogleFonts.plusJakartaSans(
+        fontWeight: FontWeight.w600, fontSize: 15, letterSpacing: 0.1,
         color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
       ),
-      titleSmall: GoogleFonts.inter(
-        fontWeight: FontWeight.w600,
-        fontSize: 14,
-        letterSpacing: 0.1,
+      titleSmall: GoogleFonts.plusJakartaSans(
+        fontWeight: FontWeight.w600, fontSize: 14, letterSpacing: 0.1,
         color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
       ),
-      bodyLarge: GoogleFonts.inter(
-        fontSize: 18,
-        fontWeight: FontWeight.w400,
-        height: 1.6,
+      bodyLarge: GoogleFonts.plusJakartaSans(
+        fontSize: 16, fontWeight: FontWeight.w400, height: 1.6,
         color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
       ),
-      bodyMedium: GoogleFonts.inter(
-        fontSize: 16,
-        fontWeight: FontWeight.w400,
-        height: 1.6,
+      bodyMedium: GoogleFonts.plusJakartaSans(
+        fontSize: 15, fontWeight: FontWeight.w400, height: 1.6,
         color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
       ),
-      bodySmall: GoogleFonts.inter(
-        fontSize: 14,
-        fontWeight: FontWeight.w400,
-        height: 1.5,
+      bodySmall: GoogleFonts.plusJakartaSans(
+        fontSize: 13, fontWeight: FontWeight.w400, height: 1.5,
         color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
       ),
-      labelLarge: GoogleFonts.inter(
-        fontSize: 14,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.7,
+      labelLarge: GoogleFonts.plusJakartaSans(
+        fontSize: 14, fontWeight: FontWeight.w700, letterSpacing: 0.2,
         color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
       ),
-      labelMedium: GoogleFonts.inter(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.6,
+      labelMedium: GoogleFonts.plusJakartaSans(
+        fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.2,
       ),
-      labelSmall: GoogleFonts.inter(
-        fontSize: 10,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0.5,
+      labelSmall: GoogleFonts.plusJakartaSans(
+        fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.2,
       ),
     );
+
+    // Glass button foreground color helper
+    final btnFg = isDark ? Colors.white : AppColors.textPrimary.withValues(alpha: 0.9);
 
     return base.copyWith(
       colorScheme: colorScheme,
       scaffoldBackgroundColor: isDark ? AppColors.darkBg : AppColors.bg,
       textTheme: textTheme,
 
-      // ── AppBar — glass style ──────────────────────────────────────────────
+      // ── AppBar — glass frosted ─────────────────────────────────────────────
       appBarTheme: AppBarTheme(
-        backgroundColor: isDark ? AppColors.darkSurface.withValues(alpha: 0.85) : Colors.white.withValues(alpha: 0.85),
+        backgroundColor: isDark
+            ? AppColors.navBgDark
+            : AppColors.navBgLight,
         foregroundColor: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
         elevation: 0,
         centerTitle: false,
@@ -164,10 +134,10 @@ class AppTheme {
         },
       ),
 
-      // ── Progress Indicator — mint liquid ──────────────────────────────────
+      // ── Progress Indicator ────────────────────────────────────────────────
       progressIndicatorTheme: ProgressIndicatorThemeData(
         color: isDark ? AppColors.primaryOnDark : AppColors.primary,
-        linearTrackColor: isDark ? AppColors.darkSurface : AppColors.surfaceRaised,
+        linearTrackColor: isDark ? AppColors.darkGlassMid : AppColors.glassMid,
         circularTrackColor: Colors.transparent,
       ),
 
@@ -179,56 +149,57 @@ class AppTheme {
         space: 1,
       ),
 
-      // ── SnackBar — glass style ────────────────────────────────────────────
+      // ── SnackBar — glass ──────────────────────────────────────────────────
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: isDark
-            ? AppColors.darkCardRaised.withValues(alpha: 0.92)
+            ? AppColors.darkGlassStrong.withValues(alpha: 0.95)
             : AppColors.textPrimary.withValues(alpha: 0.92),
-        contentTextStyle: GoogleFonts.inter(
-          color: Colors.white,
-          fontWeight: FontWeight.w500,
-          fontSize: 14,
+        contentTextStyle: GoogleFonts.plusJakartaSans(
+          color: Colors.white, fontWeight: FontWeight.w500, fontSize: 14,
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         elevation: 0,
       ),
 
-      // ── Elevated Button — glass mint slab ────────────────────────────────
+      // ── Elevated Button — Liquid Glass frosted ────────────────────────────
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ButtonStyle(
           backgroundColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.disabled)) {
-              return AppColors.primary.withValues(alpha: 0.30);
+              return isDark
+                  ? AppColors.darkGlassFill
+                  : AppColors.glassFill.withValues(alpha: 0.4);
             }
             if (states.contains(WidgetState.pressed)) {
-              return (isDark ? AppColors.primaryOnDark : AppColors.primary)
-                  .withValues(alpha: 0.95);
+              return isDark
+                  ? AppColors.accentBtnDark.withValues(alpha: 0.85)
+                  : AppColors.accentBtnLight.withValues(alpha: 0.85);
             }
-            return isDark ? AppColors.primaryOnDark : AppColors.primary;
+            return isDark ? AppColors.accentBtnDark : AppColors.accentBtnLight;
           }),
           foregroundColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.disabled)) {
-              return Colors.white.withValues(alpha: 0.5);
+              return isDark
+                  ? AppColors.darkTextMuted
+                  : AppColors.textPrimary.withValues(alpha: 0.4);
             }
-            return Colors.white;
+            return btnFg;
           }),
           overlayColor: WidgetStatePropertyAll(
             Colors.white.withValues(alpha: 0.08),
           ),
           elevation: const WidgetStatePropertyAll(0),
           shadowColor: WidgetStatePropertyAll(
-            (isDark ? AppColors.primaryOnDark : AppColors.primary)
-                .withValues(alpha: 0.08),
+            isDark ? AppColors.accentGlowDark : AppColors.accentGlowLight,
           ),
-          // Glass slab shape
+          side: WidgetStatePropertyAll(BorderSide(
+            color: isDark ? AppColors.accentBtnBorderDark : AppColors.accentBtnBorderLight,
+            width: 1,
+          )),
           shape: const WidgetStatePropertyAll(StadiumBorder()),
           textStyle: WidgetStatePropertyAll(
-            GoogleFonts.inter(
-              fontWeight: FontWeight.w600,
-              fontSize: 16,
-              letterSpacing: 0.05 * 16,
-            ),
+            GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 15, letterSpacing: 0.2),
           ),
           padding: const WidgetStatePropertyAll(
             EdgeInsets.symmetric(horizontal: 24, vertical: 14),
@@ -237,19 +208,17 @@ class AppTheme {
         ),
       ),
 
-      // ── Outlined Button — pill, mint border ───────────────────────────────
+      // ── Outlined Button — glass pill ──────────────────────────────────────
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: isDark ? AppColors.primaryOnDark : AppColors.primary,
+          foregroundColor: isDark ? AppColors.darkTextPrimary : AppColors.primary,
           side: BorderSide(
-            color: isDark ? AppColors.primaryOnDark : AppColors.primary,
-            width: 1.5,
+            color: isDark ? AppColors.darkGlassBorder : AppColors.border,
+            width: 1,
           ),
           shape: const StadiumBorder(),
-          textStyle: GoogleFonts.inter(
-            fontWeight: FontWeight.w600,
-            fontSize: 15,
-            letterSpacing: 0.05 * 15,
+          textStyle: GoogleFonts.plusJakartaSans(
+            fontWeight: FontWeight.w700, fontSize: 15, letterSpacing: 0.2,
           ),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 13),
           minimumSize: const Size(0, 48),
@@ -259,113 +228,112 @@ class AppTheme {
       // ── Text Button ───────────────────────────────────────────────────────
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: isDark ? AppColors.primaryOnDark : AppColors.primary,
-          textStyle: GoogleFonts.inter(
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-            letterSpacing: 0.05 * 14,
+          foregroundColor: isDark ? AppColors.darkTextPrimary : AppColors.primary,
+          textStyle: GoogleFonts.plusJakartaSans(
+            fontWeight: FontWeight.w700, fontSize: 14, letterSpacing: 0.2,
           ),
           shape: const StadiumBorder(),
         ),
       ),
 
-      // ── Input Decoration — etched glass ───────────────────────────────────
+      // ── Input — liquid glass etched ───────────────────────────────────────
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: isDark
-            ? AppColors.darkCard.withValues(alpha: 0.7)
-            : Colors.white.withValues(alpha: 0.7),
-        hintStyle: GoogleFonts.inter(
+        fillColor: isDark ? AppColors.inputBgDark : AppColors.inputBgLight,
+        hintStyle: GoogleFonts.plusJakartaSans(
           color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
           fontSize: 15,
         ),
-        labelStyle: GoogleFonts.inter(
+        labelStyle: GoogleFonts.plusJakartaSans(
           color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
-          fontSize: 15,
-          fontWeight: FontWeight.w500,
+          fontSize: 15, fontWeight: FontWeight.w500,
         ),
-        floatingLabelStyle: GoogleFonts.inter(
+        floatingLabelStyle: GoogleFonts.plusJakartaSans(
           color: isDark ? AppColors.primaryOnDark : AppColors.primary,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(50),
+          borderRadius: BorderRadius.circular(13),
           borderSide: BorderSide(
-            color: isDark ? AppColors.darkBorder : AppColors.divider,
+            color: isDark ? AppColors.inputBorderDark : AppColors.inputBorderLight,
           ),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(50),
+          borderRadius: BorderRadius.circular(13),
           borderSide: BorderSide(
-            color: isDark ? AppColors.darkBorder : AppColors.divider,
+            color: isDark ? AppColors.inputBorderDark : AppColors.inputBorderLight,
           ),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(50),
+          borderRadius: BorderRadius.circular(13),
           borderSide: BorderSide(
             color: isDark ? AppColors.primaryOnDark : AppColors.primary,
             width: 1.5,
           ),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(50),
-          borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
+          borderRadius: BorderRadius.circular(13),
+          borderSide: BorderSide(
+            color: isDark ? AppColors.darkDanger : AppColors.danger,
+            width: 1.5,
+          ),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(50),
-          borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
+          borderRadius: BorderRadius.circular(13),
+          borderSide: BorderSide(
+            color: isDark ? AppColors.darkDanger : AppColors.danger,
+            width: 1.5,
+          ),
         ),
       ),
 
-      // ── Card — glass surface, ambient shadow ──────────────────────────────
+      // ── Card — liquid glass ───────────────────────────────────────────────
       cardTheme: CardThemeData(
         color: isDark
-            ? AppColors.darkCard.withValues(alpha: 0.7)
-            : Colors.white.withValues(alpha: 0.55),
+            ? AppColors.darkGlassFill
+            : AppColors.glassMid,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         elevation: 0,
         shadowColor: Colors.transparent,
         margin: EdgeInsets.zero,
       ),
 
-      // ── Chip — light grey semi-transparent pill ───────────────────────────
+      // ── Chip — glass pill ─────────────────────────────────────────────────
       chipTheme: ChipThemeData(
         backgroundColor: isDark
-            ? AppColors.darkSurface.withValues(alpha: 0.7)
-            : AppColors.surfaceRaised,
-        selectedColor: isDark ? AppColors.primaryOnDark : AppColors.primary,
-        labelStyle: GoogleFonts.inter(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.05 * 13,
+            ? AppColors.darkGlassMid
+            : AppColors.glassMid,
+        selectedColor: isDark
+            ? AppColors.primaryOnDark.withValues(alpha: 0.20)
+            : AppColors.primary.withValues(alpha: 0.15),
+        labelStyle: GoogleFonts.plusJakartaSans(
+          fontSize: 13, fontWeight: FontWeight.w600,
           color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
         ),
-        secondaryLabelStyle: GoogleFonts.inter(
-          color: Colors.white,
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
+        secondaryLabelStyle: GoogleFonts.plusJakartaSans(
+          color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+          fontSize: 13, fontWeight: FontWeight.w700,
         ),
         shape: const StadiumBorder(),
         side: BorderSide.none,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       ),
 
-      // ── Switch — mint ─────────────────────────────────────────────────────
+      // ── Switch ────────────────────────────────────────────────────────────
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return isDark ? AppColors.primaryOnDark : AppColors.primary;
-          }
+          if (states.contains(WidgetState.selected)) return Colors.white;
           return null;
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return (isDark ? AppColors.primaryOnDark : AppColors.primary)
-                .withValues(alpha: 0.3);
+            return isDark
+                ? AppColors.primaryOnDark.withValues(alpha: 0.35)
+                : AppColors.primary.withValues(alpha: 0.35);
           }
-          return null;
+          return isDark ? AppColors.darkGlassBorder : AppColors.border;
         }),
       ),
 
@@ -376,13 +344,11 @@ class AppTheme {
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ),
 
-      // ── Bottom Nav ────────────────────────────────────────────────────────
+      // ── Bottom Nav bar ────────────────────────────────────────────────────
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        backgroundColor: isDark
-            ? AppColors.darkCard.withValues(alpha: 0.85)
-            : Colors.white.withValues(alpha: 0.85),
+        backgroundColor: isDark ? AppColors.navBgDark : AppColors.navBgLight,
         selectedItemColor: isDark ? AppColors.primaryOnDark : AppColors.primary,
-        unselectedItemColor: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
+        unselectedItemColor: isDark ? AppColors.darkTextDisabled : AppColors.textMuted,
         type: BottomNavigationBarType.fixed,
         showUnselectedLabels: true,
         elevation: 0,
@@ -400,7 +366,7 @@ class AppTheme {
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           ),
           elevation: const WidgetStatePropertyAll(0),
-          shadowColor: const WidgetStatePropertyAll(AppColors.shadowAmbient),
+          shadowColor: const WidgetStatePropertyAll(AppColors.glassShadow),
         ),
       ),
     );

@@ -293,7 +293,7 @@ class _TransactionsCard extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             if (transactions.isEmpty)
-              AppEmptyState(
+              const AppEmptyState(
                 icon: Icons.receipt_outlined,
                 title: 'No Transactions',
                 subtitle: 'Your transaction history will appear here.',

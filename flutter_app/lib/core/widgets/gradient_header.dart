@@ -3,10 +3,12 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../constants/app_colors.dart';
-import '../constants/app_spacing.dart';
 import '../constants/app_typography.dart';
 import 'app_logo.dart';
 
+/// Liquid Glass header — iOS 26 aesthetic.
+/// minimal=true  → frosted glass card (home screen, profile)
+/// minimal=false → deep frosted panel (detail screens)
 class GradientHeader extends StatelessWidget {
   const GradientHeader({
     super.key,
@@ -23,40 +25,28 @@ class GradientHeader extends StatelessWidget {
   final Widget? trailing;
   final bool showLogo;
   final EdgeInsetsGeometry? padding;
-
-  /// When true: glass card-style header.
-  /// When false: deep-green glass gradient header.
   final bool minimal;
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return minimal
-        ? _GlassMinimalHeader(
-            title: title,
-            subtitle: subtitle,
-            trailing: trailing,
-            showLogo: showLogo,
-            padding: padding,
-            isDark: isDark,
-          )
-        : _GlassGradientHeader(
-            title: title,
-            subtitle: subtitle,
-            trailing: trailing,
-            showLogo: showLogo,
-            padding: padding,
-            isDark: isDark,
-          );
+    return _LiquidGlassHeader(
+      title: title,
+      subtitle: subtitle,
+      trailing: trailing,
+      showLogo: showLogo,
+      padding: padding,
+      isDark: isDark,
+      minimal: minimal,
+    );
   }
 }
 
-// ── Minimal — frosted glass card (home screen) ────────────────────────────────
-
-class _GlassMinimalHeader extends StatelessWidget {
-  const _GlassMinimalHeader({
+class _LiquidGlassHeader extends StatelessWidget {
+  const _LiquidGlassHeader({
     required this.title,
     required this.isDark,
+    required this.minimal,
     this.subtitle,
     this.trailing,
     this.showLogo = true,
@@ -69,61 +59,44 @@ class _GlassMinimalHeader extends StatelessWidget {
   final bool showLogo;
   final EdgeInsetsGeometry? padding;
   final bool isDark;
+  final bool minimal;
 
   @override
   Widget build(BuildContext context) {
+    // Background color for the glass
+    final bgColor = isDark ? AppColors.headerBgDark : AppColors.headerBgLight;
+    final borderColor = isDark ? AppColors.darkGlassBorder : AppColors.glassBevelTop;
+    final topEdge = isDark ? AppColors.darkGlassBevelTop : AppColors.glassBevelTop;
+
     return ClipRect(
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
         child: Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            color: isDark
-                ? AppColors.darkCard.withValues(alpha: 0.55)
-                : Colors.white.withValues(alpha: 0.55),
+            color: bgColor,
             border: Border(
-              bottom: BorderSide(
-                color: isDark
-                    ? AppColors.glassBevelBottom
-                    : AppColors.glassBevelTop,
-                width: 1,
-              ),
+              bottom: BorderSide(color: borderColor, width: 1),
+              top: BorderSide(color: topEdge.withValues(alpha: isDark ? 0.20 : 0.95), width: 1),
             ),
-            boxShadow: const <BoxShadow>[
+            boxShadow: <BoxShadow>[
               BoxShadow(
-                color: AppColors.glassShadow,
-                blurRadius: 40,
-                spreadRadius: 0,
-                offset: Offset(0, 20),
+                color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.06),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
           child: SafeArea(
             bottom: false,
             child: Padding(
-              padding: padding ?? const EdgeInsets.fromLTRB(20, 16, 20, 14),
+              padding: padding ?? const EdgeInsets.fromLTRB(16, 14, 16, 14),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: <Widget>[
                   if (showLogo) ...<Widget>[
-                    // Glass logo badge
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        gradient: AppColors.mintGlowGradient,
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: <BoxShadow>[
-                          BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.15),
-                            blurRadius: 16,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: const AppLogo(size: 24),
-                    ),
-                    const SizedBox(width: AppSpacing.md),
+                    _GlassLogoBox(isDark: isDark),
+                    const SizedBox(width: 12),
                   ],
                   Expanded(
                     child: Column(
@@ -136,10 +109,10 @@ class _GlassMinimalHeader extends StatelessWidget {
                             color: isDark
                                 ? AppColors.darkTextPrimary
                                 : AppColors.textPrimary,
+                            letterSpacing: -0.3,
                           ),
                         ),
-                        if (subtitle != null &&
-                            subtitle!.trim().isNotEmpty) ...<Widget>[
+                        if (subtitle != null && subtitle!.trim().isNotEmpty) ...<Widget>[
                           const SizedBox(height: 2),
                           Text(
                             subtitle!,
@@ -154,14 +127,7 @@ class _GlassMinimalHeader extends StatelessWidget {
                     ),
                   ),
                   if (trailing != null)
-                    IconTheme(
-                      data: IconThemeData(
-                        color: isDark
-                            ? AppColors.primaryOnDark
-                            : AppColors.primary,
-                      ),
-                      child: trailing!,
-                    ),
+                    _GlassIconBox(isDark: isDark, child: trailing!),
                 ],
               ),
             ),
@@ -172,148 +138,73 @@ class _GlassMinimalHeader extends StatelessWidget {
   }
 }
 
-// ── Gradient — deep green glass (detail/admin screens) ────────────────────────
-
-class _GlassGradientHeader extends StatelessWidget {
-  const _GlassGradientHeader({
-    required this.title,
-    required this.isDark,
-    this.subtitle,
-    this.trailing,
-    this.showLogo = true,
-    this.padding,
-  });
-
-  final String title;
-  final String? subtitle;
-  final Widget? trailing;
-  final bool showLogo;
-  final EdgeInsetsGeometry? padding;
+class _GlassLogoBox extends StatelessWidget {
+  const _GlassLogoBox({required this.isDark});
   final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            gradient: isDark
-                ? AppColors.darkHeaderGradient
-                : AppColors.headerGradient,
-            border: const Border(
-              bottom: BorderSide(color: AppColors.glassBevelTop, width: 1),
-            ),
-            boxShadow: const <BoxShadow>[
-              BoxShadow(
-                color: AppColors.glassShadow,
-                blurRadius: 40,
-                spreadRadius: 0,
-                offset: Offset(0, 20),
-              ),
-            ],
-          ),
-          child: Stack(
-            children: <Widget>[
-              // Decorative glass orbs
-              Positioned(
-                top: -48,
-                right: -22,
-                child: Container(
-                  width: 150,
-                  height: 150,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.08),
-                  ),
-                ),
-              ),
-              Positioned(
-                bottom: -50,
-                left: -28,
-                child: Container(
-                  width: 128,
-                  height: 128,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.06),
-                  ),
-                ),
-              ),
-              SafeArea(
-                bottom: false,
-                child: Padding(
-                  padding:
-                      padding ?? const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: <Widget>[
-                      if (showLogo) ...<Widget>[
-                        Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(12),
-                            border: const Border.fromBorderSide(
-                              BorderSide(
-                                  color: AppColors.glassBevelTop, width: 1),
-                            ),
-                          ),
-                          child: const AppLogo(size: 32),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                      ],
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: <Widget>[
-                            Text(
-                              title,
-                              style: AppTypography.heading2.copyWith(
-                                color: Colors.white,
-                                letterSpacing: -0.3,
-                              ),
-                            ),
-                            if (subtitle != null &&
-                                subtitle!.trim().isNotEmpty) ...<Widget>[
-                              const SizedBox(height: 2),
-                              Text(
-                                subtitle!,
-                                style: AppTypography.bodySm.copyWith(
-                                  color: Colors.white.withValues(alpha: 0.82),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      if (trailing != null)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 4, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(12),
-                            border: const Border.fromBorderSide(
-                              BorderSide(
-                                  color: AppColors.glassBevelTop, width: 1),
-                            ),
-                          ),
-                          child: IconTheme(
-                            data: const IconThemeData(color: Colors.white),
-                            child: trailing!,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDark
+              ? <Color>[
+                  Colors.white.withValues(alpha: 0.22),
+                  Colors.white.withValues(alpha: 0.08),
+                ]
+              : <Color>[
+                  Colors.white.withValues(alpha: 0.80),
+                  Colors.white.withValues(alpha: 0.50),
+                ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: isDark ? 0.30 : 0.90),
+          width: 1,
+        ),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: Colors.white.withValues(alpha: 0.35),
+            blurRadius: 0,
+            offset: const Offset(0, 1),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.30 : 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: const AppLogo(size: 22),
+    );
+  }
+}
+
+class _GlassIconBox extends StatelessWidget {
+  const _GlassIconBox({required this.isDark, required this.child});
+  final bool isDark;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: isDark ? 0.10 : 0.55),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: isDark ? 0.20 : 0.80),
+        ),
+      ),
+      child: IconTheme(
+        data: IconThemeData(
+          color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+          size: 22,
+        ),
+        child: child,
       ),
     );
   }

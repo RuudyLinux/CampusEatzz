@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_typography.dart';
 import '../../core/widgets/app_empty_state.dart';
+import '../../core/widgets/gradient_header.dart';
 import '../../core/widgets/network_food_image.dart';
 import '../../state/canteen_provider.dart';
 import '../../state/saved_canteens_provider.dart';
@@ -24,18 +25,19 @@ class SavedCanteensScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.darkBg : AppColors.bg,
-      appBar: AppBar(
-        backgroundColor: isDark ? AppColors.darkSurface : AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        title: Text('Saved Canteens',
-            style: AppTypography.heading3.copyWith(color: Colors.white)),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
-      body: savedCanteens.isEmpty
+      body: Column(
+        children: <Widget>[
+          GradientHeader(
+            title: 'Saved Canteens',
+            subtitle: '${savedCanteens.length} saved',
+            showLogo: false,
+            trailing: IconButton(
+              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ),
+          Expanded(
+            child: savedCanteens.isEmpty
           ? const AppEmptyState(
               icon: Icons.favorite_border_rounded,
               title: 'No Saved Canteens',
@@ -52,11 +54,11 @@ class SavedCanteensScreen extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: isDark ? AppColors.darkCard : Colors.white,
                     borderRadius: BorderRadius.circular(20),
-                    boxShadow: <BoxShadow>[
+                    boxShadow: const <BoxShadow>[
                       BoxShadow(
                         color: AppColors.shadowPink,
                         blurRadius: 12,
-                        offset: const Offset(0, 4),
+                        offset: Offset(0, 4),
                       ),
                     ],
                   ),
@@ -136,6 +138,9 @@ class SavedCanteensScreen extends StatelessWidget {
                 );
               },
             ),
+          ),
+        ],
+      ),
     );
   }
 }

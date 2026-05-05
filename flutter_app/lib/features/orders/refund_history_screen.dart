@@ -124,7 +124,7 @@ class _RefundCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = _style;
 
-    return Container(
+    return DecoratedBox(
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkCard : Colors.white,
         borderRadius: BorderRadius.circular(16),

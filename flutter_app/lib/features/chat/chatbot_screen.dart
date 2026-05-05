@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_typography.dart';
+import '../../core/widgets/gradient_header.dart';
 import '../../data/models/chat_message.dart';
 import '../../state/auth_provider.dart';
 import '../../state/chat_provider.dart';
@@ -68,21 +69,63 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     _scrollToBottom();
   }
 
+  void _confirmClear(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Clear Chat?'),
+        content: const Text('This will delete all messages in this session.'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              context.read<ChatProvider>().clearChat();
+            },
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final chatState = context.watch<ChatProvider>();
 
-    // Scroll to bottom when new messages arrive
     if (chatState.messages.isNotEmpty) {
       _scrollToBottom();
     }
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBg : const Color(0xFFF0F4F8),
-      appBar: _buildAppBar(isDark, chatState),
+      backgroundColor: isDark ? AppColors.darkBg : AppColors.bg,
       body: Column(
         children: <Widget>[
+          GradientHeader(
+            title: 'CampusEatzz AI',
+            subtitle: chatState.isSending ? 'Typing...' : 'Ask me anything about food',
+            showLogo: false,
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                if (chatState.hasMessages)
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline_rounded, color: Colors.white),
+                    tooltip: 'Clear chat',
+                    onPressed: () => _confirmClear(context),
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+          ),
           Expanded(
             child: chatState.messages.isEmpty
                 ? _WelcomeView(
@@ -119,103 +162,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
             isSending: chatState.isSending,
             isDark: isDark,
             onSend: _send,
-          ),
-        ],
-      ),
-    );
-  }
-
-  PreferredSizeWidget _buildAppBar(bool isDark, ChatProvider chatState) {
-    return AppBar(
-      backgroundColor:
-          isDark ? AppColors.darkSurface : AppColors.primary,
-      foregroundColor: Colors.white,
-      elevation: 0,
-      titleSpacing: 0,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_rounded),
-        onPressed: () => Navigator.of(context).pop(),
-      ),
-      title: Row(
-        children: <Widget>[
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.20),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.smart_toy_rounded,
-              color: Colors.white,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                'CampusEatzz AI',
-                style: AppTypography.label.copyWith(
-                  color: Colors.white,
-                  fontSize: 15,
-                ),
-              ),
-              Row(
-                children: <Widget>[
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF4ADE80),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    chatState.isSending ? 'Typing...' : 'Online',
-                    style: AppTypography.caption.copyWith(
-                      color: Colors.white.withValues(alpha: 0.85),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
-      actions: <Widget>[
-        if (chatState.hasMessages)
-          IconButton(
-            icon: const Icon(Icons.delete_outline_rounded, color: Colors.white),
-            tooltip: 'Clear chat',
-            onPressed: () => _confirmClear(context),
-          ),
-      ],
-    );
-  }
-
-  void _confirmClear(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Clear Chat?'),
-        content: const Text('This will delete all messages in this session.'),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              context.read<ChatProvider>().clearChat();
-            },
-            child: Text(
-              'Clear',
-              style: TextStyle(color: AppColors.danger),
-            ),
           ),
         ],
       ),
@@ -405,7 +351,7 @@ class _MessageBubble extends StatelessWidget {
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: isUser
-                    ? (isDark ? AppColors.primary : AppColors.primary)
+                    ? AppColors.primary
                     : (isDark ? AppColors.darkCard : Colors.white),
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(18),
@@ -646,11 +592,11 @@ class _InputBar extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkBg : Colors.white,
-        boxShadow: <BoxShadow>[
+        boxShadow: const <BoxShadow>[
           BoxShadow(
             color: AppColors.shadowPink,
             blurRadius: 12,
-            offset: const Offset(0, -3),
+            offset: Offset(0, -3),
           ),
         ],
       ),
@@ -658,7 +604,6 @@ class _InputBar extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: <Widget>[
-          // Text field — pill, clean, no visible border
           Expanded(
             child: Container(
               constraints: const BoxConstraints(minHeight: 48, maxHeight: 120),
@@ -698,7 +643,6 @@ class _InputBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          // Send button — pink circle
           GestureDetector(
             onTap: isSending ? null : () => onSend(controller.text),
             child: AnimatedContainer(

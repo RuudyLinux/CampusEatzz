@@ -8,178 +8,101 @@ import '../../features/home/home_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/wallet/wallet_screen.dart';
 
-enum CustomerTab {
-  home,
-  wallet,
-  profile,
-}
+enum CustomerTab { home, wallet, profile }
 
-class _CustomerNavItem {
-  const _CustomerNavItem({
-    required this.label,
-    required this.icon,
-    required this.activeIcon,
-  });
-
+class _NavItem {
+  const _NavItem(this.label, this.icon, this.activeIcon);
   final String label;
   final IconData icon;
   final IconData activeIcon;
 }
 
 class CustomerBottomNav extends StatelessWidget {
-  const CustomerBottomNav({
-    super.key,
-    required this.current,
-  });
-
+  const CustomerBottomNav({super.key, required this.current});
   final CustomerTab current;
 
-  static const List<_CustomerNavItem> _items = <_CustomerNavItem>[
-    _CustomerNavItem(
-      label: 'Home',
-      icon: Icons.home_outlined,
-      activeIcon: Icons.home_rounded,
-    ),
-    _CustomerNavItem(
-      label: 'Wallet',
-      icon: Icons.account_balance_wallet_outlined,
-      activeIcon: Icons.account_balance_wallet_rounded,
-    ),
-    _CustomerNavItem(
-      label: 'Profile',
-      icon: Icons.person_outline_rounded,
-      activeIcon: Icons.person_rounded,
-    ),
+  static const List<_NavItem> _items = <_NavItem>[
+    _NavItem('Home', Icons.home_outlined, Icons.home_rounded),
+    _NavItem('Wallet', Icons.account_balance_wallet_outlined, Icons.account_balance_wallet_rounded),
+    _NavItem('Profile', Icons.person_outline_rounded, Icons.person_rounded),
   ];
 
-  Widget _destinationForTab(CustomerTab tab) {
-    switch (tab) {
-      case CustomerTab.home:
-        return const HomeScreen();
-      case CustomerTab.wallet:
-        return const WalletScreen();
-      case CustomerTab.profile:
-        return const ProfileScreen();
-    }
-  }
+  Widget _dest(CustomerTab tab) => switch (tab) {
+        CustomerTab.home => const HomeScreen(),
+        CustomerTab.wallet => const WalletScreen(),
+        CustomerTab.profile => const ProfileScreen(),
+      };
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final currentIndex = CustomerTab.values.indexOf(current);
+    final idx = CustomerTab.values.indexOf(current);
 
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(40),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-            child: Container(
-              height: 64,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              decoration: BoxDecoration(
-                // Glass fill: white 45% light / darkCard 55% dark
-                color: isDark
-                    ? AppColors.darkCard.withValues(alpha: 0.75)
-                    : Colors.white.withValues(alpha: 0.60),
-                borderRadius: BorderRadius.circular(40),
-                border: Border.all(
-                  // Top/left bevel — white 20%
-                  color: isDark
-                      ? AppColors.glassBevelBottom
-                      : AppColors.glassBevelTop,
-                  width: 1,
-                ),
-                boxShadow: const <BoxShadow>[
-                  // Ambient occlusion — spec: 0 20px 40px rgba(0,0,0,0.04)
-                  BoxShadow(
-                    color: AppColors.glassShadow,
-                    blurRadius: 40,
-                    spreadRadius: 0,
-                    offset: Offset(0, 20),
-                  ),
-                  BoxShadow(
-                    color: AppColors.shadowMintTint,
-                    blurRadius: 20,
-                    spreadRadius: 0,
-                    offset: Offset(0, 8),
-                  ),
-                ],
+    // Frosted glass nav bar matching design tokens
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.navBgDark : AppColors.navBgLight,
+            border: Border(
+              top: BorderSide(
+                color: isDark ? AppColors.darkGlassBorder : AppColors.glassBevelTop,
+                width: 1,
               ),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: SizedBox(
+              height: 56,
               child: Row(
-                children: List<Widget>.generate(_items.length, (index) {
-                  final item = _items[index];
-                  final selected = index == currentIndex;
+                children: List<Widget>.generate(_items.length, (i) {
+                  final item = _items[i];
+                  final active = i == idx;
+                  final activeColor = isDark ? AppColors.primaryOnDark : AppColors.primary;
+                  final mutedColor = isDark ? AppColors.darkTextDisabled : AppColors.textMuted;
 
                   return Expanded(
                     child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
                       onTap: () {
-                        if (selected) return;
-                        final destination =
-                            _destinationForTab(CustomerTab.values[index]);
+                        if (active) return;
                         Navigator.of(context).pushAndRemoveUntil(
-                          MaterialPageRoute<void>(builder: (_) => destination),
+                          MaterialPageRoute<void>(builder: (_) => _dest(CustomerTab.values[i])),
                           (route) => false,
                         );
                       },
                       child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 220),
-                        curve: Curves.easeOutCubic,
-                        margin: const EdgeInsets.symmetric(horizontal: 3),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          // Selected pill: mint at 15% — glass highlight
-                          color: selected
-                              ? (isDark
-                                  ? AppColors.primaryOnDark.withValues(alpha: 0.18)
-                                  : AppColors.primary.withValues(alpha: 0.12))
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(32),
-                          border: selected
-                              ? Border.all(
-                                  color: isDark
-                                      ? AppColors.primaryOnDark
-                                          .withValues(alpha: 0.25)
-                                      : AppColors.primary.withValues(alpha: 0.20),
-                                  width: 1,
-                                )
-                              : null,
-                        ),
-                        child: Row(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          mainAxisSize: MainAxisSize.min,
                           children: <Widget>[
-                            Icon(
-                              selected ? item.activeIcon : item.icon,
-                              size: 20,
-                              color: selected
-                                  ? (isDark
-                                      ? AppColors.primaryOnDark
-                                      : AppColors.primary)
-                                  : (isDark
-                                      ? AppColors.darkTextMuted
-                                      : AppColors.textMuted),
-                            ),
-                            AnimatedSize(
+                            AnimatedScale(
+                              scale: active ? 1.15 : 1.0,
                               duration: const Duration(milliseconds: 200),
-                              curve: Curves.easeOutCubic,
-                              child: selected
-                                  ? Padding(
-                                      padding: const EdgeInsets.only(left: 6),
-                                      child: Text(
-                                        item.label,
-                                        style: AppTypography.labelSm.copyWith(
-                                          color: isDark
-                                              ? AppColors.primaryOnDark
-                                              : AppColors.primary,
-                                          letterSpacing: 0.1,
+                              child: Icon(
+                                active ? item.activeIcon : item.icon,
+                                size: 22,
+                                color: active ? activeColor : mutedColor,
+                                shadows: active
+                                    ? <Shadow>[
+                                        Shadow(
+                                          color: (isDark ? AppColors.accentGlowDark : AppColors.accentGlowLight),
+                                          blurRadius: 10,
                                         ),
-                                      ),
-                                    )
-                                  : const SizedBox.shrink(),
+                                      ]
+                                    : null,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              item.label,
+                              style: AppTypography.badge.copyWith(
+                                color: active ? activeColor : mutedColor,
+                                fontWeight: active ? FontWeight.w700 : FontWeight.w400,
+                              ),
                             ),
                           ],
                         ),

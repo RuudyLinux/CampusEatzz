@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_typography.dart';
 import '../../core/constants/formatters.dart';
 import '../../core/widgets/animated_reveal.dart';
 import '../../core/widgets/app_backdrop.dart';
@@ -84,7 +85,7 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
                     );
                   }
 
-                  final order = snapshot.data!;
+                  final order = snapshot.data;
 
                   return ListView(
                     padding: const EdgeInsets.all(16),
@@ -102,19 +103,19 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
                                   child: Icon(Icons.check, size: 40, color: AppColors.success),
                                 ),
                                 const SizedBox(height: 12),
-                                const Text(
+                                Text(
                                   'Order Placed Successfully!',
-                                  style: TextStyle(fontSize: 25, fontWeight: FontWeight.w800),
+                                  style: AppTypography.heading1,
                                   textAlign: TextAlign.center,
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
                                   'Thank you for your order, ${user.name}!',
                                   textAlign: TextAlign.center,
-                                  style: const TextStyle(color: AppColors.textMuted),
+                                  style: AppTypography.body.copyWith(color: AppColors.textMuted),
                                 ),
                                 const SizedBox(height: 14),
-                                _line('Order Number', order.orderNumber),
+                                _line('Order Number', order!.orderNumber),
                                 _line('Order Date', formatDateTime(order.createdAt)),
                                 _line('Order Status', titleCase(order.status)),
                                 _line('Payment Status', titleCase(order.paymentStatus)),
@@ -128,20 +129,20 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      const AnimatedReveal(
+                      AnimatedReveal(
                         delayMs: 140,
                         child: Card(
                           child: Padding(
-                            padding: EdgeInsets.all(16),
+                            padding: const EdgeInsets.all(16),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: <Widget>[
-                                Text('What\'s Next?', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-                                SizedBox(height: 8),
-                                Text('• Your order has been sent to the canteen'),
-                                Text('• You will receive updates on order status'),
-                                Text('• Feedback request will be sent after completion'),
-                                Text('• You can track order from profile/orders page'),
+                                Text("What's Next?", style: AppTypography.heading3),
+                                const SizedBox(height: 8),
+                                const Text('• Your order has been sent to the canteen'),
+                                const Text('• You will receive updates on order status'),
+                                const Text('• Feedback request will be sent after completion'),
+                                const Text('• You can track order from profile/orders page'),
                               ],
                             ),
                           ),
@@ -187,10 +188,14 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
   }
 
   Widget _line(String label, String value, {bool bold = false}) {
-    final style = TextStyle(
-      fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
-      fontSize: bold ? 16 : 14,
-    );
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final style = bold
+        ? AppTypography.heading3.copyWith(
+            color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+          )
+        : AppTypography.body.copyWith(
+            color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
+          );
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),

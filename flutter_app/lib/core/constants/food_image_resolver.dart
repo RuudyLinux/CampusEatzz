@@ -172,7 +172,7 @@ class FoodImageResolver {
 
   static String? _extractUploadsPath(String value) {
     final lower = value.toLowerCase();
-    final marker = '/uploads/';
+    const marker = '/uploads/';
 
     final markerIndex = lower.indexOf(marker);
     if (markerIndex >= 0) {
