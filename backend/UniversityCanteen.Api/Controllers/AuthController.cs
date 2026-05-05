@@ -52,7 +52,7 @@ public sealed class AuthController(
                 return Unauthorized(OtpFailure("Invalid email/enrollment number or password."));
             }
 
-            var challenge = await IssueOtp(connection, schema, user, cancellationToken);
+            var challenge = await IssueOtp(connection, schema, user, identifier, cancellationToken);
             return Ok(challenge);
         }
         catch (InvalidOperationException ex)
@@ -86,12 +86,16 @@ public sealed class AuthController(
                 return NotFound(OtpFailure("User account not found."));
             }
 
-            if (string.IsNullOrWhiteSpace(user.OtpCode) || user.OtpExpiry is null || user.OtpExpiry.Value < DateTime.UtcNow)
+            var otpSession = await FindOtpSessionByUserId(connection, user.UniversityId, cancellationToken);
+            if (otpSession is null
+                || string.IsNullOrWhiteSpace(otpSession.OtpCode)
+                || otpSession.ExpiresAt is null
+                || otpSession.ExpiresAt.Value < DateTime.UtcNow)
             {
                 return BadRequest(OtpFailure("OTP session expired. Please log in again to request a new OTP."));
             }
 
-            var challenge = await IssueOtp(connection, schema, user, cancellationToken);
+            var challenge = await IssueOtp(connection, schema, user, identifier, cancellationToken);
             return Ok(challenge);
         }
         catch (InvalidOperationException ex)
@@ -133,20 +137,22 @@ public sealed class AuthController(
                 return Unauthorized(Failure("Invalid account."));
             }
 
-            if (string.IsNullOrWhiteSpace(user.OtpCode) || user.OtpExpiry is null)
+            var otpSession = await FindOtpSessionByUserId(connection, user.UniversityId, cancellationToken);
+            if (otpSession is null || string.IsNullOrWhiteSpace(otpSession.OtpCode) || otpSession.ExpiresAt is null)
             {
                 return BadRequest(Failure("Please request OTP first."));
             }
 
-            if (user.OtpExpiry.Value < DateTime.UtcNow)
+            if (otpSession.ExpiresAt.Value < DateTime.UtcNow)
             {
+                await ClearOtpSessionAsync(connection, user.UniversityId, cancellationToken);
                 return Unauthorized(Failure("OTP expired. Please request a new OTP."));
             }
 
             var isOtpValid = false;
             try
             {
-                isOtpValid = BCrypt.Net.BCrypt.Verify(otp, user.OtpCode);
+                isOtpValid = BCrypt.Net.BCrypt.Verify(otp, otpSession.OtpCode);
             }
             catch
             {
@@ -158,12 +164,8 @@ public sealed class AuthController(
                 return Unauthorized(Failure("Invalid OTP."));
             }
 
-            var updateSql = BuildVerifySuccessUpdateSql(schema);
-
-            await connection.ExecuteAsync(new CommandDefinition(
-                updateSql,
-                new { userId = user.UniversityId },
-                cancellationToken: cancellationToken));
+            await MarkUserLoggedInAsync(connection, schema, user.UniversityId, cancellationToken);
+            await ClearOtpSessionAsync(connection, user.UniversityId, cancellationToken);
 
             var session = new SessionUserDto
             {
@@ -371,6 +373,7 @@ public sealed class AuthController(
         System.Data.IDbConnection connection,
         UsersSchemaInfo schema,
         UserRow user,
+        string requestedIdentifier,
         CancellationToken cancellationToken)
     {
         var codeLength = Math.Clamp(_otpOptions.CodeLength, 4, 8);
@@ -378,18 +381,8 @@ public sealed class AuthController(
         var expiryUtc = DateTime.UtcNow.AddMinutes(expiryMinutes);
         var otp = GenerateOtp(codeLength);
         var otpHash = BCrypt.Net.BCrypt.HashPassword(otp);
-
-        var updateSql = BuildIssueOtpUpdateSql(schema);
-
-        await connection.ExecuteAsync(new CommandDefinition(
-            updateSql,
-            new
-            {
-                otpHash,
-                expiryUtc,
-                userId = user.UniversityId
-            },
-            cancellationToken: cancellationToken));
+        await UpsertOtpSessionAsync(connection, user.UniversityId, otpHash, expiryUtc, cancellationToken);
+        await MarkUserLoggedOutAsync(connection, schema, user.UniversityId, cancellationToken);
 
         string? developmentOtp = null;
         if (IsSmtpConfigured())
@@ -408,12 +401,7 @@ public sealed class AuthController(
             }
             catch
             {
-                var rollbackSql = BuildClearOtpSql(schema);
-
-                await connection.ExecuteAsync(new CommandDefinition(
-                    rollbackSql,
-                    new { userId = user.UniversityId },
-                    cancellationToken: cancellationToken));
+                await ClearOtpSessionAsync(connection, user.UniversityId, cancellationToken);
 
                 throw;
             }
@@ -432,7 +420,7 @@ public sealed class AuthController(
             "OTP sent successfully.",
             new OtpChallengeData
             {
-                Identifier = user.EmailId,
+                Identifier = ResolveOtpIdentifier(requestedIdentifier, user),
                 ExpiresInSeconds = expiryMinutes * 60,
                 DevelopmentOtp = developmentOtp
             });
@@ -531,8 +519,6 @@ public sealed class AuthController(
                     u.EmailId AS EmailId,
                     u.PasswordHash AS PasswordHash,
                     u.Role AS Role,
-                    u.OtpCode,
-                    u.OtpExpiry,
                     u.EmailId AS FullName
                 FROM users u
                 WHERE u.EmailId = @identifier
@@ -559,8 +545,6 @@ public sealed class AuthController(
                 u.email AS EmailId,
                 u.password_hash AS PasswordHash,
                 u.role AS Role,
-                u.OtpCode,
-                u.OtpExpiry,
                 {fullNameExpression} AS FullName
             FROM users u
             WHERE u.email = @identifier
@@ -569,29 +553,137 @@ public sealed class AuthController(
             """;
     }
 
-    private static string BuildIssueOtpUpdateSql(UsersSchemaInfo schema)
+    private static string BuildMarkUserLoggedInSql(UsersSchemaInfo schema)
     {
         if (schema.HasIsLoggedIn)
         {
-            return $"UPDATE users SET OtpCode = @otpHash, OtpExpiry = @expiryUtc, IsLoggedIn = 0 WHERE {schema.KeyColumn} = @userId;";
+            return $"UPDATE users SET IsLoggedIn = 1 WHERE {schema.KeyColumn} = @userId;";
         }
 
-        return $"UPDATE users SET OtpCode = @otpHash, OtpExpiry = @expiryUtc WHERE {schema.KeyColumn} = @userId;";
+        return string.Empty;
     }
 
-    private static string BuildVerifySuccessUpdateSql(UsersSchemaInfo schema)
+    private static string BuildMarkUserLoggedOutSql(UsersSchemaInfo schema)
     {
         if (schema.HasIsLoggedIn)
         {
-            return $"UPDATE users SET IsLoggedIn = 1, OtpCode = NULL, OtpExpiry = NULL WHERE {schema.KeyColumn} = @userId;";
+            return $"UPDATE users SET IsLoggedIn = 0 WHERE {schema.KeyColumn} = @userId;";
         }
 
-        return $"UPDATE users SET OtpCode = NULL, OtpExpiry = NULL WHERE {schema.KeyColumn} = @userId;";
+        return string.Empty;
     }
 
-    private static string BuildClearOtpSql(UsersSchemaInfo schema)
+    private static async Task<OtpSessionRow?> FindOtpSessionByUserId(
+        System.Data.IDbConnection connection,
+        int userId,
+        CancellationToken cancellationToken)
     {
-        return $"UPDATE users SET OtpCode = NULL, OtpExpiry = NULL WHERE {schema.KeyColumn} = @userId;";
+        return await connection.QuerySingleOrDefaultAsync<OtpSessionRow>(new CommandDefinition(
+            """
+            SELECT
+                COALESCE(otp_code, '') AS OtpCode,
+                expires_at AS ExpiresAt
+            FROM user_otps
+            WHERE user_id = @userId
+            ORDER BY id DESC
+            LIMIT 1;
+            """,
+            new { userId },
+            cancellationToken: cancellationToken));
+    }
+
+    private static async Task UpsertOtpSessionAsync(
+        System.Data.IDbConnection connection,
+        int userId,
+        string otpHash,
+        DateTime expiryUtc,
+        CancellationToken cancellationToken)
+    {
+        using var transaction = connection.BeginTransaction();
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            "DELETE FROM user_otps WHERE user_id = @userId;",
+            new { userId },
+            transaction: transaction,
+            cancellationToken: cancellationToken));
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            """
+            INSERT INTO user_otps (user_id, otp_code, expires_at, created_at)
+            VALUES (@userId, @otpHash, @expiryUtc, UTC_TIMESTAMP());
+            """,
+            new
+            {
+                userId,
+                otpHash,
+                expiryUtc
+            },
+            transaction: transaction,
+            cancellationToken: cancellationToken));
+
+        transaction.Commit();
+    }
+
+    private static async Task ClearOtpSessionAsync(
+        System.Data.IDbConnection connection,
+        int userId,
+        CancellationToken cancellationToken)
+    {
+        await connection.ExecuteAsync(new CommandDefinition(
+            "DELETE FROM user_otps WHERE user_id = @userId;",
+            new { userId },
+            cancellationToken: cancellationToken));
+    }
+
+    private static async Task MarkUserLoggedOutAsync(
+        System.Data.IDbConnection connection,
+        UsersSchemaInfo schema,
+        int userId,
+        CancellationToken cancellationToken)
+    {
+        var sql = BuildMarkUserLoggedOutSql(schema);
+        if (string.IsNullOrWhiteSpace(sql))
+        {
+            return;
+        }
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            sql,
+            new { userId },
+            cancellationToken: cancellationToken));
+    }
+
+    private static async Task MarkUserLoggedInAsync(
+        System.Data.IDbConnection connection,
+        UsersSchemaInfo schema,
+        int userId,
+        CancellationToken cancellationToken)
+    {
+        var sql = BuildMarkUserLoggedInSql(schema);
+        if (string.IsNullOrWhiteSpace(sql))
+        {
+            return;
+        }
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            sql,
+            new { userId },
+            cancellationToken: cancellationToken));
+    }
+
+    private static string ResolveOtpIdentifier(string requestedIdentifier, UserRow user)
+    {
+        if (!string.IsNullOrWhiteSpace(requestedIdentifier))
+        {
+            return requestedIdentifier.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(user.EmailId))
+        {
+            return user.EmailId;
+        }
+
+        return user.UniversityId.ToString();
     }
 
     private static string BuildCurrentUserSql(UsersSchemaInfo schema)
@@ -837,8 +929,12 @@ public sealed class AuthController(
         public string PasswordHash { get; init; } = string.Empty;
         public string Role { get; init; } = string.Empty;
         public string FullName { get; init; } = string.Empty;
-        public string? OtpCode { get; init; }
-        public DateTime? OtpExpiry { get; init; }
+    }
+
+    private sealed class OtpSessionRow
+    {
+        public string OtpCode { get; init; } = string.Empty;
+        public DateTime? ExpiresAt { get; init; }
     }
 
     private sealed class CanteenAdminAccountRow

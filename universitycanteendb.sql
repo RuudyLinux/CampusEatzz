@@ -445,8 +445,6 @@ CREATE TABLE users (
   deleted_at timestamp NULL DEFAULT NULL,
   created_at timestamp NOT NULL DEFAULT current_timestamp(),
   updated_at timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  OtpCode varchar(255) DEFAULT NULL,
-  OtpExpiry datetime DEFAULT NULL,
   IsLoggedIn tinyint(1) NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -454,15 +452,15 @@ CREATE TABLE users (
 -- Dumping data for table users
 --
 
-INSERT INTO users (id, UniversityId, first_name, last_name, email, contact, department, password_hash, role, canteen_id, status, is_deleted, deleted_at, created_at, updated_at, OtpCode, OtpExpiry, IsLoggedIn) VALUES
-(1, NULL, 'Admin', 'User', 'admin@utu.ac.in', '9876543200', 'Administration', '$2y$12$6wYuPC0WFMgTj3t6xkt4Xuxo68EcYBWfTPvROQuB4JTQtsC7ry4WK', 'admin', NULL, 'active', 0, NULL, '2025-11-22 00:00:00', '2026-04-12 08:12:54', '$2a$11$k6yBO6Ky.s8.Km/ZXeXLTe8T8sstvZdZmNgrGq0zMc9kdU/EdBIbC', '2026-04-12 08:17:54', 0),
-(2, NULL, 'Chirag', 'Admin', 'chirag@teatcenter.com', '9876543210', 'Administration', '$2y$12$6wYuPC0WFMgTj3t6xkt4Xuxo68EcYBWfTPvROQuB4JTQtsC7ry4WK', 'canteen_admin', 1, 'active', 0, NULL, '2025-11-22 14:34:05', '2026-04-07 18:23:48', '$2a$11$E2MPQXcDPm789v50bqARZ.l8A.LU2PntIYexNBServL2U0k/yHmjq', '2026-04-07 18:28:47', 0),
-(3, NULL, 'TeaPost', 'Admin', 'admin@teapost.com', '9876543211', 'Administration', '$2y$12$6wYuPC0WFMgTj3t6xkt4Xuxo68EcYBWfTPvROQuB4JTQtsC7ry4WK', 'canteen_admin', 2, 'active', 0, NULL, '2025-11-22 14:34:05', '2025-11-22 14:48:26', NULL, NULL, 0),
-(4, NULL, 'Foodies', 'Admin', 'admin@foodies.com', '9876543212', 'Administration', '$2y$12$6wYuPC0WFMgTj3t6xkt4Xuxo68EcYBWfTPvROQuB4JTQtsC7ry4WK', 'canteen_admin', 3, 'active', 0, NULL, '2025-11-22 14:34:05', '2025-11-22 14:48:26', NULL, NULL, 0),
-(5, '202307100110147', 'Ayush', 'Jain', '23bmii147@gmail.com', '9876500147', 'Computer Science', '$2a$11$SK./ZA9fON3hseSttJcqAOy6s39l/uydHRFz.wmQ1fsRg2iKV5KZ.', 'student', NULL, 'active', 0, NULL, '2026-04-04 13:57:00', '2026-04-04 13:57:00', NULL, NULL, 0),
-(6, '202307100110171', 'Helly', 'Lankapti', '23bmii171@gmail.com', '9876500171', 'Computer Science', '$2a$11$SK./ZA9fON3hseSttJcqAOy6s39l/uydHRFz.wmQ1fsRg2iKV5KZ.', 'student', NULL, 'active', 0, NULL, '2026-04-04 13:57:00', '2026-04-04 13:57:00', NULL, NULL, 0),
-(7, '202307100110025', 'Rudra', 'Gosvami', '23bmiit025@gmail.com', '9924891310', 'Computer Science', '$2a$11$SK./ZA9fON3hseSttJcqAOy6s39l/uydHRFz.wmQ1fsRg2iKV5KZ.', 'student', NULL, 'active', 0, NULL, '2026-04-04 13:57:00', '2026-04-11 18:31:44', NULL, NULL, 1),
-(8, '201', 'Ayman', 'Shekh', 'ayman.shekh@utu.ac.in', '9876500201', 'Computer Science', '$2a$11$SK./ZA9fON3hseSttJcqAOy6s39l/uydHRFz.wmQ1fsRg2iKV5KZ.', 'staff', NULL, 'active', 0, NULL, '2026-04-04 13:57:00', '2026-04-04 13:57:00', NULL, NULL, 0);
+INSERT INTO users (id, UniversityId, first_name, last_name, email, contact, department, password_hash, role, canteen_id, status, is_deleted, deleted_at, created_at, updated_at, IsLoggedIn) VALUES
+(1, NULL, 'Admin', 'User', 'admin@utu.ac.in', '9876543200', 'Administration', '$2y$12$6wYuPC0WFMgTj3t6xkt4Xuxo68EcYBWfTPvROQuB4JTQtsC7ry4WK', 'admin', NULL, 'active', 0, NULL, '2025-11-22 00:00:00', '2026-04-12 08:12:54', 0),
+(2, NULL, 'Chirag', 'Admin', 'chirag@teatcenter.com', '9876543210', 'Administration', '$2y$12$6wYuPC0WFMgTj3t6xkt4Xuxo68EcYBWfTPvROQuB4JTQtsC7ry4WK', 'canteen_admin', 1, 'active', 0, NULL, '2025-11-22 14:34:05', '2026-04-07 18:23:48', 0),
+(3, NULL, 'TeaPost', 'Admin', 'admin@teapost.com', '9876543211', 'Administration', '$2y$12$6wYuPC0WFMgTj3t6xkt4Xuxo68EcYBWfTPvROQuB4JTQtsC7ry4WK', 'canteen_admin', 2, 'active', 0, NULL, '2025-11-22 14:34:05', '2025-11-22 14:48:26', 0),
+(4, NULL, 'Foodies', 'Admin', 'admin@foodies.com', '9876543212', 'Administration', '$2y$12$6wYuPC0WFMgTj3t6xkt4Xuxo68EcYBWfTPvROQuB4JTQtsC7ry4WK', 'canteen_admin', 3, 'active', 0, NULL, '2025-11-22 14:34:05', '2025-11-22 14:48:26', 0),
+(5, '202307100110147', 'Ayush', 'Jain', '23bmii147@gmail.com', '9876500147', 'Computer Science', '$2a$11$SK./ZA9fON3hseSttJcqAOy6s39l/uydHRFz.wmQ1fsRg2iKV5KZ.', 'student', NULL, 'active', 0, NULL, '2026-04-04 13:57:00', '2026-04-04 13:57:00', 0),
+(6, '202307100110171', 'Helly', 'Lankapti', '23bmii171@gmail.com', '9876500171', 'Computer Science', '$2a$11$SK./ZA9fON3hseSttJcqAOy6s39l/uydHRFz.wmQ1fsRg2iKV5KZ.', 'student', NULL, 'active', 0, NULL, '2026-04-04 13:57:00', '2026-04-04 13:57:00', 0),
+(7, '202307100110025', 'Rudra', 'Gosvami', '23bmiit025@gmail.com', '9924891310', 'Computer Science', '$2a$11$SK./ZA9fON3hseSttJcqAOy6s39l/uydHRFz.wmQ1fsRg2iKV5KZ.', 'student', NULL, 'active', 0, NULL, '2026-04-04 13:57:00', '2026-04-11 18:31:44', 1),
+(8, '201', 'Ayman', 'Shekh', 'ayman.shekh@utu.ac.in', '9876500201', 'Computer Science', '$2a$11$SK./ZA9fON3hseSttJcqAOy6s39l/uydHRFz.wmQ1fsRg2iKV5KZ.', 'staff', NULL, 'active', 0, NULL, '2026-04-04 13:57:00', '2026-04-04 13:57:00', 0);
 
 -- --------------------------------------------------------
 

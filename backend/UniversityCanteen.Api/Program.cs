@@ -484,7 +484,7 @@ static async Task EnsureCoreSchemaAsync(
         CREATE TABLE IF NOT EXISTS user_otps (
             id INT NOT NULL AUTO_INCREMENT,
             user_id INT NULL,
-            otp_code VARCHAR(10) NULL,
+            otp_code VARCHAR(255) NULL,
             expires_at DATETIME NULL,
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
@@ -492,6 +492,16 @@ static async Task EnsureCoreSchemaAsync(
             CONSTRAINT fk_user_otps_user
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+        """,
+        """
+        ALTER TABLE user_otps
+            MODIFY COLUMN otp_code VARCHAR(255) NULL;
+        """,
+        """
+        ALTER TABLE users DROP COLUMN OtpCode;
+        """,
+        """
+        ALTER TABLE users DROP COLUMN OtpExpiry;
         """,
         """
         CREATE TABLE IF NOT EXISTS user_activity_logs (

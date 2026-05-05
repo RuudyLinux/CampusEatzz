@@ -54,7 +54,10 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
 
-      _pendingIdentifier = challenge.identifier;
+      final resolvedIdentifier = challenge.identifier.trim().isNotEmpty
+          ? challenge.identifier.trim()
+          : identifier.trim();
+      _pendingIdentifier = resolvedIdentifier;
       _pendingDevOtp = challenge.developmentOtp;
       _error = null;
       return true;

@@ -16,7 +16,7 @@ This folder contains the ASP.NET Web API backend for your existing web and WebVi
 - OTP flow in .NET with:
   - cryptographically random OTP generation,
   - SMTP email delivery,
-  - hashed OTP storage in MySQL (`users.OtpCode`),
+  - hashed OTP storage in MySQL (`user_otps.otp_code`),
   - expiry-based verification.
 - Additional role login endpoints:
   - `POST /api/admin/login`
@@ -92,7 +92,7 @@ Important:
 
 - For Gmail SMTP use host `smtp.gmail.com` with port `587` and SSL enabled.
 - Use an App Password (not your normal Gmail account password).
-- App startup automatically ensures `users.OtpCode` is `VARCHAR(255)` so hashed OTP values can be stored.
+- App startup automatically ensures `user_otps.otp_code` is `VARCHAR(255)` and removes legacy `users.OtpCode` / `users.OtpExpiry` columns.
 
 ## Optional: set a known test password
 

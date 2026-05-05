@@ -25,10 +25,12 @@ class AuthService {
     final success = body['success'] == true;
     final data = _asMap(body['data']);
 
+    final responseIdentifier = (data['identifier'] ?? '').toString().trim();
+
     return OtpChallenge(
       success: success,
       message: (body['message'] ?? 'Unable to request OTP').toString(),
-      identifier: (data['identifier'] ?? identifier).toString(),
+      identifier: responseIdentifier.isNotEmpty ? responseIdentifier : identifier.trim(),
       developmentOtp: data['developmentOtp']?.toString(),
     );
   }
