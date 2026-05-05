@@ -40,6 +40,11 @@ class ApiClient {
     final savedBase = await _preferences.getApiBase();
     final allCandidates = ApiConfig.allBaseUrls(savedBase);
     final normalizedPath = path.startsWith('/') ? path : '/$path';
+    final hasAuthInputHeader =
+        headers?.keys.any((key) => key.toLowerCase() == 'authorization') ?? false;
+    final hasBearerOverride = (bearerTokenOverride ?? '').trim().isNotEmpty;
+    final shouldTreat401AsSessionExpired =
+        authenticated || hasAuthInputHeader || hasBearerOverride;
 
     // FormData is consumed (finalized) after first send — never retry with fallback URLs.
     // Multipart uploads must only attempt the primary/saved base.
@@ -78,8 +83,8 @@ class ApiClient {
       } on DioException catch (e) {
         final status = e.response?.statusCode ?? 0;
 
-        if (status == 401) {
-          // Token expired or invalid — clear saved session so next restoreSession forces re-login
+        if (status == 401 && shouldTreat401AsSessionExpired) {
+          // Token expired or invalid; clear session so restoreSession forces re-login.
           await _preferences.clearSession();
           throw const SessionExpiredException();
         }
@@ -129,3 +134,4 @@ class ApiClient {
     throw Exception('Unable to reach the server. Please check your internet connection and try again.');
   }
 }
+
