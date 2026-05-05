@@ -33,13 +33,13 @@ public sealed class UniversityCanteenDbContext(IDbConnectionFactory connectionFa
         var students = await connection.QueryAsync<Student>(new CommandDefinition(
             """
             SELECT
-                COALESCE(university_id, '') AS UniversityId,
+                COALESCE(UniversityId, '') AS UniversityId,
                 COALESCE(course, '') AS Course,
                 COALESCE(semester, 0) AS Semester,
                 COALESCE(created_at, UTC_TIMESTAMP()) AS CreatedAt,
                 COALESCE(updated_at, UTC_TIMESTAMP()) AS UpdatedAt
             FROM students
-            WHERE COALESCE(university_id, '') = @universityId
+            WHERE COALESCE(UniversityId, '') = @universityId
             LIMIT 2;
             """,
             new { universityId },
@@ -54,13 +54,13 @@ public sealed class UniversityCanteenDbContext(IDbConnectionFactory connectionFa
         var staff = await connection.QueryAsync<UniversityStaff>(new CommandDefinition(
             """
             SELECT
-                COALESCE(university_id, '') AS UniversityId,
+                COALESCE(UniversityId, '') AS UniversityId,
                 COALESCE(department, '') AS Department,
-                date_of_birth AS DateOfBirth,
+                DateOfBirth AS DateOfBirth,
                 COALESCE(created_at, UTC_TIMESTAMP()) AS CreatedAt,
                 COALESCE(updated_at, UTC_TIMESTAMP()) AS UpdatedAt
             FROM university_staff
-            WHERE COALESCE(university_id, '') = @universityId
+            WHERE COALESCE(UniversityId, '') = @universityId
             LIMIT 2;
             """,
             new { universityId },
@@ -76,7 +76,7 @@ public sealed class UniversityCanteenDbContext(IDbConnectionFactory connectionFa
             """
             SELECT
                 u.id AS Id,
-                COALESCE(u.university_id, '') AS UniversityId,
+                COALESCE(u.UniversityId, '') AS UniversityId,
                 COALESCE(u.email, '') AS Email,
                 COALESCE(u.password_hash, '') AS PasswordHash,
                 COALESCE(u.role, '') AS Role,
@@ -86,7 +86,8 @@ public sealed class UniversityCanteenDbContext(IDbConnectionFactory connectionFa
                 COALESCE(u.department, '') AS Department,
                 COALESCE(u.status, '') AS Status
             FROM users u
-            WHERE COALESCE(u.university_id, '') = @universityId
+            WHERE COALESCE(u.UniversityId, '') = @universityId
+              AND COALESCE(u.is_deleted, 0) = 0
               AND COALESCE(u.status, 'active') = 'active'
             LIMIT 2;
             """,
@@ -195,10 +196,10 @@ public sealed class UniversityCanteenDbContext(IDbConnectionFactory connectionFa
             """
             SELECT
                 u.id AS Id,
-                COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''), COALESCE(u.email, ''), COALESCE(u.university_id, '')) AS Name,
+                COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''), COALESCE(u.email, ''), COALESCE(u.UniversityId, '')) AS Name,
                 COALESCE(u.email, '') AS Email,
                 COALESCE(u.role, '') AS Role,
-                COALESCE(u.university_id, '') AS UniversityId,
+                COALESCE(u.UniversityId, '') AS UniversityId,
                 COALESCE(u.first_name, '') AS FirstName,
                 COALESCE(u.last_name, '') AS LastName,
                 COALESCE(u.contact, '') AS Contact,
@@ -206,6 +207,7 @@ public sealed class UniversityCanteenDbContext(IDbConnectionFactory connectionFa
                 COALESCE(u.status, '') AS Status
             FROM users u
             WHERE u.id = @userId
+              AND COALESCE(u.is_deleted, 0) = 0
               AND COALESCE(u.status, 'active') = 'active'
             LIMIT 1;
             """,

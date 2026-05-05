@@ -207,19 +207,12 @@ Use this checklist for reliable production deployment:
 
 1. Deploy from the repository root so Render can use the root `Dockerfile`.
 2. Ensure the service is using the latest commit that includes dynamic `PORT` binding.
-3. In Render/Railway Environment Variables, set:
+3. In Render Environment Variables, set:
 
 - `ASPNETCORE_ENVIRONMENT=Production`
 - `ConnectionStrings__DefaultConnection=Server=<cloud-mysql-host>;Port=3306;Database=<db-name>;User ID=<user>;Password=<password>;SslMode=Required;TreatTinyAsBoolean=true;`
-- `JWT_SECRET=<random-string-min-32-chars>` (**required** — app will crash on startup without this)
 - `Startup__FailOnSchemaInitError=false`
 - `Notifications__Scheduler__Enabled=false` (optional temporary setting while DB connectivity is being fixed)
-
-Generate a strong JWT secret (PowerShell):
-
-```powershell
-[Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(48))
-```
 
 As an alternative, the API can also resolve common MySQL env variables if `ConnectionStrings__DefaultConnection` is not set, including:
 
@@ -235,11 +228,11 @@ If your MySQL provider is Railway and your app is running on Render, prefer Rail
 
 Do not use Railway internal/private host values from another platform, because they are not reachable from Render.
 
-1. Set your health check path to:
+4. Set your health check path to:
 
 - `/api/health`
 
-1. Verify database reachability after deploy:
+5. Verify database reachability after deploy:
 
 - `GET /api/health` should return API running.
 - `GET /api/health/db` should return database connection successful.

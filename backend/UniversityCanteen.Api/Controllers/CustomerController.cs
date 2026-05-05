@@ -1485,7 +1485,7 @@ public sealed class CustomerController(
             return new UsersSchemaInfo
             {
                 HasEnrollmentNo = await ColumnExistsByProbe(connection, "enrollment_no", cancellationToken, transaction),
-                HasUniversityId = await ColumnExistsByProbe(connection, "university_id", cancellationToken, transaction),
+                HasUniversityId = await ColumnExistsByProbe(connection, "UniversityId", cancellationToken, transaction),
                 HasFirstName = hasFirstName,
                 HasLastName = hasLastName
             };
@@ -1543,7 +1543,7 @@ public sealed class CustomerController(
             : "u.email";
 
         var universityIdExpression = schema.HasUniversityId
-            ? "COALESCE(u.university_id, CAST(u.id AS CHAR))"
+            ? "COALESCE(u.UniversityId, CAST(u.id AS CHAR))"
             : "CAST(u.id AS CHAR)";
 
         var enrollmentCondition = schema.HasEnrollmentNo
@@ -1551,7 +1551,7 @@ public sealed class CustomerController(
             : string.Empty;
 
         var universityIdCondition = schema.HasUniversityId
-            ? "\n               OR COALESCE(u.university_id, '') = @identifier"
+            ? "\n               OR COALESCE(u.UniversityId, '') = @identifier"
             : string.Empty;
 
         return $"""
