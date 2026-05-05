@@ -9,6 +9,7 @@ class CartItem {
     required this.imageUrl,
     required this.canteenId,
     this.description = '',
+    this.specialInstruction = '',
   });
 
   final int menuItemId;
@@ -18,11 +19,13 @@ class CartItem {
   final String imageUrl;
   final int? canteenId;
   final String description;
+  final String specialInstruction;
 
   double get lineTotal => price * quantity;
 
   CartItem copyWith({
     int? quantity,
+    String? specialInstruction,
   }) {
     return CartItem(
       menuItemId: menuItemId,
@@ -32,6 +35,7 @@ class CartItem {
       imageUrl: imageUrl,
       canteenId: canteenId,
       description: description,
+      specialInstruction: specialInstruction ?? this.specialInstruction,
     );
   }
 
@@ -56,6 +60,7 @@ class CartItem {
       'imageUrl': imageUrl,
       'canteenId': canteenId,
       'description': description,
+      'specialInstruction': specialInstruction,
     };
   }
 
@@ -68,6 +73,7 @@ class CartItem {
       imageUrl: (json['imageUrl'] ?? json['image'] ?? '').toString(),
       canteenId: _optionalInt(json['canteenId']),
       description: (json['description'] ?? '').toString(),
+      specialInstruction: (json['specialInstruction'] ?? '').toString(),
     );
   }
 }

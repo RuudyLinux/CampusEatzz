@@ -9,6 +9,7 @@ import '../../core/widgets/app_async_view.dart';
 import '../../core/widgets/app_empty_state.dart';
 import '../../core/widgets/customer_bottom_nav.dart';
 import '../../core/widgets/gradient_header.dart';
+import '../../core/widgets/global_actions.dart';
 import '../../state/auth_provider.dart';
 import '../../state/wallet_provider.dart';
 
@@ -83,6 +84,7 @@ class _WalletScreenState extends State<WalletScreen> {
           const GradientHeader(
             title: 'My Wallet',
             subtitle: 'Balance & transactions',
+            trailing: GlobalActions(),
           ),
           Expanded(
             child: _isSessionExpired(wallet.error)

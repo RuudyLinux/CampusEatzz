@@ -144,6 +144,7 @@ class CustomerService {
                   'itemName': item.name,
                   'quantity': item.quantity,
                   'unitPrice': item.price,
+                  'specialInstructions': item.specialInstruction,
                 })
             .toList(growable: false),
       },

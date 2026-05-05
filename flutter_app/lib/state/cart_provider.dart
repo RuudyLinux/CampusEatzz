@@ -98,6 +98,15 @@ class CartProvider extends ChangeNotifier {
     await _persist();
   }
 
+  Future<void> updateSpecialInstruction(int menuItemId, String instruction) async {
+    final index = _items.indexWhere((item) => item.menuItemId == menuItemId);
+    if (index < 0) return;
+    
+    final current = _items[index];
+    _items[index] = current.copyWith(specialInstruction: instruction);
+    await _persist();
+  }
+
   Future<void> remove(int menuItemId) async {
     _items.removeWhere((item) => item.menuItemId == menuItemId);
     await _persist();

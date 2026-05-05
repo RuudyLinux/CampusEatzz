@@ -9,6 +9,7 @@ import '../../core/constants/formatters.dart';
 import '../../core/widgets/animated_reveal.dart';
 import '../../core/widgets/app_empty_state.dart';
 import '../../core/widgets/customer_bottom_nav.dart';
+import '../../core/widgets/global_actions.dart';
 import '../../data/services/customer_service.dart';
 import '../../state/auth_provider.dart';
 import '../../state/cart_provider.dart';
@@ -149,6 +150,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     : AppColors.textPrimary,
                               ),
                             ),
+                          ),
+                          GlobalActions(
+                            iconColor: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
                           ),
                         ],
                       ),

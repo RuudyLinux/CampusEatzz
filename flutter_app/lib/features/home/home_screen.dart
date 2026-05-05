@@ -13,7 +13,7 @@ import '../../core/widgets/app_empty_state.dart';
 import '../../core/widgets/customer_bottom_nav.dart';
 import '../../core/widgets/gradient_header.dart';
 import '../../core/widgets/network_food_image.dart';
-import '../../core/widgets/notification_bell_button.dart';
+import '../../core/widgets/global_actions.dart';
 import '../../core/widgets/shimmer_loader.dart';
 import '../../data/models/canteen.dart';
 import '../../data/models/menu_item.dart';
@@ -146,7 +146,7 @@ class _HomeScreenState extends State<HomeScreen> {
           GradientHeader(
             title: 'CampusEatzz',
             subtitle: greeting,
-            trailing: const NotificationBellButton(),
+            trailing: const GlobalActions(),
             minimal: true,
           ),
           Expanded(

@@ -86,137 +86,205 @@ class CartScreen extends StatelessWidget {
 
 // ── Cart Item Card ────────────────────────────────────────────────────────────
 
-class _CartItemCard extends StatelessWidget {
+class _CartItemCard extends StatefulWidget {
   const _CartItemCard({required this.item, required this.isDark});
 
   final dynamic item;
   final bool isDark;
 
   @override
+  State<_CartItemCard> createState() => _CartItemCardState();
+}
+
+class _CartItemCardState extends State<_CartItemCard> {
+  late TextEditingController _instructionController;
+
+  @override
+  void initState() {
+    super.initState();
+    _instructionController = TextEditingController(text: widget.item.specialInstruction as String? ?? '');
+  }
+
+  @override
+  void didUpdateWidget(covariant _CartItemCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.item.specialInstruction != oldWidget.item.specialInstruction &&
+        widget.item.specialInstruction != _instructionController.text) {
+      _instructionController.text = (widget.item.specialInstruction as String?) ?? '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _instructionController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
-        child: Row(
+        child: Column(
           children: <Widget>[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: NetworkFoodImage(
-                imageUrl: item.imageUrl,
-                fallbackAsset: 'assets/images/Restaurants.jpg',
-                foodName: item.name,
-                width: 72,
-                height: 72,
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    item.name,
-                    style: AppTypography.bodyLg.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: isDark
-                          ? AppColors.darkTextPrimary
-                          : AppColors.textPrimary,
-                    ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: NetworkFoodImage(
+                    imageUrl: widget.item.imageUrl,
+                    fallbackAsset: 'assets/images/Restaurants.jpg',
+                    foodName: widget.item.name,
+                    width: 72,
+                    height: 72,
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  if ((item.description as String).isNotEmpty) ...<Widget>[
-                    const SizedBox(height: 2),
-                    Text(
-                      item.description as String,
-                      style: AppTypography.caption.copyWith(
-                        color: isDark
-                            ? AppColors.darkTextMuted
-                            : AppColors.textMuted,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                  const SizedBox(height: 3),
-                  Text(
-                    formatInr(item.price),
-                    style: AppTypography.label.copyWith(
-                      color:
-                          isDark ? AppColors.primaryOnDark : AppColors.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  // Qty stepper
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? AppColors.darkSurface
-                          : AppColors.surfaceRaised,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isDark
-                            ? AppColors.darkBorder
-                            : AppColors.border,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        _StepperButton(
-                          icon: Icons.remove_rounded,
-                          onTap: () => context
-                              .read<CartProvider>()
-                              .decrease(item.menuItemId),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        widget.item.name,
+                        style: AppTypography.bodyLg.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: widget.isDark
+                              ? AppColors.darkTextPrimary
+                              : AppColors.textPrimary,
                         ),
-                        Padding(
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: 10),
-                          child: Text(
-                            '${item.quantity}',
-                            style: AppTypography.label.copyWith(
-                              color: isDark
-                                  ? AppColors.darkTextPrimary
-                                  : AppColors.textPrimary,
-                            ),
+                      ),
+                      if ((widget.item.description as String).isNotEmpty) ...<Widget>[
+                        const SizedBox(height: 2),
+                        Text(
+                          widget.item.description as String,
+                          style: AppTypography.caption.copyWith(
+                            color: widget.isDark
+                                ? AppColors.darkTextMuted
+                                : AppColors.textMuted,
                           ),
-                        ),
-                        _StepperButton(
-                          icon: Icons.add_rounded,
-                          onTap: () => context
-                              .read<CartProvider>()
-                              .increase(item.menuItemId),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: <Widget>[
-                Text(
-                  formatInr(item.lineTotal),
-                  style: AppTypography.priceSm.copyWith(
-                    color:
-                        isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                      const SizedBox(height: 3),
+                      Text(
+                        formatInr(widget.item.price),
+                        style: AppTypography.label.copyWith(
+                          color:
+                              widget.isDark ? AppColors.primaryOnDark : AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Qty stepper
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: widget.isDark
+                              ? AppColors.darkSurface
+                              : AppColors.surfaceRaised,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: widget.isDark
+                                ? AppColors.darkBorder
+                                : AppColors.border,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            _StepperButton(
+                              icon: Icons.remove_rounded,
+                              onTap: () => context
+                                  .read<CartProvider>()
+                                  .decrease(widget.item.menuItemId),
+                            ),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 10),
+                              child: Text(
+                                '${widget.item.quantity}',
+                                style: AppTypography.label.copyWith(
+                                  color: widget.isDark
+                                      ? AppColors.darkTextPrimary
+                                      : AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                            _StepperButton(
+                              icon: Icons.add_rounded,
+                              onTap: () => context
+                                  .read<CartProvider>()
+                                  .increase(widget.item.menuItemId),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 8),
-                IconButton(
-                  onPressed: () =>
-                      context.read<CartProvider>().remove(item.menuItemId),
-                  icon: const Icon(Icons.delete_outline_rounded),
-                  color: AppColors.danger,
-                  iconSize: 20,
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppColors.dangerBg,
-                    padding: const EdgeInsets.all(6),
-                    minimumSize: const Size(32, 32),
-                  ),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: <Widget>[
+                    Text(
+                      formatInr(widget.item.lineTotal),
+                      style: AppTypography.priceSm.copyWith(
+                        color:
+                            widget.isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    IconButton(
+                      onPressed: () =>
+                          context.read<CartProvider>().remove(widget.item.menuItemId),
+                      icon: const Icon(Icons.delete_outline_rounded),
+                      color: AppColors.danger,
+                      iconSize: 20,
+                      style: IconButton.styleFrom(
+                        backgroundColor: AppColors.dangerBg,
+                        padding: const EdgeInsets.all(6),
+                        minimumSize: const Size(32, 32),
+                      ),
+                    ),
+                  ],
                 ),
               ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _instructionController,
+              decoration: InputDecoration(
+                hintText: 'Add special instructions (e.g., Make it spicy)',
+                hintStyle: AppTypography.caption.copyWith(
+                  color: widget.isDark ? AppColors.darkTextMuted : AppColors.textMuted,
+                ),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(
+                    color: widget.isDark ? AppColors.darkBorder : AppColors.border,
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(
+                    color: widget.isDark ? AppColors.darkBorder : AppColors.border,
+                  ),
+                ),
+                prefixIcon: Icon(
+                  Icons.notes_rounded,
+                  size: 16,
+                  color: widget.isDark ? AppColors.darkTextMuted : AppColors.textMuted,
+                ),
+              ),
+              style: AppTypography.caption.copyWith(
+                color: widget.isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+              ),
+              onChanged: (val) {
+                context.read<CartProvider>().updateSpecialInstruction(widget.item.menuItemId, val);
+              },
             ),
           ],
         ),
