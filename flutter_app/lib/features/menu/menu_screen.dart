@@ -683,7 +683,6 @@ class _MenuCard extends StatelessWidget {
                             const Spacer(),
                             _AddButton(
                               item: item,
-                              isDark: isDark,
                               isMaintenance: isMaintenance,
                             ),
                           ],
@@ -706,12 +705,10 @@ class _MenuCard extends StatelessWidget {
 class _AddButton extends StatelessWidget {
   const _AddButton({
     required this.item,
-    required this.isDark,
     this.isMaintenance = false,
   });
 
   final MenuItem item;
-  final bool isDark;
   final bool isMaintenance;
 
   @override
@@ -765,9 +762,8 @@ class _AddButton extends StatelessWidget {
                 : 'Sold Out',
       ),
       style: ElevatedButton.styleFrom(
-        // Override global dark button: use pink for Add to Cart
-        backgroundColor:
-            isDark ? AppColors.primaryOnDark : AppColors.primary,
+        // Keep a solid brand accent so icon/text stay readable in dark mode.
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         disabledBackgroundColor:
             AppColors.primary.withValues(alpha: 0.30),

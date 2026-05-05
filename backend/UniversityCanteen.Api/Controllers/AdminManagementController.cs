@@ -245,6 +245,180 @@ public sealed class AdminManagementController(
         }
     }
 
+    [HttpPost("users/bulk-import")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> BulkImportUsers(IFormFile? file, CancellationToken cancellationToken)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest(Failure("CSV file is required."));
+
+        var ext = Path.GetExtension(file.FileName ?? string.Empty).ToLowerInvariant();
+        if (ext != ".csv")
+            return BadRequest(Failure("Only .csv files are accepted."));
+
+        const long maxBytes = 5 * 1024 * 1024;
+        if (file.Length > maxBytes)
+            return BadRequest(Failure("CSV file must be smaller than 5 MB."));
+
+        List<string[]> rows;
+        string[] headers;
+        try
+        {
+            using var reader = new System.IO.StreamReader(file.OpenReadStream(), System.Text.Encoding.UTF8);
+            var headerLine = await reader.ReadLineAsync(cancellationToken);
+            if (string.IsNullOrWhiteSpace(headerLine))
+                return BadRequest(Failure("CSV file is empty or has no header row."));
+
+            headers = ParseCsvLine(headerLine);
+            rows = new List<string[]>();
+            string? line;
+            while ((line = await reader.ReadLineAsync(cancellationToken)) != null)
+            {
+                if (!string.IsNullOrWhiteSpace(line))
+                    rows.Add(ParseCsvLine(line));
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to parse CSV upload.");
+            return BadRequest(Failure("Failed to parse CSV file. Ensure it is valid UTF-8 CSV."));
+        }
+
+        int firstNameIdx  = Array.FindIndex(headers, h => h.Equals("first_name",  StringComparison.OrdinalIgnoreCase));
+        int lastNameIdx   = Array.FindIndex(headers, h => h.Equals("last_name",   StringComparison.OrdinalIgnoreCase));
+        int emailIdx      = Array.FindIndex(headers, h => h.Equals("email",       StringComparison.OrdinalIgnoreCase));
+        int passwordIdx   = Array.FindIndex(headers, h => h.Equals("password",    StringComparison.OrdinalIgnoreCase));
+        int contactIdx    = Array.FindIndex(headers, h => h.Equals("contact",     StringComparison.OrdinalIgnoreCase));
+        int departmentIdx = Array.FindIndex(headers, h => h.Equals("department",  StringComparison.OrdinalIgnoreCase));
+        int roleIdx       = Array.FindIndex(headers, h => h.Equals("role",        StringComparison.OrdinalIgnoreCase));
+        int universityIdx = Array.FindIndex(headers, h => h.Equals("university_id",StringComparison.OrdinalIgnoreCase));
+
+        if (firstNameIdx < 0 || lastNameIdx < 0 || emailIdx < 0 || passwordIdx < 0)
+            return BadRequest(Failure("CSV must have columns: first_name, last_name, email, password."));
+
+        if (rows.Count == 0)
+            return BadRequest(Failure("CSV has no data rows."));
+
+        try
+        {
+            using var connection = dbConnectionFactory.CreateConnection();
+            if (!await EnsureAdminAccessAsync(connection, cancellationToken))
+                return StatusCode(StatusCodes.Status403Forbidden, Failure("Admin access required."));
+
+            var existingEmails = (await connection.QueryAsync<string>(new CommandDefinition(
+                "SELECT LOWER(email) FROM users WHERE COALESCE(is_deleted,0)=0;",
+                cancellationToken: cancellationToken))).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            int inserted = 0;
+            var failed   = new List<object>();
+            var seenInBatch = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            static string Cell(string[] r, int idx) =>
+                idx >= 0 && idx < r.Length ? (r[idx] ?? string.Empty).Trim() : string.Empty;
+
+            for (int i = 0; i < rows.Count; i++)
+            {
+                var row       = rows[i];
+                int rowNumber = i + 2; // 1-based, row 1 = header
+
+                var firstName  = Cell(row, firstNameIdx);
+                var lastName   = Cell(row, lastNameIdx);
+                var email      = Cell(row, emailIdx);
+                var password   = Cell(row, passwordIdx);
+                var contact    = Cell(row, contactIdx);
+                var department = Cell(row, departmentIdx);
+                var role       = Cell(row, roleIdx);
+                var univId     = Cell(row, universityIdx);
+
+                if (string.IsNullOrWhiteSpace(firstName))
+                { failed.Add(new { row = rowNumber, email, reason = "first_name is required." }); continue; }
+                if (string.IsNullOrWhiteSpace(lastName))
+                { failed.Add(new { row = rowNumber, email, reason = "last_name is required." }); continue; }
+                if (string.IsNullOrWhiteSpace(email))
+                { failed.Add(new { row = rowNumber, email, reason = "email is required." }); continue; }
+                if (!IsValidEmail(email))
+                { failed.Add(new { row = rowNumber, email, reason = "Invalid email format." }); continue; }
+                if (string.IsNullOrWhiteSpace(password) || password.Length < 6)
+                { failed.Add(new { row = rowNumber, email, reason = "password must be at least 6 characters." }); continue; }
+                if (existingEmails.Contains(email))
+                { failed.Add(new { row = rowNumber, email, reason = "Email already exists in database." }); continue; }
+                if (seenInBatch.Contains(email))
+                { failed.Add(new { row = rowNumber, email, reason = "Duplicate email in CSV." }); continue; }
+
+                seenInBatch.Add(email);
+
+                var passwordHash = BCrypt.Net.BCrypt.HashPassword(password);
+                var normalizedRole   = NormalizeRole(role);
+
+                await connection.ExecuteAsync(new CommandDefinition(
+                    """
+                    INSERT INTO users
+                        (UniversityId, first_name, last_name, email, contact, department, password_hash, role, status, is_deleted, created_at)
+                    VALUES
+                        (@universityId, @firstName, @lastName, @email, @contact, @department, @passwordHash, @role, 'active', 0, UTC_TIMESTAMP());
+                    """,
+                    new
+                    {
+                        universityId = string.IsNullOrWhiteSpace(univId) ? null : univId,
+                        firstName,
+                        lastName,
+                        email,
+                        contact,
+                        department,
+                        passwordHash,
+                        role = normalizedRole
+                    },
+                    cancellationToken: cancellationToken));
+
+                existingEmails.Add(email);
+                inserted++;
+            }
+
+            return Ok(Success("Bulk import completed.", new
+            {
+                total     = rows.Count,
+                inserted,
+                failed    = failed.Count,
+                failedRows = failed
+            }));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Bulk user import failed.");
+            return StatusCode(StatusCodes.Status500InternalServerError, Failure("Internal server error during bulk import."));
+        }
+    }
+
+    private static bool IsValidEmail(string email)
+    {
+        try { var _ = new System.Net.Mail.MailAddress(email); return true; }
+        catch { return false; }
+    }
+
+    private static string[] ParseCsvLine(string line)
+    {
+        var result = new List<string>();
+        bool inQuotes = false;
+        var current = new System.Text.StringBuilder();
+        for (int i = 0; i < line.Length; i++)
+        {
+            char c = line[i];
+            if (c == '"')
+            {
+                if (inQuotes && i + 1 < line.Length && line[i + 1] == '"')
+                { current.Append('"'); i++; }
+                else
+                { inQuotes = !inQuotes; }
+            }
+            else if (c == ',' && !inQuotes)
+            { result.Add(current.ToString()); current.Clear(); }
+            else
+            { current.Append(c); }
+        }
+        result.Add(current.ToString());
+        return result.Select(s => s.Trim()).ToArray();
+    }
+
     [HttpPut("users/{id:int}")]
     public async Task<IActionResult> UpdateUser(int id, [FromBody] UserUpsertRequest request, CancellationToken cancellationToken)
     {

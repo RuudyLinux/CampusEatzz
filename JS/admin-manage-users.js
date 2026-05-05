@@ -1,3 +1,116 @@
+// ── CSV Import ────────────────────────────────────────────────────────────────
+let _csvFailedRows = [];
+
+window.openImportModal = function() {
+    resetImportModal();
+    document.getElementById("csvImportModal").classList.remove("hidden");
+};
+
+window.closeImportModal = function() {
+    document.getElementById("csvImportModal").classList.add("hidden");
+};
+
+window.resetImportModal = function() {
+    _csvFailedRows = [];
+    document.getElementById("csvFileInput").value = "";
+    document.getElementById("csvFileName").textContent = "Click to choose a .csv file";
+    document.getElementById("csvUploadBtn").disabled = true;
+    document.getElementById("csvPickerSection").classList.remove("hidden");
+    document.getElementById("csvProgress").classList.add("hidden");
+    document.getElementById("csvResult").classList.add("hidden");
+    document.getElementById("csvFailedList").classList.add("hidden");
+    document.getElementById("csvFailedItems").innerHTML = "";
+};
+
+window.onCsvFileSelected = function(input) {
+    const file = input.files[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+        AdminApi.showMessage("Only .csv files are allowed.", "error");
+        input.value = "";
+        return;
+    }
+    document.getElementById("csvFileName").textContent = file.name;
+    document.getElementById("csvUploadBtn").disabled = false;
+};
+
+window.uploadCsvFile = async function() {
+    const input = document.getElementById("csvFileInput");
+    const file = input.files[0];
+    if (!file) return;
+
+    document.getElementById("csvPickerSection").classList.add("hidden");
+    document.getElementById("csvProgress").classList.remove("hidden");
+
+    try {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const result = await AdminApi.request("/api/admin/users/bulk-import", {
+            method: "POST",
+            body: formData
+        });
+
+        const data = result.data || {};
+        _csvFailedRows = data.failedRows || [];
+
+        document.getElementById("csvTotal").textContent    = data.total    ?? 0;
+        document.getElementById("csvInserted").textContent = data.inserted ?? 0;
+        document.getElementById("csvFailed").textContent   = data.failed   ?? 0;
+
+        if (_csvFailedRows.length > 0) {
+            const items = document.getElementById("csvFailedItems");
+            items.innerHTML = _csvFailedRows.map(function(r) {
+                return `<div class="flex gap-2 text-red-600 bg-red-50 px-2 py-1 rounded">
+                    <span class="font-mono">Row ${r.row}</span>
+                    <span class="text-gray-600">${r.email || ""}</span>
+                    <span class="ml-auto">${r.reason}</span>
+                </div>`;
+            }).join("");
+            document.getElementById("csvFailedList").classList.remove("hidden");
+        }
+
+        document.getElementById("csvProgress").classList.add("hidden");
+        document.getElementById("csvResult").classList.remove("hidden");
+
+        if (data.inserted > 0 && typeof window.__reloadUsers === "function") {
+            window.__reloadUsers();
+        }
+    } catch (err) {
+        document.getElementById("csvProgress").classList.add("hidden");
+        document.getElementById("csvPickerSection").classList.remove("hidden");
+        AdminApi.showMessage(err.message || "Upload failed.", "error");
+    }
+};
+
+window.downloadFailedRows = function() {
+    if (!_csvFailedRows.length) return;
+    const header = "row,email,reason";
+    const lines  = _csvFailedRows.map(function(r) {
+        return `${r.row},"${(r.email||"").replace(/"/g,'""')}","${(r.reason||"").replace(/"/g,'""')}"`;
+    });
+    const csv  = [header, ...lines].join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = "failed_rows.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+};
+
+window.downloadCsvTemplate = function() {
+    const csv  = "first_name,last_name,email,password,contact,department,role,university_id\r\nJohn,Doe,john@example.com,secret123,9876543210,Computer Science,student,CS2024001\r\n";
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = "users_template.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
 (function() {
     const session = AdminApi.ensureAdminSession();
     if (!session) return;
@@ -62,6 +175,8 @@
             if (loading) loading.classList.add("hidden");
         }
     }
+
+    window.__reloadUsers = load;
 
     if (form) {
         form.addEventListener("submit", function(e) {
