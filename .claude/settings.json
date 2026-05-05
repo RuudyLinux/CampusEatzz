@@ -3,7 +3,28 @@
     "allow": [
       "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('id'\\), d.get\\('status'\\), d.get\\('createdAt'\\)\\)\")",
       "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('id'\\), d.get\\('status'\\)\\)\")",
-      "Bash(flutter analyze *)"
+      "Bash(flutter analyze *)",
+      "Bash(Get-ChildItem -Path \"d:\\\\#practicals\\\\FCampusEatzz\" -Recurse -Force)",
+      "Bash(Select-Object FullName)",
+      "Bash(Sort-Object FullName)",
+      "Bash(ConvertTo-Json)",
+      "Bash(xargs -I {} sh -c 'file \"{}\" | grep -i \"text\\\\|json\\\\|script\"')",
+      "Bash(Move-Item \"RENDER_MYSQL_DIAGNOSTIC.md\" \"mdr\\\\\" -ErrorAction SilentlyContinue; Move-Item \"UPDATE_RENDER_MANUAL.md\" \"mdr\\\\\" -ErrorAction SilentlyContinue)",
+      "Bash(Move-Item \"RAILWAY_RENDER_CHECKLIST.md\" \"mdr\\\\\" -ErrorAction SilentlyContinue; echo \"MD files moved\")",
+      "Bash(curl -s -H \"Authorization: Bearer e2c1b4fe-d966-461b-99de-76c0ddb18938\" https://api.railway.app/graphql -d '{\"query\":\"query { project\\(id:\\\\\"PROJECT_ID\\\\\"\\) { environments { nodes { databases { edges { node { name } } } } } } }\"}')",
+      "PowerShell(mysql -h $server -P $port -u $user -p$password -D $database -e \"SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='universitycanteendb';\" 2>&1)",
+      "PowerShell($connectionString = \"Server=roundhouse.proxy.rlwy.net;Port=47842;Database=universitycanteendb;User=root;Password=ZJUSaeMDXTrbQptDuNxAmiEBBKmiMsIf;\")",
+      "PowerShell($server = \"roundhouse.proxy.rlwy.net\")",
+      "PowerShell($port = 47842)",
+      "PowerShell($database = \"universitycanteendb\")",
+      "PowerShell($user = \"root\")",
+      "PowerShell($password = \"ZJUSaeMDXTrbQptDuNxAmiEBBKmiMsIf\")",
+      "Bash(Get-ChildItem \"C:\\\\Users\\\\ASUS\\\\Downloads\\\\CampusEatzz-handoff\" -Recurse)",
+      "Bash(Select-Object FullName, Extension)",
+      "Bash(Format-Table -AutoSize)",
+      "Read(//mnt/c/Users/ASUS/Downloads/**)",
+      "Read(//c/Users/ASUS/Downloads/CampusEatzz-handoff/**)",
+      "Bash(git rm *)"
     ]
   }
 }
