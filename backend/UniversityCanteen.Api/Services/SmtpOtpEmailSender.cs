@@ -12,7 +12,7 @@ public sealed class SmtpOtpEmailSender(
     IOptions<OtpOptions> otpOptions,
     ILogger<SmtpOtpEmailSender> logger) : IOtpEmailSender
 {
-    private static readonly TimeSpan SmtpAttemptTimeout = TimeSpan.FromSeconds(18);
+    private static readonly TimeSpan SmtpAttemptTimeout = TimeSpan.FromSeconds(8);
     private readonly SmtpOptions _smtpOptions = smtpOptions.Value;
     private readonly OtpOptions _otpOptions = otpOptions.Value;
 
