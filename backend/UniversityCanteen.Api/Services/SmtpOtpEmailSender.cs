@@ -10,6 +10,7 @@ public sealed class SmtpOtpEmailSender(
     IOptions<OtpOptions> otpOptions,
     ILogger<SmtpOtpEmailSender> logger) : IOtpEmailSender
 {
+    private static readonly TimeSpan SmtpSendTimeout = TimeSpan.FromSeconds(12);
     private readonly SmtpOptions _smtpOptions = smtpOptions.Value;
     private readonly OtpOptions _otpOptions = otpOptions.Value;
 
@@ -43,13 +44,30 @@ public sealed class SmtpOtpEmailSender(
             EnableSsl = _smtpOptions.EnableSsl,
             UseDefaultCredentials = false,
             DeliveryMethod = SmtpDeliveryMethod.Network,
-            Credentials = new NetworkCredential(_smtpOptions.UserName, appPassword)
+            Credentials = new NetworkCredential(_smtpOptions.UserName, appPassword),
+            Timeout = (int)SmtpSendTimeout.TotalMilliseconds
         };
 
         try
         {
-            await client.SendMailAsync(message);
+            var sendTask = client.SendMailAsync(message);
+            var completedTask = await Task.WhenAny(
+                sendTask,
+                Task.Delay(SmtpSendTimeout, cancellationToken));
+
+            if (!ReferenceEquals(completedTask, sendTask))
+            {
+                throw new TimeoutException(
+                    $"SMTP delivery timed out after {SmtpSendTimeout.TotalSeconds:0} seconds.");
+            }
+
+            await sendTask;
             logger.LogInformation("OTP email delivered to {Email}", toEmail);
+        }
+        catch (TimeoutException ex)
+        {
+            logger.LogError(ex, "SMTP delivery timed out for {Email}", toEmail);
+            throw new InvalidOperationException("Unable to deliver OTP email right now. Please try again shortly.");
         }
         catch (SmtpException ex)
         {
