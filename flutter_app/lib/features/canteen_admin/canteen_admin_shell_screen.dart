@@ -13,6 +13,7 @@ import '../../core/widgets/app_status_badge.dart';
 import '../../data/models/canteen_admin_session.dart';
 import '../../data/services/app_preferences.dart';
 import '../../data/services/canteen_admin_service.dart';
+import '../home/home_screen.dart';
 
 class CanteenAdminShellScreen extends StatefulWidget {
   const CanteenAdminShellScreen({
@@ -42,6 +43,7 @@ class _CanteenAdminShellScreenState extends State<CanteenAdminShellScreen> {
     _AdminNavItem('Reviews', Icons.reviews_rounded, AppColors.warning),
     _AdminNavItem('Wallet', Icons.account_balance_wallet_rounded, AppColors.success),
     _AdminNavItem('Settings', Icons.settings_rounded, AppColors.textSecondary),
+    _AdminNavItem('Customer', Icons.storefront_rounded, AppColors.primaryBright),
   ];
 
   @override
@@ -76,10 +78,11 @@ class _CanteenAdminShellScreenState extends State<CanteenAdminShellScreen> {
       3 => _ReportsTab(session: _session),
       4 => _ReviewsTab(session: _session),
       5 => _WalletTab(session: _session),
-      _ => _SettingsTab(
+      6 => _SettingsTab(
           session: _session,
           onSessionChanged: _persistSession,
         ),
+      _ => const HomeScreen(),
     };
   }
 
@@ -2375,7 +2378,7 @@ class _AdminHeader extends StatelessWidget {
   }
 }
 
-class _AdminBottomNavBar extends StatelessWidget {
+class _AdminBottomNavBar extends StatefulWidget {
   const _AdminBottomNavBar({
     required this.items,
     required this.selectedIndex,
@@ -2385,6 +2388,27 @@ class _AdminBottomNavBar extends StatelessWidget {
   final List<_AdminNavItem> items;
   final int selectedIndex;
   final ValueChanged<int> onSelected;
+
+  @override
+  State<_AdminBottomNavBar> createState() => _AdminBottomNavBarState();
+}
+
+class _AdminBottomNavBarState extends State<_AdminBottomNavBar> {
+  late List<bool> _pressed;
+
+  @override
+  void initState() {
+    super.initState();
+    _pressed = List<bool>.filled(widget.items.length, false);
+  }
+
+  @override
+  void didUpdateWidget(_AdminBottomNavBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.items.length != widget.items.length) {
+      _pressed = List<bool>.filled(widget.items.length, false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2401,112 +2425,155 @@ class _AdminBottomNavBar extends StatelessWidget {
           responsive.pageHorizontalInset,
           responsive.bottomNavBottomInset,
         ),
-        child: Container(
-          height: responsive.bottomNavHeight,
-          padding: EdgeInsets.symmetric(
-            horizontal: responsive.bottomNavInnerPadding,
-            vertical: responsive.bottomNavInnerPadding,
-          ),
-          decoration: BoxDecoration(
-            color: isDark
-                ? AppColors.navBgDark
-                : AppColors.navBgLight,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: isDark ? AppColors.darkGlassBorder : AppColors.glassBevelTop,
-            ),
-            boxShadow: <BoxShadow>[
-              BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.30 : 0.10),
-                blurRadius: 18,
-                offset: const Offset(0, 5),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+            child: Container(
+              height: responsive.bottomNavHeight,
+              padding: EdgeInsets.symmetric(
+                horizontal: responsive.bottomNavInnerPadding,
+                vertical: responsive.bottomNavInnerPadding,
               ),
-            ],
-          ),
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 6),
-            itemBuilder: (context, index) {
-              final item = items[index];
-              final selected = selectedIndex == index;
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.navBgDark : AppColors.navBgLight,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isDark ? AppColors.darkGlassBorder : AppColors.glassBevelTop,
+                  width: 0.8,
+                ),
+                boxShadow: <BoxShadow>[
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.12),
+                    blurRadius: 22,
+                    spreadRadius: -2,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: widget.items.length,
+                separatorBuilder: (_, __) => SizedBox(width: responsive.compact ? 5 : 6),
+                itemBuilder: (context, index) {
+                  final item = widget.items[index];
+                  final selected = widget.selectedIndex == index;
 
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 240),
-                curve: Curves.easeOutCubic,
-                width: selected ? responsive.bottomNavSelectedWidth : responsive.bottomNavCollapsedWidth,
-                decoration: BoxDecoration(
-                  gradient: selected
-                      ? LinearGradient(
-                          colors: <Color>[
-                            item.color.withValues(alpha: isDark ? 0.22 : 0.18),
-                            item.color.withValues(alpha: isDark ? 0.12 : 0.06),
-                          ],
-                        )
-                      : null,
-                  color: selected
-                      ? null
-                      : (isDark ? AppColors.darkSurface : AppColors.bgSoft)
-                          .withValues(alpha: 0.68),
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(
-                    color: selected
-                        ? item.color.withValues(alpha: 0.45)
-                        : (isDark ? AppColors.darkBorder : AppColors.border)
-                            .withValues(alpha: 0.80),
-                    width: selected ? 1.5 : 1,
-                  ),
-                ),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(15),
-                  onTap: () => onSelected(index),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: responsive.bottomNavItemPadding,
-                      vertical: responsive.bottomNavItemPadding,
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: <Widget>[
-                        Icon(
-                          item.icon,
-                          size: selected
-                              ? (responsive.compact ? 19 : 20)
-                              : (responsive.compact ? 18 : 19),
-                          color: selected ? item.color : unselectedColor,
-                        ),
-                        SizedBox(height: responsive.compact ? 2 : 3),
-                        AnimatedSize(
-                          duration: const Duration(milliseconds: 200),
-                          curve: Curves.easeOut,
-                          child: selected
-                              ? Text(
-                                  item.label,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.center,
-                                  style: AppTypography.labelSm.copyWith(
-                                    color: item.color,
-                                    fontSize: responsive.compact ? 10 : 11,
-                                    letterSpacing: 0.1,
-                                  ),
+                  return GestureDetector(
+                    onTapDown: (_) => setState(() => _pressed[index] = true),
+                    onTapUp: (_) => setState(() => _pressed[index] = false),
+                    onTapCancel: () => setState(() => _pressed[index] = false),
+                    onTap: () {
+                      setState(() => _pressed[index] = false);
+                      widget.onSelected(index);
+                    },
+                    child: AnimatedScale(
+                      scale: _pressed[index] ? 0.93 : 1.0,
+                      duration: const Duration(milliseconds: 110),
+                      curve: Curves.easeOut,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 280),
+                        curve: Curves.easeInOutCubic,
+                        width: selected
+                            ? responsive.bottomNavSelectedWidth
+                            : responsive.bottomNavCollapsedWidth,
+                        decoration: BoxDecoration(
+                          gradient: selected
+                              ? LinearGradient(
+                                  colors: <Color>[
+                                    item.color.withValues(alpha: isDark ? 0.25 : 0.20),
+                                    item.color.withValues(alpha: isDark ? 0.12 : 0.07),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
                                 )
-                              : Container(
-                                  width: 4,
-                                  height: 4,
-                                  decoration: BoxDecoration(
-                                    color: unselectedColor.withValues(alpha: 0.55),
-                                    shape: BoxShape.circle,
+                              : null,
+                          color: selected
+                              ? null
+                              : (isDark ? AppColors.darkSurface : AppColors.bgSoft)
+                                  .withValues(alpha: 0.60),
+                          borderRadius: BorderRadius.circular(15),
+                          border: Border.all(
+                            color: selected
+                                ? item.color.withValues(alpha: 0.50)
+                                : (isDark ? AppColors.darkBorder : AppColors.border)
+                                    .withValues(alpha: 0.70),
+                            width: selected ? 1.5 : 0.8,
+                          ),
+                          boxShadow: selected
+                              ? <BoxShadow>[
+                                  BoxShadow(
+                                    color: item.color.withValues(alpha: 0.20),
+                                    blurRadius: 10,
+                                    spreadRadius: -2,
                                   ),
-                                ),
+                                ]
+                              : null,
                         ),
-                      ],
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: responsive.bottomNavItemPadding,
+                            vertical: responsive.bottomNavItemPadding,
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: <Widget>[
+                              AnimatedScale(
+                                scale: selected ? 1.10 : 1.0,
+                                duration: const Duration(milliseconds: 250),
+                                curve: Curves.easeOutBack,
+                                child: Icon(
+                                  item.icon,
+                                  size: selected
+                                      ? (responsive.compact ? 19 : 20)
+                                      : (responsive.compact ? 17 : 18),
+                                  color: selected ? item.color : unselectedColor,
+                                  shadows: selected
+                                      ? <Shadow>[
+                                          Shadow(
+                                            color: item.color.withValues(alpha: 0.45),
+                                            blurRadius: 10,
+                                          ),
+                                        ]
+                                      : null,
+                                ),
+                              ),
+                              SizedBox(height: responsive.compact ? 2 : 3),
+                              AnimatedSize(
+                                duration: const Duration(milliseconds: 220),
+                                curve: Curves.easeInOutCubic,
+                                child: selected
+                                    ? Text(
+                                        item.label,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        textAlign: TextAlign.center,
+                                        style: AppTypography.labelSm.copyWith(
+                                          color: item.color,
+                                          fontSize: responsive.compact ? 10 : 10.5,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.1,
+                                        ),
+                                      )
+                                    : Container(
+                                        width: 4,
+                                        height: 4,
+                                        decoration: BoxDecoration(
+                                          color: unselectedColor.withValues(alpha: 0.45),
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              );
-            },
+                  );
+                },
+              ),
+            ),
           ),
         ),
       ),

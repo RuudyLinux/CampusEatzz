@@ -471,7 +471,10 @@ public sealed class AuthController(
             Name = user.FullName,
             Email = user.EmailId,
             Role = user.Role,
-            UniversityId = LooksLikeEmail(identifier) ? null : identifier
+            UniversityId = LooksLikeEmail(identifier) ? null : identifier,
+            ProfileImageUrl = string.IsNullOrWhiteSpace(user.ProfileImageUrl)
+                ? null
+                : user.ProfileImageUrl
         };
     }
 
@@ -571,6 +574,7 @@ public sealed class AuthController(
             var hasLastName = await ColumnExistsByProbe(connection, "last_name", cancellationToken);
             var hasUniversityId = await ColumnExistsByProbe(connection, "UniversityId", cancellationToken);
             var hasUniversityIdSnake = await ColumnExistsByProbe(connection, "university_id", cancellationToken);
+            var hasProfileImageUrl = await ColumnExistsByProbe(connection, "profile_image_url", cancellationToken);
             var studentKeyColumn = await ResolveIdentifierColumn(connection, "students", cancellationToken);
             var staffKeyColumn = await ResolveIdentifierColumn(connection, "university_staff", cancellationToken);
 
@@ -583,6 +587,7 @@ public sealed class AuthController(
                 HasUniversityId = hasUniversityId,
                 HasUniversityIdSnake = hasUniversityIdSnake,
                 HasNameColumns = hasFirstName || hasLastName,
+                HasProfileImageUrl = hasProfileImageUrl,
                 StudentIdentifierColumn = studentKeyColumn,
                 StaffIdentifierColumn = staffKeyColumn
             };
@@ -662,6 +667,9 @@ public sealed class AuthController(
             : emailExpression;
 
         var userIdentifierExpression = BuildUserIdentifierExpression(schema, "u");
+        var profileImageSelect = schema.HasProfileImageUrl
+            ? "COALESCE(u.profile_image_url, '') AS ProfileImageUrl"
+            : "'' AS ProfileImageUrl";
 
         return $"""
             SELECT
@@ -669,7 +677,8 @@ public sealed class AuthController(
                 {emailExpression} AS EmailId,
                 COALESCE(u.password_hash, '') AS PasswordHash,
                 COALESCE(u.role, '') AS Role,
-                {fullNameExpression} AS FullName
+                {fullNameExpression} AS FullName,
+                {profileImageSelect}
             FROM users u
             INNER JOIN students s
                 ON COALESCE(s.{schema.StudentIdentifierColumn}, '') = COALESCE({userIdentifierExpression}, '')
@@ -688,6 +697,9 @@ public sealed class AuthController(
             : emailExpression;
 
         var userIdentifierExpression = BuildUserIdentifierExpression(schema, "u");
+        var profileImageSelect = schema.HasProfileImageUrl
+            ? "COALESCE(u.profile_image_url, '') AS ProfileImageUrl"
+            : "'' AS ProfileImageUrl";
 
         return $"""
             SELECT
@@ -695,7 +707,8 @@ public sealed class AuthController(
                 {emailExpression} AS EmailId,
                 COALESCE(u.password_hash, '') AS PasswordHash,
                 COALESCE(u.role, '') AS Role,
-                {fullNameExpression} AS FullName
+                {fullNameExpression} AS FullName,
+                {profileImageSelect}
             FROM users u
             INNER JOIN university_staff us
                 ON COALESCE(us.{schema.StaffIdentifierColumn}, '') = COALESCE({userIdentifierExpression}, '')
@@ -933,6 +946,10 @@ public sealed class AuthController(
                     ? "COALESCE(u.university_id, CAST(u.id AS CHAR))"
                     : "CAST(u.id AS CHAR)";
 
+        var profileImageSelect = schema.HasProfileImageUrl
+            ? "COALESCE(u.profile_image_url, '') AS ProfileImageUrl"
+            : "'' AS ProfileImageUrl";
+
         return $"""
             SELECT
                 u.id AS Id,
@@ -945,7 +962,7 @@ public sealed class AuthController(
                 COALESCE(u.contact, '') AS Contact,
                 COALESCE(u.department, '') AS Department,
                 COALESCE(u.status, '') AS Status,
-                COALESCE(u.profile_image_url, '') AS ProfileImageUrl
+                {profileImageSelect}
             FROM users u
             WHERE u.email = @identifier
                OR CAST(u.id AS CHAR) = @identifier{enrollmentCondition}{universityIdCondition}
@@ -1137,6 +1154,7 @@ public sealed class AuthController(
         public bool HasUniversityId { get; init; }
         public bool HasUniversityIdSnake { get; init; }
         public bool HasNameColumns { get; init; }
+        public bool HasProfileImageUrl { get; init; }
         public string StudentIdentifierColumn { get; init; } = "UniversityId";
         public string StaffIdentifierColumn { get; init; } = "UniversityId";
     }
@@ -1148,6 +1166,7 @@ public sealed class AuthController(
         public string PasswordHash { get; init; } = string.Empty;
         public string Role { get; init; } = string.Empty;
         public string FullName { get; init; } = string.Empty;
+        public string ProfileImageUrl { get; init; } = string.Empty;
     }
 
     private sealed class OtpSessionRow

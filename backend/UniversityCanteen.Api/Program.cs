@@ -267,6 +267,8 @@ static async Task EnsureCoreSchemaAsync(
     {
         "ALTER TABLE canteen_admins ADD COLUMN image_url VARCHAR(500) NULL;",
         "ALTER TABLE users ADD COLUMN profile_image_url VARCHAR(500) NULL;",
+        "ALTER TABLE users ADD COLUMN profile_image_data MEDIUMBLOB NULL;",
+        "ALTER TABLE users ADD COLUMN profile_image_content_type VARCHAR(50) NULL;",
         "ALTER TABLE users ADD COLUMN is_logged_in TINYINT(1) NOT NULL DEFAULT 0;",
         "ALTER TABLE students ADD COLUMN password_hash VARCHAR(255) NULL;",
         "ALTER TABLE students ADD COLUMN email VARCHAR(255) NULL;",

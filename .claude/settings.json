@@ -24,7 +24,11 @@
       "Bash(Format-Table -AutoSize)",
       "Read(//mnt/c/Users/ASUS/Downloads/**)",
       "Read(//c/Users/ASUS/Downloads/CampusEatzz-handoff/**)",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "Bash(Select-String -Pattern \"\\(nav|navigation|bottom_nav|side_nav|admin\\)\")",
+      "Bash(dir \"#practicals\\\\FCampusEatzz\\\\flutter_app\\\\lib\\\\features\\\\canteen_admin\\\\\" -Recurse)",
+      "Bash(Get-ChildItem -Path \"d:\\\\#practicals\\\\FCampusEatzz\" -Directory)",
+      "Bash(Select-Object Name)"
     ]
   }
 }

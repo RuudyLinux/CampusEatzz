@@ -1408,29 +1408,52 @@ public sealed class CustomerController(
             if (user is null)
                 return NotFound(Failure("User not found."));
 
-            // Save file
-            var uploadDir = Path.Combine("wwwroot", "uploads", "profile_images");
-            Directory.CreateDirectory(uploadDir);
-
-            var fileName = $"user_{user.Id}_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}{ext}";
-            var filePath = Path.Combine(uploadDir, fileName);
-
-            await using (var stream = System.IO.File.Create(filePath))
+            // Read image bytes into memory
+            byte[] imageBytes;
+            using (var ms = new System.IO.MemoryStream())
             {
-                await file.CopyToAsync(stream, cancellationToken);
+                await file.CopyToAsync(ms, cancellationToken);
+                imageBytes = ms.ToArray();
             }
 
-            var relativeUrl = $"/uploads/profile_images/{fileName}";
+            var contentType = ext switch
+            {
+                ".jpg" or ".jpeg" => "image/jpeg",
+                ".png" => "image/png",
+                ".webp" => "image/webp",
+                _ => "image/jpeg"
+            };
 
-            // Persist to users table
+            // Persist image bytes to DB (survives redeploys)
+            var dbEndpointUrl = $"/api/customer/profile/image/{user.Id}";
             await connection.ExecuteAsync(new CommandDefinition(
-                "UPDATE users SET profile_image_url = @url WHERE id = @id;",
-                new { url = relativeUrl, id = user.Id },
+                """
+                UPDATE users
+                SET profile_image_url = @url,
+                    profile_image_data = @data,
+                    profile_image_content_type = @contentType
+                WHERE id = @id;
+                """,
+                new { url = dbEndpointUrl, data = imageBytes, contentType, id = user.Id },
                 cancellationToken: cancellationToken));
+
+            // Also write to disk for static file serving (best-effort, not relied upon for persistence)
+            try
+            {
+                var uploadDir = Path.Combine("wwwroot", "uploads", "profile_images");
+                Directory.CreateDirectory(uploadDir);
+                var fileName = $"user_{user.Id}{ext}";
+                var filePath = Path.Combine(uploadDir, fileName);
+                await System.IO.File.WriteAllBytesAsync(filePath, imageBytes, cancellationToken);
+            }
+            catch
+            {
+                // Disk write failure is non-fatal — DB copy is the source of truth
+            }
 
             return Ok(Success("Profile image uploaded successfully.", new
             {
-                profileImageUrl = relativeUrl
+                profileImageUrl = dbEndpointUrl
             }));
         }
         catch (Exception ex)
@@ -1438,6 +1461,39 @@ public sealed class CustomerController(
             logger.LogError(ex, "Failed to upload profile image for identifier {Identifier}", identifier);
             return StatusCode(StatusCodes.Status500InternalServerError, Failure("Internal server error while uploading image."));
         }
+    }
+
+    [HttpGet("profile/image/{userId:int}")]
+    public async Task<IActionResult> GetProfileImage(int userId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var connection = dbConnectionFactory.CreateConnection();
+            var row = await connection.QuerySingleOrDefaultAsync<ProfileImageRow>(new CommandDefinition(
+                """
+                SELECT profile_image_data AS Data, COALESCE(profile_image_content_type, 'image/jpeg') AS ContentType
+                FROM users
+                WHERE id = @userId AND profile_image_data IS NOT NULL;
+                """,
+                new { userId },
+                cancellationToken: cancellationToken));
+
+            if (row is null || row.Data is null || row.Data.Length == 0)
+                return NotFound();
+
+            return File(row.Data, row.ContentType);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to fetch profile image for userId {UserId}", userId);
+            return StatusCode(StatusCodes.Status500InternalServerError);
+        }
+    }
+
+    private sealed class ProfileImageRow
+    {
+        public byte[] Data { get; init; } = Array.Empty<byte>();
+        public string ContentType { get; init; } = "image/jpeg";
     }
 
     private static async Task<UserLookupRow?> FindUserByIdentifier(
