@@ -359,7 +359,11 @@ public sealed class AuthController(
         string identifier,
         CancellationToken cancellationToken)
     {
-        var sql = BuildFindUserSql(schema);
+        var sql = schema.Kind == UsersSchemaKind.Legacy
+            ? BuildFindLegacyUserSql()
+            : LooksLikeEmail(identifier)
+                ? BuildFindStaffUserSql(schema)
+                : BuildFindStudentUserSql(schema);
 
         return await connection.QuerySingleOrDefaultAsync<UserRow>(
             new CommandDefinition(sql, new { identifier }, cancellationToken: cancellationToken));
@@ -535,6 +539,8 @@ public sealed class AuthController(
             var hasLastName = await ColumnExistsByProbe(connection, "last_name", cancellationToken);
             var hasUniversityId = await ColumnExistsByProbe(connection, "UniversityId", cancellationToken);
             var hasUniversityIdSnake = await ColumnExistsByProbe(connection, "university_id", cancellationToken);
+            var studentKeyColumn = await ResolveIdentifierColumn(connection, "students", cancellationToken);
+            var staffKeyColumn = await ResolveIdentifierColumn(connection, "university_staff", cancellationToken);
 
             return new UsersSchemaInfo
             {
@@ -544,7 +550,9 @@ public sealed class AuthController(
                 HasEnrollmentNo = await ColumnExistsByProbe(connection, "enrollment_no", cancellationToken),
                 HasUniversityId = hasUniversityId,
                 HasUniversityIdSnake = hasUniversityIdSnake,
-                HasNameColumns = hasFirstName || hasLastName
+                HasNameColumns = hasFirstName || hasLastName,
+                StudentIdentifierColumn = studentKeyColumn,
+                StaffIdentifierColumn = staffKeyColumn
             };
         }
 
@@ -557,7 +565,16 @@ public sealed class AuthController(
         string columnName,
         CancellationToken cancellationToken)
     {
-        var sql = $"SELECT `{columnName}` FROM users LIMIT 1;";
+        return await ColumnExistsByProbe(connection, "users", columnName, cancellationToken);
+    }
+
+    private static async Task<bool> ColumnExistsByProbe(
+        System.Data.IDbConnection connection,
+        string tableName,
+        string columnName,
+        CancellationToken cancellationToken)
+    {
+        var sql = $"SELECT `{columnName}` FROM `{tableName}` LIMIT 1;";
 
         try
         {
@@ -570,52 +587,129 @@ public sealed class AuthController(
         }
     }
 
-    private static string BuildFindUserSql(UsersSchemaInfo schema)
+    private static async Task<string> ResolveIdentifierColumn(
+        System.Data.IDbConnection connection,
+        string tableName,
+        CancellationToken cancellationToken)
     {
-        if (schema.Kind == UsersSchemaKind.Legacy)
+        if (await ColumnExistsByProbe(connection, tableName, "UniversityId", cancellationToken))
         {
-            return """
-                SELECT
-                    u.UniversityId AS UniversityId,
-                    u.EmailId AS EmailId,
-                    u.PasswordHash AS PasswordHash,
-                    u.Role AS Role,
-                    u.EmailId AS FullName
-                FROM users u
-                WHERE u.EmailId = @identifier
-                   OR CAST(u.UniversityId AS CHAR) = @identifier
-                LIMIT 1;
-                """;
+            return "UniversityId";
         }
 
+        if (await ColumnExistsByProbe(connection, tableName, "university_id", cancellationToken))
+        {
+            return "university_id";
+        }
+
+        throw new InvalidOperationException(
+            $"Missing identifier column in table '{tableName}'. Expected 'UniversityId' or 'university_id'.");
+    }
+
+    private static string BuildFindLegacyUserSql()
+    {
+        return """
+            SELECT
+                u.UniversityId AS UniversityId,
+                u.EmailId AS EmailId,
+                u.PasswordHash AS PasswordHash,
+                u.Role AS Role,
+                u.EmailId AS FullName
+            FROM users u
+            WHERE u.EmailId = @identifier
+               OR CAST(u.UniversityId AS CHAR) = @identifier
+            LIMIT 1;
+            """;
+    }
+
+    private static string BuildFindStudentUserSql(UsersSchemaInfo schema)
+    {
         var fullNameExpression = schema.HasNameColumns
             ? "COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''), u.email)"
             : "u.email";
 
-        var enrollmentCondition = schema.HasEnrollmentNo
-            ? "\n               OR COALESCE(u.enrollment_no, '') = @identifier"
-            : string.Empty;
-
-        var universityIdCondition =
-            (schema.HasUniversityId
-                ? "\n               OR COALESCE(u.UniversityId, '') = @identifier"
-                : string.Empty)
-            + (schema.HasUniversityIdSnake
-                ? "\n               OR COALESCE(u.university_id, '') = @identifier"
-                : string.Empty);
+        var userIdentifierExpression = BuildUserIdentifierExpression(schema, "u");
 
         return $"""
             SELECT
                 u.id AS UniversityId,
-                u.email AS EmailId,
-                u.password_hash AS PasswordHash,
-                u.role AS Role,
+                COALESCE(u.email, '') AS EmailId,
+                COALESCE(u.password_hash, '') AS PasswordHash,
+                COALESCE(u.role, '') AS Role,
                 {fullNameExpression} AS FullName
             FROM users u
-            WHERE u.email = @identifier
-                    OR CAST(u.id AS CHAR) = @identifier{enrollmentCondition}{universityIdCondition}
+            INNER JOIN students s
+                ON COALESCE(s.{schema.StudentIdentifierColumn}, '') = COALESCE({userIdentifierExpression}, '')
+            WHERE COALESCE({userIdentifierExpression}, '') = @identifier
+              AND LOWER(COALESCE(u.role, '')) = 'student'
+              AND COALESCE(u.status, 'active') = 'active'
             LIMIT 1;
             """;
+    }
+
+    private static string BuildFindStaffUserSql(UsersSchemaInfo schema)
+    {
+        var fullNameExpression = schema.HasNameColumns
+            ? "COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''), u.email)"
+            : "u.email";
+
+        var userIdentifierExpression = BuildUserIdentifierExpression(schema, "u");
+
+        return $"""
+            SELECT
+                u.id AS UniversityId,
+                COALESCE(u.email, '') AS EmailId,
+                COALESCE(u.password_hash, '') AS PasswordHash,
+                COALESCE(u.role, '') AS Role,
+                {fullNameExpression} AS FullName
+            FROM users u
+            INNER JOIN university_staff us
+                ON COALESCE(us.{schema.StaffIdentifierColumn}, '') = COALESCE({userIdentifierExpression}, '')
+            WHERE LOWER(COALESCE(u.email, '')) = LOWER(@identifier)
+              AND LOWER(COALESCE(u.role, '')) IN ('staff', 'faculty')
+              AND COALESCE(u.status, 'active') = 'active'
+            LIMIT 1;
+            """;
+    }
+
+    private static string BuildUserIdentifierExpression(UsersSchemaInfo schema, string alias)
+    {
+        if (schema.HasUniversityId && schema.HasUniversityIdSnake && schema.HasEnrollmentNo)
+        {
+            return $"COALESCE({alias}.UniversityId, {alias}.university_id, {alias}.enrollment_no, CAST({alias}.id AS CHAR))";
+        }
+
+        if (schema.HasUniversityId && schema.HasUniversityIdSnake)
+        {
+            return $"COALESCE({alias}.UniversityId, {alias}.university_id, CAST({alias}.id AS CHAR))";
+        }
+
+        if (schema.HasUniversityId && schema.HasEnrollmentNo)
+        {
+            return $"COALESCE({alias}.UniversityId, {alias}.enrollment_no, CAST({alias}.id AS CHAR))";
+        }
+
+        if (schema.HasUniversityIdSnake && schema.HasEnrollmentNo)
+        {
+            return $"COALESCE({alias}.university_id, {alias}.enrollment_no, CAST({alias}.id AS CHAR))";
+        }
+
+        if (schema.HasUniversityId)
+        {
+            return $"COALESCE({alias}.UniversityId, CAST({alias}.id AS CHAR))";
+        }
+
+        if (schema.HasUniversityIdSnake)
+        {
+            return $"COALESCE({alias}.university_id, CAST({alias}.id AS CHAR))";
+        }
+
+        if (schema.HasEnrollmentNo)
+        {
+            return $"COALESCE({alias}.enrollment_no, CAST({alias}.id AS CHAR))";
+        }
+
+        return $"CAST({alias}.id AS CHAR)";
     }
 
     private static string BuildMarkUserLoggedInSql(UsersSchemaInfo schema)
@@ -1008,6 +1102,8 @@ public sealed class AuthController(
         public bool HasUniversityId { get; init; }
         public bool HasUniversityIdSnake { get; init; }
         public bool HasNameColumns { get; init; }
+        public string StudentIdentifierColumn { get; init; } = "UniversityId";
+        public string StaffIdentifierColumn { get; init; } = "UniversityId";
     }
 
     private sealed class UserRow
