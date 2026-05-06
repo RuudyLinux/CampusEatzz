@@ -20,6 +20,7 @@ builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOpt
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.Configure<OtpOptions>(builder.Configuration.GetSection(OtpOptions.SectionName));
 builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection(SmtpOptions.SectionName));
+builder.Services.Configure<ResendOptions>(builder.Configuration.GetSection(ResendOptions.SectionName));
 builder.Services.Configure<FcmOptions>(builder.Configuration.GetSection(FcmOptions.SectionName));
 builder.Services.Configure<AiOptions>(builder.Configuration.GetSection(AiOptions.SectionName));
 
@@ -54,7 +55,22 @@ builder.Services.AddScoped<IDbConnectionFactory>(_ =>
     return new MySqlConnectionFactory(resolvedDatabaseConnectionString);
 });
 
-builder.Services.AddScoped<IOtpEmailSender, SmtpOtpEmailSender>();
+builder.Services.AddHttpClient<IOtpEmailSender, ResendOtpEmailSender>(client =>
+{
+    var resendBaseUrl = builder.Configuration["Resend:ApiBaseUrl"];
+    if (string.IsNullOrWhiteSpace(resendBaseUrl))
+    {
+        resendBaseUrl = "https://api.resend.com/";
+    }
+
+    if (!resendBaseUrl.EndsWith('/'))
+    {
+        resendBaseUrl += "/";
+    }
+
+    client.BaseAddress = new Uri(resendBaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(20);
+});
 builder.Services.AddScoped<UniversityCanteenDbContext>();
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddSingleton<IFcmPushSender, FirebaseFcmPushSender>();
@@ -483,20 +499,20 @@ static async Task EnsureCoreSchemaAsync(
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         """,
         """
-        CREATE TABLE IF NOT EXISTS user_otps (
+        CREATE TABLE IF NOT EXISTS user_opts (
             id INT NOT NULL AUTO_INCREMENT,
             user_id INT NULL,
             otp_code VARCHAR(255) NULL,
             expires_at DATETIME NULL,
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            KEY ix_user_otps_user (user_id),
-            CONSTRAINT fk_user_otps_user
+            KEY ix_user_opts_user (user_id),
+            CONSTRAINT fk_user_opts_user
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
         """,
         """
-        ALTER TABLE user_otps
+        ALTER TABLE user_opts
             MODIFY COLUMN otp_code VARCHAR(255) NULL;
         """,
         """

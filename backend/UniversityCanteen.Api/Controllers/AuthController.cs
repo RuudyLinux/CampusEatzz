@@ -19,13 +19,11 @@ public sealed class AuthController(
     IDbConnectionFactory dbConnectionFactory,
     IOptions<OtpOptions> otpOptions,
     IOptions<JwtOptions> jwtOptions,
-    IOptions<SmtpOptions> smtpOptions,
     IOtpEmailSender otpEmailSender,
     ILogger<AuthController> logger) : ControllerBase
 {
     private readonly JwtOptions _jwtOptions = jwtOptions.Value;
     private readonly OtpOptions _otpOptions = otpOptions.Value;
-    private readonly SmtpOptions _smtpOptions = smtpOptions.Value;
 
     [HttpPost("login.php")]
     [HttpPost("auth/request-otp")]
@@ -397,11 +395,6 @@ public sealed class AuthController(
         string requestedIdentifier,
         CancellationToken cancellationToken)
     {
-        if (!IsSmtpConfigured())
-        {
-            throw new InvalidOperationException("SMTP is not configured. Please configure SMTP and try again.");
-        }
-
         var codeLength = Math.Clamp(_otpOptions.CodeLength, 4, 8);
         var expiryMinutes = Math.Clamp(_otpOptions.ExpiryMinutes, 1, 30);
         var expiryUtc = DateTime.UtcNow.AddMinutes(expiryMinutes);
@@ -442,14 +435,6 @@ public sealed class AuthController(
             Role = user.Role,
             UniversityId = LooksLikeEmail(identifier) ? null : identifier
         };
-    }
-
-    private bool IsSmtpConfigured()
-    {
-        return !string.IsNullOrWhiteSpace(_smtpOptions.Host)
-            && !string.IsNullOrWhiteSpace(_smtpOptions.UserName)
-            && !string.IsNullOrWhiteSpace(_smtpOptions.Password)
-            && !string.IsNullOrWhiteSpace(_smtpOptions.FromEmail);
     }
 
     private static string GenerateOtp(int length)
@@ -752,7 +737,7 @@ public sealed class AuthController(
                 COALESCE(otp_code, '') AS OtpCode,
                 expires_at AS ExpiresAt,
                 created_at AS CreatedAt
-            FROM user_otps
+            FROM user_opts
             WHERE user_id = @userId
             ORDER BY id DESC
             LIMIT 1;
@@ -781,14 +766,14 @@ public sealed class AuthController(
         using var transaction = connection.BeginTransaction();
 
         await connection.ExecuteAsync(new CommandDefinition(
-            "DELETE FROM user_otps WHERE user_id = @userId;",
+            "DELETE FROM user_opts WHERE user_id = @userId;",
             new { userId },
             transaction: transaction,
             cancellationToken: cancellationToken));
 
         await connection.ExecuteAsync(new CommandDefinition(
             """
-            INSERT INTO user_otps (user_id, otp_code, expires_at, created_at)
+            INSERT INTO user_opts (user_id, otp_code, expires_at, created_at)
             VALUES (@userId, @otpHash, @expiryUtc, UTC_TIMESTAMP());
             """,
             new
@@ -809,7 +794,7 @@ public sealed class AuthController(
         CancellationToken cancellationToken)
     {
         await connection.ExecuteAsync(new CommandDefinition(
-            "DELETE FROM user_otps WHERE user_id = @userId;",
+            "DELETE FROM user_opts WHERE user_id = @userId;",
             new { userId },
             cancellationToken: cancellationToken));
     }
