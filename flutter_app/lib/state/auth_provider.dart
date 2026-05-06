@@ -42,21 +42,15 @@ class AuthProvider extends ChangeNotifier {
   }) async {
     _setLoading(true);
     try {
-      final challenge = await _authService.requestOtp(
+      final session = await _authService.loginWithPassword(
         identifier: identifier,
         password: password,
       );
 
-      if (!challenge.success) {
-        _error = challenge.message;
-        return false;
-      }
-
-      final resolvedIdentifier = challenge.identifier.trim().isNotEmpty
-          ? challenge.identifier.trim()
-          : identifier.trim();
-      _pendingIdentifier = resolvedIdentifier;
+      _session = session;
+      _pendingIdentifier = '';
       _error = null;
+      await _preferences.saveSession(session);
       return true;
     } catch (e) {
       _error = _formatError(e);

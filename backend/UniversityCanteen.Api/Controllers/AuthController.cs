@@ -60,8 +60,17 @@ public sealed class AuthController(
                 return BadRequest(OtpFailure("Faculty must login using email."));
             }
 
-            var challenge = await IssueOtp(connection, schema, user, identifier, cancellationToken);
-            return Ok(challenge);
+            var session = new SessionUserDto
+            {
+                Id = user.UniversityId,
+                Name = user.FullName,
+                Email = user.EmailId,
+                Role = user.Role,
+                UniversityId = LooksLikeEmail(identifier) ? null : identifier
+            };
+
+            var token = IssueJwt(session);
+            return Ok(Success("Login successful.", session, token));
         }
         catch (InvalidOperationException ex)
         {
@@ -78,119 +87,17 @@ public sealed class AuthController(
     [HttpPost("auth/resend-otp")]
     public async Task<IActionResult> ResendOtp([FromBody] OtpResendRequest request, CancellationToken cancellationToken)
     {
-        var identifier = request.Email.Trim();
-        if (string.IsNullOrWhiteSpace(identifier))
-        {
-            return BadRequest(OtpFailure("Email or enrollment number is required."));
-        }
-
-        try
-        {
-            using var connection = dbConnectionFactory.CreateConnection();
-            var schema = await ResolveUsersSchema(connection, cancellationToken);
-            var user = await FindUserByIdentifier(connection, schema, identifier, cancellationToken);
-            if (user is null)
-            {
-                return NotFound(OtpFailure("User account not found."));
-            }
-
-            var otpSession = await FindOtpSessionByUserId(connection, user.UniversityId, cancellationToken);
-            if (otpSession is null
-                || string.IsNullOrWhiteSpace(otpSession.OtpCode)
-                || otpSession.ExpiresAt is null
-                || otpSession.ExpiresAt.Value < DateTime.UtcNow)
-            {
-                return BadRequest(OtpFailure("OTP session expired. Please log in again to request a new OTP."));
-            }
-
-            var challenge = await IssueOtp(connection, schema, user, identifier, cancellationToken);
-            return Ok(challenge);
-        }
-        catch (InvalidOperationException ex)
-        {
-            logger.LogWarning(ex, "OTP resend delivery failed for identifier {Identifier}", identifier);
-            return StatusCode(StatusCodes.Status503ServiceUnavailable, OtpFailure(ex.Message));
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "OTP resend failed for identifier {Identifier}", identifier);
-            return StatusCode(StatusCodes.Status500InternalServerError, OtpFailure("Internal server error during OTP resend."));
-        }
+        _ = request;
+        _ = cancellationToken;
+        return BadRequest(OtpFailure("OTP verification is disabled. Please log in with your password."));
     }
 
     [HttpPost("auth/verify-otp")]
     public async Task<IActionResult> VerifyOtp([FromBody] OtpVerifyRequest request, CancellationToken cancellationToken)
     {
-        var identifier = request.Email.Trim();
-        var otp = request.Otp.Trim();
-
-        if (string.IsNullOrWhiteSpace(identifier) || string.IsNullOrWhiteSpace(otp))
-        {
-            return BadRequest(Failure("Email/enrollment number and OTP are required."));
-        }
-
-        if (otp.Length != 6 || otp.Any(ch => !char.IsDigit(ch)))
-        {
-            return BadRequest(Failure("OTP must be exactly 6 digits."));
-        }
-
-        try
-        {
-            using var connection = dbConnectionFactory.CreateConnection();
-            var schema = await ResolveUsersSchema(connection, cancellationToken);
-            var user = await FindUserByIdentifier(connection, schema, identifier, cancellationToken);
-
-            if (user is null)
-            {
-                return Unauthorized(Failure("Invalid account."));
-            }
-
-            var otpSession = await FindOtpSessionByUserId(connection, user.UniversityId, cancellationToken);
-            if (otpSession is null || string.IsNullOrWhiteSpace(otpSession.OtpCode) || otpSession.ExpiresAt is null)
-            {
-                return BadRequest(Failure("Please request OTP first."));
-            }
-
-            if (otpSession.ExpiresAt.Value < DateTime.UtcNow)
-            {
-                await ClearOtpSessionAsync(connection, user.UniversityId, cancellationToken);
-                return Unauthorized(Failure("OTP expired. Please request a new OTP."));
-            }
-
-            var isOtpValid = false;
-            try
-            {
-                isOtpValid = BCrypt.Net.BCrypt.Verify(otp, otpSession.OtpCode);
-            }
-            catch
-            {
-                isOtpValid = false;
-            }
-
-            if (!isOtpValid)
-            {
-                return Unauthorized(Failure("Invalid OTP."));
-            }
-
-            await MarkUserLoggedInAsync(connection, schema, user.UniversityId, cancellationToken);
-            await ClearOtpSessionAsync(connection, user.UniversityId, cancellationToken);
-
-            var session = new SessionUserDto
-            {
-                Id = user.UniversityId,
-                Name = user.FullName,
-                Email = user.EmailId,
-                Role = user.Role
-            };
-
-            var token = IssueJwt(session);
-            return Ok(Success("OTP verified. Login successful.", session, token));
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "OTP verification failed for identifier {Identifier}", identifier);
-            return StatusCode(StatusCodes.Status500InternalServerError, Failure("Internal server error during OTP verification."));
-        }
+        _ = request;
+        _ = cancellationToken;
+        return BadRequest(Failure("OTP verification is disabled. Please log in with your password."));
     }
 
     [HttpGet("auth/me")]

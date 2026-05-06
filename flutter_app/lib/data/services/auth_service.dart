@@ -7,6 +7,44 @@ class AuthService {
 
   final ApiClient _apiClient;
 
+  Future<UserSession> loginWithPassword({
+    required String identifier,
+    required String password,
+  }) async {
+    final response = await _apiClient.request(
+      'api/auth/user/login',
+      method: 'POST',
+      data: <String, dynamic>{
+        'identifier': identifier,
+        'password': password,
+      },
+      authenticated: false,
+    );
+
+    final body = _asMap(response.data);
+    if (body['success'] != true) {
+      throw Exception((body['message'] ?? 'Login failed').toString());
+    }
+
+    final data = _asMap(body['data']);
+    final token = (body['token'] ?? '').toString();
+    final universityId = (data['universityId'] ?? '').toString().trim();
+
+    return UserSession(
+      id: _asInt(data['id']),
+      name: (data['name'] ?? '').toString(),
+      email: (data['email'] ?? '').toString(),
+      role: (data['role'] ?? '').toString(),
+      universityId: universityId.isNotEmpty ? universityId : identifier.trim(),
+      token: token,
+      firstName: (data['firstName'] ?? '').toString(),
+      lastName: (data['lastName'] ?? '').toString(),
+      contact: (data['contact'] ?? '').toString(),
+      department: (data['department'] ?? '').toString(),
+      profileImageUrl: (data['profileImageUrl'] ?? '').toString(),
+    );
+  }
+
   Future<OtpChallenge> requestOtp({
     required String identifier,
     required String password,

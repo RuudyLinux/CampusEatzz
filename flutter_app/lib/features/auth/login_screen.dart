@@ -8,7 +8,7 @@ import '../../core/widgets/app_backdrop.dart';
 import '../../core/widgets/animated_reveal.dart';
 import '../../state/auth_provider.dart';
 import '../canteen_admin/canteen_admin_entry_screen.dart';
-import 'otp_screen.dart';
+import '../home/home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -43,13 +43,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (!ok) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(auth.error ?? 'Unable to send OTP.')),
+        SnackBar(content: Text(auth.error ?? 'Unable to sign in.')),
       );
       return;
     }
 
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const OtpScreen()),
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(builder: (_) => const HomeScreen()),
+      (route) => false,
     );
   }
 
@@ -142,7 +143,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'OTP verification required for secure access',
+                                  'Login with your account credentials',
                                   style: AppTypography.bodySm.copyWith(
                                     color: isDark
                                         ? AppColors.darkTextMuted
@@ -224,8 +225,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                         : const Icon(Icons.arrow_forward_rounded),
                                     label: Text(
                                       auth.isLoading
-                                          ? 'Sending OTP…'
-                                          : 'Continue with OTP',
+                                          ? 'Signing in...'
+                                          : 'Sign In',
                                     ),
                                   ),
                                 ),
@@ -273,3 +274,4 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
+
