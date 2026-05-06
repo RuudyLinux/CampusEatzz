@@ -29,7 +29,7 @@ class AuthProvider extends ChangeNotifier {
       _session = saved;
       _error = null;
     } catch (e) {
-      _error = e.toString();
+      _error = _formatError(e);
     } finally {
       _loading = false;
       notifyListeners();
@@ -59,7 +59,7 @@ class AuthProvider extends ChangeNotifier {
       _error = null;
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = _formatError(e);
       return false;
     } finally {
       _setLoading(false);
@@ -84,7 +84,7 @@ class AuthProvider extends ChangeNotifier {
       _error = null;
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = _formatError(e);
       return false;
     } finally {
       _setLoading(false);
@@ -110,7 +110,7 @@ class AuthProvider extends ChangeNotifier {
       await _preferences.saveSession(session);
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = _formatError(e);
       return false;
     } finally {
       _setLoading(false);
@@ -153,5 +153,34 @@ class AuthProvider extends ChangeNotifier {
   void _setLoading(bool value) {
     _loading = value;
     notifyListeners();
+  }
+
+  String _formatError(Object error) {
+    final raw = error.toString().trim();
+    if (raw.isEmpty) {
+      return 'Something went wrong. Please try again.';
+    }
+
+    var cleaned = raw
+        .replaceFirst(RegExp(r'^Exception:\s*', caseSensitive: false), '')
+        .trim();
+    cleaned = cleaned
+        .replaceFirst(
+            RegExp(r'^DioException[^:]*:\s*', caseSensitive: false), '')
+        .trim();
+
+    final lowered = cleaned.toLowerCase();
+    if (lowered.contains('socketexception') ||
+        lowered.contains('failed host lookup') ||
+        lowered.contains('connection refused') ||
+        lowered.contains('connection error') ||
+        lowered.contains('network is unreachable') ||
+        lowered.contains('server unreachable')) {
+      return 'Server unreachable. Please check your internet connection and try again.';
+    }
+
+    return cleaned.isEmpty
+        ? 'Something went wrong. Please try again.'
+        : cleaned;
   }
 }

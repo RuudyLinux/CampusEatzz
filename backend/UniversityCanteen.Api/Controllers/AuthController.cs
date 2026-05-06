@@ -45,7 +45,7 @@ public sealed class AuthController(
             var schema = await ResolveUsersSchema(connection, cancellationToken);
             var user = await FindUserByIdentifier(connection, schema, identifier, cancellationToken);
 
-            if (user is null || !BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
+            if (user is null || !IsPasswordValid(password, user.PasswordHash))
             {
                 return Unauthorized(OtpFailure("Invalid email/enrollment number or password."));
             }
@@ -474,6 +474,33 @@ public sealed class AuthController(
     {
         return string.Equals(role, "staff", StringComparison.OrdinalIgnoreCase)
             || string.Equals(role, "faculty", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsPasswordValid(string providedPassword, string storedPasswordHash)
+    {
+        if (string.IsNullOrWhiteSpace(providedPassword) || string.IsNullOrWhiteSpace(storedPasswordHash))
+        {
+            return false;
+        }
+
+        var stored = storedPasswordHash.Trim();
+
+        // Legacy datasets sometimes store plaintext passwords. Only allow plaintext compare
+        // when the stored value doesn't look like a bcrypt hash.
+        var looksLikeBcrypt = stored.StartsWith("$2", StringComparison.Ordinal) && stored.Length >= 20;
+        if (!looksLikeBcrypt)
+        {
+            return string.Equals(providedPassword, stored, StringComparison.Ordinal);
+        }
+
+        try
+        {
+            return BCrypt.Net.BCrypt.Verify(providedPassword, stored);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static async Task<UsersSchemaInfo> ResolveUsersSchema(
