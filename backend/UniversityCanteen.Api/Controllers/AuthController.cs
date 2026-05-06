@@ -407,6 +407,12 @@ public sealed class AuthController(
         {
             await otpEmailSender.SendOtpAsync(user.EmailId, user.FullName, otp, expiryUtc, cancellationToken);
         }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("Resend", StringComparison.OrdinalIgnoreCase))
+        {
+            logger.LogWarning(ex, "Resend OTP configuration/delivery failed for {UniversityId}.", user.UniversityId);
+            await ClearOtpSessionAsync(connection, user.UniversityId, cancellationToken);
+            throw;
+        }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to send OTP email for {UniversityId}.", user.UniversityId);
