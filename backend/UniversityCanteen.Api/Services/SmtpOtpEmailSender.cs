@@ -1,6 +1,8 @@
 using System.Net;
-using System.Net.Mail;
+using MailKit.Net.Smtp;
+using MailKit.Security;
 using Microsoft.Extensions.Options;
+using MimeKit;
 using UniversityCanteen.Api.Configuration;
 
 namespace UniversityCanteen.Api.Services;
@@ -10,7 +12,7 @@ public sealed class SmtpOtpEmailSender(
     IOptions<OtpOptions> otpOptions,
     ILogger<SmtpOtpEmailSender> logger) : IOtpEmailSender
 {
-    private static readonly TimeSpan SmtpSendTimeout = TimeSpan.FromSeconds(12);
+    private static readonly TimeSpan SmtpAttemptTimeout = TimeSpan.FromSeconds(18);
     private readonly SmtpOptions _smtpOptions = smtpOptions.Value;
     private readonly OtpOptions _otpOptions = otpOptions.Value;
 
@@ -25,55 +27,66 @@ public sealed class SmtpOtpEmailSender(
 
         ValidateOptions();
 
+        var host = (_smtpOptions.Host ?? string.Empty).Trim();
+        var userName = (_smtpOptions.UserName ?? string.Empty).Trim();
         var appPassword = new string((_smtpOptions.Password ?? string.Empty)
             .Where(ch => !char.IsWhiteSpace(ch))
             .ToArray());
+        var endpoints = BuildEndpoints(host, _smtpOptions.Port, _smtpOptions.EnableSsl);
+        Exception? lastException = null;
 
-        using var message = new MailMessage
+        foreach (var endpoint in endpoints)
         {
-            From = new MailAddress(_smtpOptions.FromEmail, _smtpOptions.FromName),
-            Subject = string.IsNullOrWhiteSpace(_otpOptions.EmailSubject) ? "Your University Canteen OTP" : _otpOptions.EmailSubject,
-            IsBodyHtml = true,
-            Body = BuildHtmlBody(recipientName, otp, expiryUtc)
-        };
-
-        message.To.Add(toEmail);
-
-        using var client = new SmtpClient(_smtpOptions.Host, _smtpOptions.Port)
-        {
-            EnableSsl = _smtpOptions.EnableSsl,
-            UseDefaultCredentials = false,
-            DeliveryMethod = SmtpDeliveryMethod.Network,
-            Credentials = new NetworkCredential(_smtpOptions.UserName, appPassword),
-            Timeout = (int)SmtpSendTimeout.TotalMilliseconds
-        };
-
-        try
-        {
-            var sendTask = client.SendMailAsync(message);
-            var completedTask = await Task.WhenAny(
-                sendTask,
-                Task.Delay(SmtpSendTimeout, cancellationToken));
-
-            if (!ReferenceEquals(completedTask, sendTask))
+            cancellationToken.ThrowIfCancellationRequested();
+            try
             {
-                throw new TimeoutException(
-                    $"SMTP delivery timed out after {SmtpSendTimeout.TotalSeconds:0} seconds.");
-            }
+                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                linkedCts.CancelAfter(SmtpAttemptTimeout);
 
-            await sendTask;
-            logger.LogInformation("OTP email delivered to {Email}", toEmail);
+                using var client = new SmtpClient();
+                client.Timeout = (int)SmtpAttemptTimeout.TotalMilliseconds;
+
+                var message = BuildMessage(toEmail, recipientName, otp, expiryUtc);
+                var socketOption = ResolveSocketOption(endpoint.Port, endpoint.EnableSsl);
+
+                await client.ConnectAsync(endpoint.Host, endpoint.Port, socketOption, linkedCts.Token);
+                await client.AuthenticateAsync(userName, appPassword, linkedCts.Token);
+                await client.SendAsync(message, linkedCts.Token);
+                await client.DisconnectAsync(true, linkedCts.Token);
+
+                logger.LogInformation(
+                    "OTP email delivered to {Email} via {Host}:{Port} ({SocketOption})",
+                    toEmail,
+                    endpoint.Host,
+                    endpoint.Port,
+                    socketOption);
+
+                return;
+            }
+            catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                lastException = ex;
+                logger.LogWarning(
+                    ex,
+                    "SMTP delivery attempt timed out for {Email} via {Host}:{Port}.",
+                    toEmail,
+                    endpoint.Host,
+                    endpoint.Port);
+            }
+            catch (Exception ex)
+            {
+                lastException = ex;
+                logger.LogWarning(
+                    ex,
+                    "SMTP delivery attempt failed for {Email} via {Host}:{Port}.",
+                    toEmail,
+                    endpoint.Host,
+                    endpoint.Port);
+            }
         }
-        catch (TimeoutException ex)
-        {
-            logger.LogError(ex, "SMTP delivery timed out for {Email}", toEmail);
-            throw new InvalidOperationException("Unable to deliver OTP email right now. Please try again shortly.");
-        }
-        catch (SmtpException ex)
-        {
-            logger.LogError(ex, "SMTP delivery failed for {Email}", toEmail);
-            throw new InvalidOperationException("Unable to deliver OTP email right now. Please try again shortly.");
-        }
+
+        logger.LogError(lastException, "SMTP delivery failed after all attempts for {Email}", toEmail);
+        throw new InvalidOperationException("Unable to deliver OTP email right now. Please try again shortly.");
     }
 
     private void ValidateOptions()
@@ -87,6 +100,77 @@ public sealed class SmtpOtpEmailSender(
                 "SMTP settings are incomplete. Configure Smtp:Host, UserName, Password, and FromEmail in appsettings.");
         }
     }
+
+    private MimeMessage BuildMessage(string toEmail, string recipientName, string otp, DateTime expiryUtc)
+    {
+        var message = new MimeMessage();
+        message.From.Add(new MailboxAddress(_smtpOptions.FromName, _smtpOptions.FromEmail));
+        message.To.Add(MailboxAddress.Parse(toEmail));
+        message.Subject = string.IsNullOrWhiteSpace(_otpOptions.EmailSubject)
+            ? "Your University Canteen OTP"
+            : _otpOptions.EmailSubject;
+        message.Body = new BodyBuilder
+        {
+            HtmlBody = BuildHtmlBody(recipientName, otp, expiryUtc),
+        }.ToMessageBody();
+        return message;
+    }
+
+    private static List<SmtpEndpoint> BuildEndpoints(string host, int port, bool enableSsl)
+    {
+        var endpoints = new List<SmtpEndpoint>();
+
+        void Add(string h, int p, bool ssl)
+        {
+            if (string.IsNullOrWhiteSpace(h) || p <= 0)
+            {
+                return;
+            }
+
+            if (endpoints.Any(item =>
+                string.Equals(item.Host, h, StringComparison.OrdinalIgnoreCase)
+                && item.Port == p
+                && item.EnableSsl == ssl))
+            {
+                return;
+            }
+
+            endpoints.Add(new SmtpEndpoint(h, p, ssl));
+        }
+
+        Add(host, port, enableSsl);
+
+        // Gmail-specific fallback: try both STARTTLS(587) and implicit TLS(465).
+        if (string.Equals(host, "smtp.gmail.com", StringComparison.OrdinalIgnoreCase))
+        {
+            Add(host, 587, true);
+            Add(host, 465, true);
+        }
+
+        return endpoints;
+    }
+
+    private static SecureSocketOptions ResolveSocketOption(int port, bool enableSsl)
+    {
+        if (!enableSsl)
+        {
+            return SecureSocketOptions.None;
+        }
+
+        if (port == 465)
+        {
+            return SecureSocketOptions.SslOnConnect;
+        }
+
+        if (port == 587)
+        {
+            return SecureSocketOptions.StartTls;
+        }
+
+        return SecureSocketOptions.Auto;
+    }
+
+    private sealed record SmtpEndpoint(string Host, int Port, bool EnableSsl);
 
     private static string BuildHtmlBody(string recipientName, string otp, DateTime expiryUtc)
     {
