@@ -8,7 +8,7 @@ import '../../core/widgets/app_backdrop.dart';
 import '../../core/widgets/animated_reveal.dart';
 import '../../state/auth_provider.dart';
 import '../canteen_admin/canteen_admin_entry_screen.dart';
-import '../home/home_screen.dart';
+import 'otp_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -48,9 +48,8 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute<void>(builder: (_) => const HomeScreen()),
-      (route) => false,
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const OtpScreen()),
     );
   }
 
@@ -225,8 +224,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                         : const Icon(Icons.arrow_forward_rounded),
                                     label: Text(
                                       auth.isLoading
-                                          ? 'Signing in...'
-                                          : 'Sign In',
+                                          ? 'Sending OTP...'
+                                          : 'Send OTP',
                                     ),
                                   ),
                                 ),

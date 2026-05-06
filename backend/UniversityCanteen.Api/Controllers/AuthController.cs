@@ -60,17 +60,8 @@ public sealed class AuthController(
                 return BadRequest(OtpFailure("Faculty must login using email."));
             }
 
-            var session = new SessionUserDto
-            {
-                Id = user.UniversityId,
-                Name = user.FullName,
-                Email = user.EmailId,
-                Role = user.Role,
-                UniversityId = LooksLikeEmail(identifier) ? null : identifier
-            };
-
-            var token = IssueJwt(session);
-            return Ok(Success("Login successful.", session, token));
+            var challenge = await IssueOtp(connection, schema, user, identifier, cancellationToken);
+            return Ok(challenge);
         }
         catch (InvalidOperationException ex)
         {
@@ -87,17 +78,128 @@ public sealed class AuthController(
     [HttpPost("auth/resend-otp")]
     public async Task<IActionResult> ResendOtp([FromBody] OtpResendRequest request, CancellationToken cancellationToken)
     {
-        _ = request;
-        _ = cancellationToken;
-        return BadRequest(OtpFailure("OTP verification is disabled. Please log in with your password."));
+        var identifier = request.Email.Trim();
+
+        if (string.IsNullOrWhiteSpace(identifier))
+        {
+            return BadRequest(OtpFailure("Email or enrollment number is required."));
+        }
+
+        try
+        {
+            using var connection = dbConnectionFactory.CreateConnection();
+            var schema = await ResolveUsersSchema(connection, cancellationToken);
+            var user = await FindUserByIdentifier(connection, schema, identifier, cancellationToken);
+
+            if (user is null)
+            {
+                return Unauthorized(OtpFailure("Invalid email/enrollment number."));
+            }
+
+            if (IsStudentRole(user.Role) && LooksLikeEmail(identifier))
+            {
+                return BadRequest(OtpFailure("Students must login using enrollment number."));
+            }
+
+            if (IsStaffRole(user.Role) && !LooksLikeEmail(identifier))
+            {
+                return BadRequest(OtpFailure("Faculty must login using email."));
+            }
+
+            var otpSession = await FindOtpSessionByUserId(connection, user.UniversityId, cancellationToken);
+            if (otpSession is null || string.IsNullOrWhiteSpace(otpSession.OtpCode))
+            {
+                return BadRequest(OtpFailure("No active OTP session found. Please login again."));
+            }
+
+            var cooldownSeconds = Math.Clamp(_otpOptions.ResendCooldownSeconds, 0, 300);
+            if (cooldownSeconds > 0 && otpSession.CreatedAt.HasValue)
+            {
+                var issuedAtUtc = NormalizeToUtc(otpSession.CreatedAt.Value);
+                var secondsSinceLastIssue = (DateTime.UtcNow - issuedAtUtc).TotalSeconds;
+                if (secondsSinceLastIssue < cooldownSeconds)
+                {
+                    var waitSeconds = Math.Max(1, cooldownSeconds - (int)Math.Floor(secondsSinceLastIssue));
+                    return BadRequest(OtpFailure($"Please wait {waitSeconds} seconds before requesting another OTP."));
+                }
+            }
+
+            var challenge = await IssueOtp(connection, schema, user, identifier, cancellationToken);
+            return Ok(challenge);
+        }
+        catch (InvalidOperationException ex)
+        {
+            logger.LogWarning(ex, "OTP resend failed for identifier {Identifier}", identifier);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, OtpFailure(ex.Message));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Unexpected OTP resend error for identifier {Identifier}", identifier);
+            return StatusCode(StatusCodes.Status500InternalServerError, OtpFailure("Internal server error during OTP resend."));
+        }
     }
 
     [HttpPost("auth/verify-otp")]
     public async Task<IActionResult> VerifyOtp([FromBody] OtpVerifyRequest request, CancellationToken cancellationToken)
     {
-        _ = request;
-        _ = cancellationToken;
-        return BadRequest(Failure("OTP verification is disabled. Please log in with your password."));
+        var identifier = request.Email.Trim();
+        var otp = request.Otp.Trim();
+
+        if (string.IsNullOrWhiteSpace(identifier) || string.IsNullOrWhiteSpace(otp))
+        {
+            return BadRequest(Failure("Email or enrollment number and OTP are required."));
+        }
+
+        try
+        {
+            using var connection = dbConnectionFactory.CreateConnection();
+            var schema = await ResolveUsersSchema(connection, cancellationToken);
+            var user = await FindUserByIdentifier(connection, schema, identifier, cancellationToken);
+
+            if (user is null)
+            {
+                return Unauthorized(Failure("Invalid email/enrollment number."));
+            }
+
+            if (IsStudentRole(user.Role) && LooksLikeEmail(identifier))
+            {
+                return BadRequest(Failure("Students must login using enrollment number."));
+            }
+
+            if (IsStaffRole(user.Role) && !LooksLikeEmail(identifier))
+            {
+                return BadRequest(Failure("Faculty must login using email."));
+            }
+
+            var otpSession = await FindOtpSessionByUserId(connection, user.UniversityId, cancellationToken);
+            if (otpSession is null || string.IsNullOrWhiteSpace(otpSession.OtpCode))
+            {
+                return BadRequest(Failure("No active OTP found. Please request a new OTP."));
+            }
+
+            if (otpSession.ExpiresAt is null || NormalizeToUtc(otpSession.ExpiresAt.Value) <= DateTime.UtcNow)
+            {
+                await ClearOtpSessionAsync(connection, user.UniversityId, cancellationToken);
+                return BadRequest(Failure("OTP has expired. Please request a new OTP."));
+            }
+
+            if (!VerifyBcrypt(otp, otpSession.OtpCode))
+            {
+                return Unauthorized(Failure("Invalid OTP."));
+            }
+
+            await ClearOtpSessionAsync(connection, user.UniversityId, cancellationToken);
+            await MarkUserLoggedInAsync(connection, schema, user.UniversityId, cancellationToken);
+
+            var session = BuildUserSession(user, identifier);
+            var token = IssueJwt(session);
+            return Ok(Success("OTP verified. Login successful.", session, token));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "OTP verify failed for identifier {Identifier}", identifier);
+            return StatusCode(StatusCodes.Status500InternalServerError, Failure("Internal server error during OTP verification."));
+        }
     }
 
     [HttpGet("auth/me")]
@@ -295,6 +397,11 @@ public sealed class AuthController(
         string requestedIdentifier,
         CancellationToken cancellationToken)
     {
+        if (!IsSmtpConfigured())
+        {
+            throw new InvalidOperationException("SMTP is not configured. Please configure SMTP and try again.");
+        }
+
         var codeLength = Math.Clamp(_otpOptions.CodeLength, 4, 8);
         var expiryMinutes = Math.Clamp(_otpOptions.ExpiryMinutes, 1, 30);
         var expiryUtc = DateTime.UtcNow.AddMinutes(expiryMinutes);
@@ -303,42 +410,15 @@ public sealed class AuthController(
         await UpsertOtpSessionAsync(connection, user.UniversityId, otpHash, expiryUtc, cancellationToken);
         await MarkUserLoggedOutAsync(connection, schema, user.UniversityId, cancellationToken);
 
-        if (!IsSmtpConfigured())
-        {
-            var fallbackOtp = "123456";
-            var fallbackOtpHash = BCrypt.Net.BCrypt.HashPassword(fallbackOtp);
-            await UpsertOtpSessionAsync(connection, user.UniversityId, fallbackOtpHash, expiryUtc, cancellationToken);
-            
-            logger.LogWarning("SMTP not configured. Bypassing email send. Fallback OTP is {Otp} for {UniversityId}", fallbackOtp, user.UniversityId);
-            
-            return OtpSuccess(
-                "OTP bypassed. Use 123456 to login.",
-                new OtpChallengeData
-                {
-                    Identifier = ResolveOtpIdentifier(requestedIdentifier, user),
-                    ExpiresInSeconds = expiryMinutes * 60
-                });
-        }
-
         try
         {
             await otpEmailSender.SendOtpAsync(user.EmailId, user.FullName, otp, expiryUtc, cancellationToken);
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to send OTP email. Overriding OTP to 123456 for {UniversityId}.", user.UniversityId);
-            
-            var fallbackOtp = "123456";
-            var fallbackOtpHash = BCrypt.Net.BCrypt.HashPassword(fallbackOtp);
-            await UpsertOtpSessionAsync(connection, user.UniversityId, fallbackOtpHash, expiryUtc, cancellationToken);
-            
-            return OtpSuccess(
-                "Failed to send OTP mail. Bypassed. Use 123456 to login.",
-                new OtpChallengeData
-                {
-                    Identifier = ResolveOtpIdentifier(requestedIdentifier, user),
-                    ExpiresInSeconds = expiryMinutes * 60
-                });
+            logger.LogWarning(ex, "Failed to send OTP email for {UniversityId}.", user.UniversityId);
+            await ClearOtpSessionAsync(connection, user.UniversityId, cancellationToken);
+            throw new InvalidOperationException("Unable to deliver OTP email right now. Please try again shortly.");
         }
 
         logger.LogInformation("OTP generated for user {UniversityId}", user.UniversityId);
@@ -350,6 +430,18 @@ public sealed class AuthController(
                 Identifier = ResolveOtpIdentifier(requestedIdentifier, user),
                 ExpiresInSeconds = expiryMinutes * 60
             });
+    }
+
+    private static SessionUserDto BuildUserSession(UserRow user, string identifier)
+    {
+        return new SessionUserDto
+        {
+            Id = user.UniversityId,
+            Name = user.FullName,
+            Email = user.EmailId,
+            Role = user.Role,
+            UniversityId = LooksLikeEmail(identifier) ? null : identifier
+        };
     }
 
     private bool IsSmtpConfigured()
@@ -369,6 +461,16 @@ public sealed class AuthController(
         }
 
         return new string(output);
+    }
+
+    private static DateTime NormalizeToUtc(DateTime value)
+    {
+        return value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+        };
     }
 
     private static bool LooksLikeEmail(string identifier)
@@ -648,7 +750,8 @@ public sealed class AuthController(
             """
             SELECT
                 COALESCE(otp_code, '') AS OtpCode,
-                expires_at AS ExpiresAt
+                expires_at AS ExpiresAt,
+                created_at AS CreatedAt
             FROM user_otps
             WHERE user_id = @userId
             ORDER BY id DESC
@@ -1026,6 +1129,7 @@ public sealed class AuthController(
     {
         public string OtpCode { get; init; } = string.Empty;
         public DateTime? ExpiresAt { get; init; }
+        public DateTime? CreatedAt { get; init; }
     }
 
     private sealed class CanteenAdminAccountRow
