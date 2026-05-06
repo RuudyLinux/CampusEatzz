@@ -404,13 +404,20 @@ public sealed class AuthController(
         var allowOtpResponseOnDeliveryFailure = _otpOptions.AllowOtpInResponseOnDeliveryFailure;
         var responseMessage = "OTP sent successfully.";
         var otpForResponse = exposeOtpInResponse ? otp : null;
+        var recipientEmail = (user.EmailId ?? string.Empty).Trim();
         var otpHash = BCrypt.Net.BCrypt.HashPassword(otp);
         await UpsertOtpSessionAsync(connection, user.UniversityId, otpHash, expiryUtc, cancellationToken);
         await MarkUserLoggedOutAsync(connection, schema, user.UniversityId, cancellationToken);
 
+        if (string.IsNullOrWhiteSpace(recipientEmail) || !LooksLikeEmail(recipientEmail))
+        {
+            await ClearOtpSessionAsync(connection, user.UniversityId, cancellationToken);
+            throw new InvalidOperationException("No valid registered email found for this account. Please contact support.");
+        }
+
         try
         {
-            await otpEmailSender.SendOtpAsync(user.EmailId, user.FullName, otp, expiryUtc, cancellationToken);
+            await otpEmailSender.SendOtpAsync(recipientEmail, user.FullName, otp, expiryUtc, cancellationToken);
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("Resend", StringComparison.OrdinalIgnoreCase))
         {
@@ -451,7 +458,8 @@ public sealed class AuthController(
             {
                 Identifier = ResolveOtpIdentifier(requestedIdentifier, user),
                 ExpiresInSeconds = expiryMinutes * 60,
-                Otp = otpForResponse
+                Otp = otpForResponse,
+                DeliveryEmail = recipientEmail
             });
     }
 
@@ -648,16 +656,17 @@ public sealed class AuthController(
 
     private static string BuildFindStudentUserSql(UsersSchemaInfo schema)
     {
+        const string emailExpression = "COALESCE(NULLIF(TRIM(s.email), ''), NULLIF(TRIM(u.email), ''), '')";
         var fullNameExpression = schema.HasNameColumns
-            ? "COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''), u.email)"
-            : "u.email";
+            ? $"COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''), {emailExpression})"
+            : emailExpression;
 
         var userIdentifierExpression = BuildUserIdentifierExpression(schema, "u");
 
         return $"""
             SELECT
                 u.id AS UniversityId,
-                COALESCE(u.email, '') AS EmailId,
+                {emailExpression} AS EmailId,
                 COALESCE(u.password_hash, '') AS PasswordHash,
                 COALESCE(u.role, '') AS Role,
                 {fullNameExpression} AS FullName
@@ -673,16 +682,17 @@ public sealed class AuthController(
 
     private static string BuildFindStaffUserSql(UsersSchemaInfo schema)
     {
+        const string emailExpression = "COALESCE(NULLIF(TRIM(us.email), ''), NULLIF(TRIM(u.email), ''), '')";
         var fullNameExpression = schema.HasNameColumns
-            ? "COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''), u.email)"
-            : "u.email";
+            ? $"COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''), {emailExpression})"
+            : emailExpression;
 
         var userIdentifierExpression = BuildUserIdentifierExpression(schema, "u");
 
         return $"""
             SELECT
                 u.id AS UniversityId,
-                COALESCE(u.email, '') AS EmailId,
+                {emailExpression} AS EmailId,
                 COALESCE(u.password_hash, '') AS PasswordHash,
                 COALESCE(u.role, '') AS Role,
                 {fullNameExpression} AS FullName

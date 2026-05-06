@@ -269,7 +269,9 @@ static async Task EnsureCoreSchemaAsync(
         "ALTER TABLE users ADD COLUMN profile_image_url VARCHAR(500) NULL;",
         "ALTER TABLE users ADD COLUMN is_logged_in TINYINT(1) NOT NULL DEFAULT 0;",
         "ALTER TABLE students ADD COLUMN password_hash VARCHAR(255) NULL;",
+        "ALTER TABLE students ADD COLUMN email VARCHAR(255) NULL;",
         "ALTER TABLE university_staff ADD COLUMN password_hash VARCHAR(255) NULL;",
+        "ALTER TABLE university_staff ADD COLUMN email VARCHAR(255) NULL;",
         "ALTER TABLE order_items ADD COLUMN item_name VARCHAR(255) NULL;",
         "ALTER TABLE orders ADD COLUMN delivery_address VARCHAR(500) NULL;",
         "ALTER TABLE menu_items ADD COLUMN is_vegetarian TINYINT(1) NOT NULL DEFAULT 0;",
@@ -710,6 +712,8 @@ static async Task EnsureAcademicPasswordHashSyncAsync(
 
     await SyncPasswordHashForAcademicTableAsync(connection, logger, "students", usersUniversityIdColumn);
     await SyncPasswordHashForAcademicTableAsync(connection, logger, "university_staff", usersUniversityIdColumn);
+    await SyncEmailForAcademicTableAsync(connection, logger, "students", usersUniversityIdColumn);
+    await SyncEmailForAcademicTableAsync(connection, logger, "university_staff", usersUniversityIdColumn);
 }
 
 static async Task SyncPasswordHashForAcademicTableAsync(
@@ -746,6 +750,48 @@ static async Task SyncPasswordHashForAcademicTableAsync(
     {
         logger.LogInformation(
             "Synced password_hash for {Count} rows in {TableName}.",
+            affectedRows,
+            tableName);
+    }
+}
+
+static async Task SyncEmailForAcademicTableAsync(
+    System.Data.IDbConnection connection,
+    ILogger logger,
+    string tableName,
+    string usersUniversityIdColumn)
+{
+    var tableUniversityIdColumn = await ResolveExistingColumnNameAsync(
+        connection,
+        tableName,
+        "UniversityId",
+        "university_id");
+
+    if (string.IsNullOrWhiteSpace(tableUniversityIdColumn))
+    {
+        logger.LogWarning(
+            "Skipping email sync for {TableName}: missing UniversityId/university_id column.",
+            tableName);
+        return;
+    }
+
+    var sql = $"""
+        UPDATE `{tableName}` t
+        JOIN `users` u
+            ON COALESCE(t.`{tableUniversityIdColumn}`, '') = COALESCE(u.`{usersUniversityIdColumn}`, '')
+        SET t.`email` = u.`email`
+        WHERE COALESCE(u.`email`, '') <> ''
+          AND (
+              COALESCE(t.`email`, '') = ''
+              OR LOWER(COALESCE(t.`email`, '')) <> LOWER(COALESCE(u.`email`, ''))
+          );
+        """;
+
+    var affectedRows = await connection.ExecuteAsync(sql);
+    if (affectedRows > 0)
+    {
+        logger.LogInformation(
+            "Synced email for {Count} rows in {TableName}.",
             affectedRows,
             tableName);
     }

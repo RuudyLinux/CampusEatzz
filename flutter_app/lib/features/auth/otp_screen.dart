@@ -82,6 +82,9 @@ class _OtpScreenState extends State<OtpScreen> {
     final auth = context.watch<AuthProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final scheme = Theme.of(context).colorScheme;
+    final deliveryTarget = auth.pendingOtpDeliveryEmail.trim().isNotEmpty
+        ? auth.pendingOtpDeliveryEmail.trim()
+        : auth.pendingIdentifier;
 
     // Guard: no pending session
     if (auth.pendingIdentifier.trim().isEmpty) {
@@ -147,8 +150,7 @@ class _OtpScreenState extends State<OtpScreen> {
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 460),
                 child: AnimatedReveal(
@@ -167,8 +169,7 @@ class _OtpScreenState extends State<OtpScreen> {
                                 color: scheme.primary.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(22),
                                 border: Border.all(
-                                  color:
-                                      scheme.primary.withValues(alpha: 0.24),
+                                  color: scheme.primary.withValues(alpha: 0.24),
                                 ),
                               ),
                               child: Icon(
@@ -188,7 +189,7 @@ class _OtpScreenState extends State<OtpScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Code sent to ${auth.pendingIdentifier}',
+                              'Code sent to $deliveryTarget',
                               style: AppTypography.bodySm.copyWith(
                                 color: isDark
                                     ? AppColors.darkTextMuted

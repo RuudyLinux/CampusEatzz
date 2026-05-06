@@ -26,11 +26,15 @@ class AuthService {
     final data = _asMap(body['data']);
 
     final responseIdentifier = (data['identifier'] ?? '').toString().trim();
+    final deliveryEmail = (data['deliveryEmail'] ?? '').toString().trim();
 
     return OtpChallenge(
       success: success,
       message: (body['message'] ?? 'Unable to request OTP').toString(),
-      identifier: responseIdentifier.isNotEmpty ? responseIdentifier : identifier.trim(),
+      identifier: responseIdentifier.isNotEmpty
+          ? responseIdentifier
+          : identifier.trim(),
+      deliveryEmail: deliveryEmail,
     );
   }
 
@@ -45,10 +49,13 @@ class AuthService {
     );
 
     final body = _asMap(response.data);
+    final data = _asMap(body['data']);
+    final deliveryEmail = (data['deliveryEmail'] ?? '').toString().trim();
     return OtpChallenge(
       success: body['success'] == true,
       message: (body['message'] ?? 'Unable to resend OTP').toString(),
       identifier: identifier,
+      deliveryEmail: deliveryEmail,
     );
   }
 
@@ -68,7 +75,8 @@ class AuthService {
 
     final body = _asMap(response.data);
     if (body['success'] != true) {
-      throw Exception((body['message'] ?? 'OTP verification failed').toString());
+      throw Exception(
+          (body['message'] ?? 'OTP verification failed').toString());
     }
 
     final data = _asMap(body['data']);
