@@ -20,6 +20,7 @@ public sealed class AuthController(
     IOptions<OtpOptions> otpOptions,
     IOptions<JwtOptions> jwtOptions,
     IOtpEmailSender otpEmailSender,
+    IHostEnvironment hostEnvironment,
     ILogger<AuthController> logger) : ControllerBase
 {
     private readonly JwtOptions _jwtOptions = jwtOptions.Value;
@@ -399,6 +400,10 @@ public sealed class AuthController(
         var expiryMinutes = Math.Clamp(_otpOptions.ExpiryMinutes, 1, 30);
         var expiryUtc = DateTime.UtcNow.AddMinutes(expiryMinutes);
         var otp = GenerateOtp(codeLength);
+        var exposeOtpInResponse = _otpOptions.ExposeOtpInResponseInDevelopment && hostEnvironment.IsDevelopment();
+        var allowOtpResponseOnDeliveryFailure = _otpOptions.AllowOtpInResponseOnDeliveryFailure;
+        var responseMessage = "OTP sent successfully.";
+        var otpForResponse = exposeOtpInResponse ? otp : null;
         var otpHash = BCrypt.Net.BCrypt.HashPassword(otp);
         await UpsertOtpSessionAsync(connection, user.UniversityId, otpHash, expiryUtc, cancellationToken);
         await MarkUserLoggedOutAsync(connection, schema, user.UniversityId, cancellationToken);
@@ -409,25 +414,44 @@ public sealed class AuthController(
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("Resend", StringComparison.OrdinalIgnoreCase))
         {
-            logger.LogWarning(ex, "Resend OTP configuration/delivery failed for {UniversityId}.", user.UniversityId);
-            await ClearOtpSessionAsync(connection, user.UniversityId, cancellationToken);
-            throw;
+            if (allowOtpResponseOnDeliveryFailure)
+            {
+                logger.LogWarning(ex, "Resend delivery failed for {UniversityId}; returning OTP in response due fallback setting.", user.UniversityId);
+                responseMessage = "OTP generated. Email delivery unavailable; use OTP from response.";
+                otpForResponse = otp;
+            }
+            else
+            {
+                logger.LogWarning(ex, "Resend OTP configuration/delivery failed for {UniversityId}.", user.UniversityId);
+                await ClearOtpSessionAsync(connection, user.UniversityId, cancellationToken);
+                throw;
+            }
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to send OTP email for {UniversityId}.", user.UniversityId);
-            await ClearOtpSessionAsync(connection, user.UniversityId, cancellationToken);
-            throw new InvalidOperationException("Unable to deliver OTP email right now. Please try again shortly.");
+            if (allowOtpResponseOnDeliveryFailure)
+            {
+                logger.LogWarning(ex, "SMTP/Email delivery failed for {UniversityId}; returning OTP in response due fallback setting.", user.UniversityId);
+                responseMessage = "OTP generated. Email delivery unavailable; use OTP from response.";
+                otpForResponse = otp;
+            }
+            else
+            {
+                logger.LogWarning(ex, "Failed to send OTP email for {UniversityId}.", user.UniversityId);
+                await ClearOtpSessionAsync(connection, user.UniversityId, cancellationToken);
+                throw new InvalidOperationException("Unable to deliver OTP email right now. Please try again shortly.");
+            }
         }
 
         logger.LogInformation("OTP generated for user {UniversityId}", user.UniversityId);
 
         return OtpSuccess(
-            "OTP sent successfully.",
+            responseMessage,
             new OtpChallengeData
             {
                 Identifier = ResolveOtpIdentifier(requestedIdentifier, user),
-                ExpiresInSeconds = expiryMinutes * 60
+                ExpiresInSeconds = expiryMinutes * 60,
+                Otp = otpForResponse
             });
     }
 

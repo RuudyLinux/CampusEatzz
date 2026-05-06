@@ -9,4 +9,5 @@ public sealed class OtpOptions
     public int ResendCooldownSeconds { get; init; } = 30;
     public string EmailSubject { get; init; } = "Your University Canteen OTP";
     public bool ExposeOtpInResponseInDevelopment { get; init; } = true;
+    public bool AllowOtpInResponseOnDeliveryFailure { get; init; } = false;
 }
