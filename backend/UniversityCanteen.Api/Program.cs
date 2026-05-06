@@ -55,7 +55,13 @@ builder.Services.AddScoped<IDbConnectionFactory>(_ =>
     return new MySqlConnectionFactory(resolvedDatabaseConnectionString);
 });
 
-builder.Services.AddHttpClient<IOtpEmailSender, ResendOtpEmailSender>(client =>
+var hasResendKeyConfigured =
+    !string.IsNullOrWhiteSpace(builder.Configuration["Resend:ApiKey"]) ||
+    !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RESEND_API_KEY")) ||
+    !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("Resend__ApiKey")) ||
+    !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RESEND_APIKEY"));
+
+builder.Services.AddHttpClient<ResendOtpEmailSender>(client =>
 {
     var resendBaseUrl = builder.Configuration["Resend:ApiBaseUrl"];
     if (string.IsNullOrWhiteSpace(resendBaseUrl))
@@ -70,6 +76,12 @@ builder.Services.AddHttpClient<IOtpEmailSender, ResendOtpEmailSender>(client =>
 
     client.BaseAddress = new Uri(resendBaseUrl);
     client.Timeout = TimeSpan.FromSeconds(20);
+});
+builder.Services.AddScoped<IOtpEmailSender>(services =>
+{
+    return hasResendKeyConfigured
+        ? services.GetRequiredService<ResendOtpEmailSender>()
+        : ActivatorUtilities.CreateInstance<SmtpOtpEmailSender>(services);
 });
 builder.Services.AddScoped<UniversityCanteenDbContext>();
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
@@ -250,24 +262,6 @@ static async Task EnsureCoreSchemaAsync(
         : configuredAdmin.Password;
 
     using var connection = dbConnectionFactory.CreateConnection();
-
-    // Drop system_settings if it exists without AUTO_INCREMENT on id (broken legacy schema).
-    // All rows are re-seeded below, so dropping is safe.
-    var settingsHasAutoInc = await connection.ExecuteScalarAsync<int>(
-        """
-        SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA = DATABASE()
-          AND TABLE_NAME   = 'system_settings'
-          AND COLUMN_NAME  = 'id'
-          AND EXTRA LIKE '%auto_increment%'
-        """) > 0;
-    if (!settingsHasAutoInc)
-    {
-        var settingsExists = await connection.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='system_settings'") > 0;
-        if (settingsExists)
-            await connection.ExecuteAsync("DROP TABLE system_settings;");
-    }
 
     var schemaSql = new[]
     {
@@ -499,21 +493,24 @@ static async Task EnsureCoreSchemaAsync(
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         """,
         """
-        CREATE TABLE IF NOT EXISTS user_opts (
+        CREATE TABLE IF NOT EXISTS user_otps (
             id INT NOT NULL AUTO_INCREMENT,
             user_id INT NULL,
             otp_code VARCHAR(255) NULL,
             expires_at DATETIME NULL,
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            KEY ix_user_opts_user (user_id),
-            CONSTRAINT fk_user_opts_user
+            KEY ix_user_otps_user (user_id),
+            CONSTRAINT fk_user_otps_user
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
         """,
         """
-        ALTER TABLE user_opts
+        ALTER TABLE user_otps
             MODIFY COLUMN otp_code VARCHAR(255) NULL;
+        """,
+        """
+        DROP TABLE IF EXISTS user_opts;
         """,
         """
         ALTER TABLE users DROP COLUMN OtpCode;
@@ -553,6 +550,24 @@ static async Task EnsureCoreSchemaAsync(
     {
         try
         {
+            // Drop system_settings if it exists without AUTO_INCREMENT on id (broken legacy schema).
+            // All rows are re-seeded below, so dropping is safe.
+            var settingsHasAutoInc = await connection.ExecuteScalarAsync<int>(
+                """
+                SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME   = 'system_settings'
+                  AND COLUMN_NAME  = 'id'
+                  AND EXTRA LIKE '%auto_increment%'
+                """) > 0;
+            if (!settingsHasAutoInc)
+            {
+                var settingsExists = await connection.ExecuteScalarAsync<int>(
+                    "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='system_settings'") > 0;
+                if (settingsExists)
+                    await connection.ExecuteAsync("DROP TABLE system_settings;");
+            }
+
             foreach (var sql in schemaSql)
             {
                 try { await connection.ExecuteAsync(sql); }

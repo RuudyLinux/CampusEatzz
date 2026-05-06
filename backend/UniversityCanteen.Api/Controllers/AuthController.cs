@@ -743,7 +743,7 @@ public sealed class AuthController(
                 COALESCE(otp_code, '') AS OtpCode,
                 expires_at AS ExpiresAt,
                 created_at AS CreatedAt
-            FROM user_opts
+            FROM user_otps
             WHERE user_id = @userId
             ORDER BY id DESC
             LIMIT 1;
@@ -772,14 +772,14 @@ public sealed class AuthController(
         using var transaction = connection.BeginTransaction();
 
         await connection.ExecuteAsync(new CommandDefinition(
-            "DELETE FROM user_opts WHERE user_id = @userId;",
+            "DELETE FROM user_otps WHERE user_id = @userId;",
             new { userId },
             transaction: transaction,
             cancellationToken: cancellationToken));
 
         await connection.ExecuteAsync(new CommandDefinition(
             """
-            INSERT INTO user_opts (user_id, otp_code, expires_at, created_at)
+            INSERT INTO user_otps (user_id, otp_code, expires_at, created_at)
             VALUES (@userId, @otpHash, @expiryUtc, UTC_TIMESTAMP());
             """,
             new
@@ -800,7 +800,7 @@ public sealed class AuthController(
         CancellationToken cancellationToken)
     {
         await connection.ExecuteAsync(new CommandDefinition(
-            "DELETE FROM user_opts WHERE user_id = @userId;",
+            "DELETE FROM user_otps WHERE user_id = @userId;",
             new { userId },
             cancellationToken: cancellationToken));
     }
