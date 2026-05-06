@@ -45,6 +45,7 @@ public sealed class SmtpOtpEmailSender(
 
                 using var client = new SmtpClient();
                 client.Timeout = (int)SmtpAttemptTimeout.TotalMilliseconds;
+                client.CheckCertificateRevocation = false;
 
                 var message = BuildMessage(toEmail, recipientName, otp, expiryUtc);
                 var socketOption = ResolveSocketOption(endpoint.Port, endpoint.EnableSsl);
