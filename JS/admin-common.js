@@ -447,22 +447,23 @@
         if (!container) {
             container = document.createElement("div");
             container.id = "__adminToastContainer";
-            container.style.cssText = "position:fixed;top:16px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:360px;";
+            container.style.cssText = "position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;";
             document.body.appendChild(container);
         }
 
         const toast = document.createElement("div");
         const isSuccess = type === "success";
-        toast.style.cssText = "padding:12px 16px;border-radius:8px;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.15);color:#fff;word-break:break-word;";
-        toast.style.backgroundColor = isSuccess ? "#16a34a" : "#dc2626";
+        toast.style.cssText = "padding:13px 22px;border-radius:999px;font-size:14px;font-weight:600;box-shadow:0 8px 32px rgba(0,0,0,0.18),0 1px 0 rgba(255,255,255,0.18) inset;color:#fff;white-space:nowrap;backdrop-filter:blur(8px);opacity:0;transform:translateY(12px);transition:opacity 0.22s ease,transform 0.22s ease;pointer-events:auto;";
+        toast.style.backgroundColor = isSuccess ? "rgba(5,150,105,0.92)" : "rgba(220,38,38,0.92)";
         toast.textContent = message || (isSuccess ? "Done." : "An error occurred.");
+        requestAnimationFrame(function() { toast.style.opacity = "1"; toast.style.transform = "translateY(0)"; });
         container.appendChild(toast);
 
         setTimeout(function() {
-            if (toast.parentNode) {
-                toast.parentNode.removeChild(toast);
-            }
-        }, 4000);
+            toast.style.opacity = "0";
+            toast.style.transform = "translateY(8px)";
+            setTimeout(function() { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 240);
+        }, 3500);
     }
 
     function fmtMoney(value) {

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../constants/app_colors.dart';
+
 /// Liquid navigation indicator with "melting" animation.
 /// Slides between tab positions with slight overshoot (300ms ease-in-out).
 /// Use inside a Row of tabs to animate the active indicator.
@@ -79,7 +81,7 @@ class _LiquidNavIndicatorState extends State<LiquidNavIndicator>
         width: 8,
         height: 8,
         decoration: const BoxDecoration(
-          color: Color(0xFF006D2F),
+          color: AppColors.primary,
           shape: BoxShape.circle,
         ),
       ),
@@ -138,8 +140,8 @@ class _LiquidTabBarState extends State<LiquidTabBar> {
                           ? FontWeight.w600
                           : FontWeight.w400,
                       color: _currentIndex == index
-                          ? const Color(0xFF006D2F)
-                          : Colors.grey,
+                          ? AppColors.primary
+                          : AppColors.textMuted,
                     ),
                   ),
                   const SizedBox(height: 8),

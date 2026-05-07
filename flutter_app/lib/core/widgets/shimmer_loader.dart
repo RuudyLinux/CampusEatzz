@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../constants/app_colors.dart';
 
-/// Animated shimmer effect for loading skeletons.
-/// Uses a TweenAnimationBuilder so no external packages are needed.
+/// Animated shimmer wrapper. Wraps child in a sweeping gradient mask.
 class ShimmerLoader extends StatefulWidget {
   const ShimmerLoader({super.key, required this.child});
 
@@ -13,7 +12,8 @@ class ShimmerLoader extends StatefulWidget {
   State<ShimmerLoader> createState() => _ShimmerLoaderState();
 }
 
-class _ShimmerLoaderState extends State<ShimmerLoader> with SingleTickerProviderStateMixin {
+class _ShimmerLoaderState extends State<ShimmerLoader>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _animation;
 
@@ -38,37 +38,39 @@ class _ShimmerLoaderState extends State<ShimmerLoader> with SingleTickerProvider
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return AnimatedBuilder(
-      animation: _animation,
-      builder: (context, child) {
-        return ShaderMask(
-          shaderCallback: (bounds) {
-            return LinearGradient(
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-              colors: isDark
-                  ? <Color>[
-                      AppColors.darkCard,
-                      AppColors.darkBorder,
-                      AppColors.darkCardRaised,
-                      AppColors.darkBorder,
-                      AppColors.darkCard,
-                    ]
-                  : <Color>[
-                      AppColors.surfaceHighest,
-                      AppColors.surfaceHigh,
-                      Colors.white.withValues(alpha: 0.85),
-                      AppColors.surfaceHigh,
-                      AppColors.surfaceHighest,
-                    ],
-              stops: const <double>[0.0, 0.25, 0.5, 0.75, 1.0],
-              transform: _SlidingGradientTransform(slidePercent: _animation.value),
-            ).createShader(bounds);
-          },
-          child: child,
-        );
-      },
-      child: widget.child,
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _animation,
+        builder: (_, child) {
+          return ShaderMask(
+            shaderCallback: (bounds) {
+              return LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: isDark
+                    ? <Color>[
+                        AppColors.darkCard,
+                        AppColors.darkBorder,
+                        AppColors.darkCardRaised,
+                        AppColors.darkBorder,
+                        AppColors.darkCard,
+                      ]
+                    : <Color>[
+                        AppColors.surfaceHighest,
+                        AppColors.surfaceHigh,
+                        Colors.white.withValues(alpha: 0.85),
+                        AppColors.surfaceHigh,
+                        AppColors.surfaceHighest,
+                      ],
+                stops: const <double>[0.0, 0.25, 0.5, 0.75, 1.0],
+                transform: _SlidingGradientTransform(slidePercent: _animation.value),
+              ).createShader(bounds);
+            },
+            child: child,
+          );
+        },
+        child: widget.child,
+      ),
     );
   }
 }
@@ -79,34 +81,37 @@ class _SlidingGradientTransform extends GradientTransform {
   final double slidePercent;
 
   @override
-  Matrix4? transform(Rect bounds, {TextDirection? textDirection}) {
-    return Matrix4.translationValues(bounds.width * slidePercent, 0.0, 0.0);
-  }
+  Matrix4? transform(Rect bounds, {TextDirection? textDirection}) =>
+      Matrix4.translationValues(bounds.width * slidePercent, 0.0, 0.0);
 }
 
 // ── Shimmer Box ──────────────────────────────────────────────────────────────
 
-/// A single placeholder rectangle for use in skeleton layouts.
+/// Single placeholder rectangle. Pass [isDark] from parent to avoid extra Theme lookups.
 class ShimmerBox extends StatelessWidget {
   const ShimmerBox({
     super.key,
     required this.width,
     required this.height,
     this.radius = 10,
+    this.isDark,
   });
 
   final double width;
   final double height;
   final double radius;
 
+  /// Optional — if null, resolved from Theme. Pass from parent for efficiency.
+  final bool? isDark;
+
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dark = isDark ?? (Theme.of(context).brightness == Brightness.dark);
     return Container(
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: isDark ? AppColors.darkCard : AppColors.surfaceHighest,
+        color: dark ? AppColors.darkCard : AppColors.surfaceHighest,
         borderRadius: BorderRadius.circular(radius),
       ),
     );
@@ -115,48 +120,48 @@ class ShimmerBox extends StatelessWidget {
 
 // ── Pre-built Skeleton Layouts ────────────────────────────────────────────────
 
-/// Skeleton for a home-screen canteen card (image + 2 text lines).
 class SkeletonCanteenCard extends StatelessWidget {
   const SkeletonCanteenCard({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const ShimmerLoader(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return ShimmerLoader(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          ShimmerBox(width: double.infinity, height: 180, radius: 16),
-          SizedBox(height: 10),
-          ShimmerBox(width: 160, height: 16, radius: 8),
-          SizedBox(height: 6),
-          ShimmerBox(width: 220, height: 12, radius: 6),
+          ShimmerBox(width: double.infinity, height: 180, radius: 16, isDark: isDark),
+          const SizedBox(height: 10),
+          ShimmerBox(width: 160, height: 16, radius: 8, isDark: isDark),
+          const SizedBox(height: 6),
+          ShimmerBox(width: 220, height: 12, radius: 6, isDark: isDark),
         ],
       ),
     );
   }
 }
 
-/// Skeleton for a menu item card (image + name + price row).
 class SkeletonMenuCard extends StatelessWidget {
   const SkeletonMenuCard({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const ShimmerLoader(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return ShimmerLoader(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          ShimmerBox(width: double.infinity, height: 160, radius: 14),
-          SizedBox(height: 10),
-          ShimmerBox(width: 180, height: 16, radius: 8),
-          SizedBox(height: 6),
-          ShimmerBox(width: double.infinity, height: 12, radius: 6),
-          SizedBox(height: 10),
+          ShimmerBox(width: double.infinity, height: 160, radius: 14, isDark: isDark),
+          const SizedBox(height: 10),
+          ShimmerBox(width: 180, height: 16, radius: 8, isDark: isDark),
+          const SizedBox(height: 6),
+          ShimmerBox(width: double.infinity, height: 12, radius: 6, isDark: isDark),
+          const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: <Widget>[
-              ShimmerBox(width: 70, height: 20, radius: 8),
-              ShimmerBox(width: 80, height: 36, radius: 12),
+              ShimmerBox(width: 70, height: 20, radius: 8, isDark: isDark),
+              ShimmerBox(width: 80, height: 36, radius: 12, isDark: isDark),
             ],
           ),
         ],
@@ -165,36 +170,35 @@ class SkeletonMenuCard extends StatelessWidget {
   }
 }
 
-/// Skeleton for a transaction / order list item.
 class SkeletonListTile extends StatelessWidget {
   const SkeletonListTile({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const ShimmerLoader(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return ShimmerLoader(
       child: Row(
         children: <Widget>[
-          ShimmerBox(width: 44, height: 44, radius: 22),
-          SizedBox(width: 12),
+          ShimmerBox(width: 44, height: 44, radius: 22, isDark: isDark),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                ShimmerBox(width: double.infinity, height: 14, radius: 7),
-                SizedBox(height: 6),
-                ShimmerBox(width: 140, height: 11, radius: 5),
+                ShimmerBox(width: double.infinity, height: 14, radius: 7, isDark: isDark),
+                const SizedBox(height: 6),
+                ShimmerBox(width: 140, height: 11, radius: 5, isDark: isDark),
               ],
             ),
           ),
-          SizedBox(width: 12),
-          ShimmerBox(width: 60, height: 14, radius: 7),
+          const SizedBox(width: 12),
+          ShimmerBox(width: 60, height: 14, radius: 7, isDark: isDark),
         ],
       ),
     );
   }
 }
 
-/// A full-screen shimmer skeleton for content that needs multiple items.
 class SkeletonScreen extends StatelessWidget {
   const SkeletonScreen({super.key, this.itemCount = 4});
 

@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -10,6 +11,7 @@ import '../../core/widgets/animated_reveal.dart';
 import '../../core/widgets/app_empty_state.dart';
 import '../../core/widgets/customer_bottom_nav.dart';
 import '../../core/widgets/global_actions.dart';
+import '../../core/widgets/gradient_header.dart';
 import '../../data/services/customer_service.dart';
 import '../../state/auth_provider.dart';
 import '../../state/cart_provider.dart';
@@ -121,13 +123,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
         onRefresh: _loadData,
         child: CustomScrollView(
           slivers: <Widget>[
-            // ── Minimal top app bar ───────────────────────────────────────
+            // ── Pinned glass header — bell always visible while scrolling ─
             SliverAppBar(
-              backgroundColor: isDark ? AppColors.darkBg : AppColors.bg,
+              pinned: true,
+              automaticallyImplyLeading: false,
+              toolbarHeight: 64,
+              backgroundColor: Colors.transparent,
               elevation: 0,
-              pinned: false,
-              expandedHeight: 0,
-              toolbarHeight: 0,
+              flexibleSpace: GradientHeader(
+                title: 'Profile',
+                minimal: true,
+                showLogo: false,
+                trailing: GlobalActions(
+                  iconColor: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                ),
+              ),
             ),
 
             SliverToBoxAdapter(
@@ -136,28 +146,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    // ── Page title ───────────────────────────────────────
-                    AnimatedReveal(
-                      delayMs: 0,
-                      child: Row(
-                        children: <Widget>[
-                          Expanded(
-                            child: Text(
-                              'Profile',
-                              style: AppTypography.display.copyWith(
-                                color: isDark
-                                    ? AppColors.darkTextPrimary
-                                    : AppColors.textPrimary,
-                              ),
-                            ),
-                          ),
-                          GlobalActions(
-                            iconColor: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 4),
 
                     // ── Avatar card ───────────────────────────────────────
                     AnimatedReveal(
@@ -433,10 +422,16 @@ class _AvatarCardState extends State<_AvatarCard> {
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: hasImage && absoluteImageUrl != null
-                      ? Image.network(
-                          absoluteImageUrl,
+                      ? CachedNetworkImage(
+                          imageUrl: absoluteImageUrl,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Center(
+                          width: 64,
+                          height: 64,
+                          fadeInDuration: const Duration(milliseconds: 180),
+                          placeholder: (_, __) => Container(
+                            color: AppColors.primary.withValues(alpha: 0.10),
+                          ),
+                          errorWidget: (_, __, ___) => Center(
                             child: Text(
                               initials,
                               style: AppTypography.heading2.copyWith(

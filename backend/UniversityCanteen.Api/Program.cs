@@ -267,6 +267,8 @@ static async Task EnsureCoreSchemaAsync(
     {
         "ALTER TABLE canteen_admins ADD COLUMN image_url VARCHAR(500) NULL;",
         "ALTER TABLE users ADD COLUMN profile_image_url VARCHAR(500) NULL;",
+        "ALTER TABLE users ADD COLUMN profile_image_data MEDIUMBLOB NULL;",
+        "ALTER TABLE users ADD COLUMN profile_image_content_type VARCHAR(50) NULL;",
         "ALTER TABLE users ADD COLUMN is_logged_in TINYINT(1) NOT NULL DEFAULT 0;",
         "ALTER TABLE students ADD COLUMN password_hash VARCHAR(255) NULL;",
         "ALTER TABLE students ADD COLUMN email VARCHAR(255) NULL;",
@@ -442,13 +444,21 @@ static async Task EnsureCoreSchemaAsync(
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
         """,
         """
-        CREATE TABLE IF NOT EXISTS website_maintenance (
+        CREATE TABLE IF NOT EXISTS maintenance (
             id INT NOT NULL AUTO_INCREMENT,
+            maintenance_type ENUM('global','canteen') NOT NULL,
+            canteen_id INT NOT NULL DEFAULT 0,
             is_active TINYINT(1) NOT NULL DEFAULT 0,
-            maintenance_message TEXT NULL,
+            message TEXT NULL,
+            reason TEXT NULL,
+            started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            ended_at TIMESTAMP NULL,
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (id)
+            PRIMARY KEY (id),
+            KEY idx_type (maintenance_type),
+            KEY idx_canteen (canteen_id),
+            KEY idx_active (is_active)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
         """,
         """
@@ -632,13 +642,14 @@ static async Task EnsureCoreSchemaAsync(
                 logger.LogError(ex, "Admin sync failed: {Message}", ex.Message);
             }
 
-            var maintenanceCount = await connection.ExecuteScalarAsync<int>("SELECT COUNT(1) FROM website_maintenance;");
+            var maintenanceCount = await connection.ExecuteScalarAsync<int>(
+                "SELECT COUNT(1) FROM maintenance WHERE maintenance_type = 'global' AND canteen_id = 0;");
             if (maintenanceCount == 0)
             {
                 await connection.ExecuteAsync(
                     """
-                    INSERT INTO website_maintenance (id, is_active, maintenance_message, created_at, updated_at)
-                    VALUES (1, 0, NULL, UTC_TIMESTAMP(), UTC_TIMESTAMP());
+                    INSERT INTO maintenance (maintenance_type, canteen_id, is_active, message, reason, started_at, created_at, updated_at)
+                    VALUES ('global', 0, 0, NULL, NULL, UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP());
                     """);
             }
 
@@ -1158,7 +1169,7 @@ static async Task<SystemMaintenanceState?> GetMaintenanceStateFromDatabaseAsync(
         using var connection = dbConnectionFactory.CreateConnection();
 
         var state = await connection.QuerySingleOrDefaultAsync<SystemMaintenanceState>(new CommandDefinition(
-            "SELECT COALESCE(is_active, 0) AS IsActive, COALESCE(maintenance_message, '') AS Message FROM website_maintenance WHERE id = 1 LIMIT 1;",
+            "SELECT COALESCE(is_active, 0) AS IsActive, COALESCE(message, '') AS Message FROM maintenance WHERE maintenance_type = 'global' AND canteen_id = 0 LIMIT 1;",
             cancellationToken: CancellationToken.None));
 
         return state ?? new SystemMaintenanceState { IsActive = false, Message = string.Empty };

@@ -129,25 +129,30 @@ CREATE TABLE contact_messages (
 -- --------------------------------------------------------
 
 --
--- Table structure for table maintenance_mode
+-- Table structure for table maintenance
 --
 
-CREATE TABLE maintenance_mode (
+CREATE TABLE maintenance (
   id int(11) NOT NULL,
-  canteen_id int(11) NOT NULL,
-  is_active tinyint(1) DEFAULT 0,
+  maintenance_type enum('global','canteen') NOT NULL,
+  canteen_id int(11) NOT NULL DEFAULT 0,
+  is_active tinyint(1) NOT NULL DEFAULT 0,
+  message text DEFAULT NULL,
   reason text DEFAULT NULL,
   started_at timestamp NOT NULL DEFAULT current_timestamp(),
+  ended_at timestamp NULL DEFAULT NULL,
+  created_at timestamp NOT NULL DEFAULT current_timestamp(),
   updated_at timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table maintenance_mode
+-- Dumping data for table maintenance
 --
 
-INSERT INTO maintenance_mode (id, canteen_id, is_active, reason, started_at, updated_at) VALUES
-(1, 1, 0, 'Canteen maintenance test', '2026-04-11 10:07:19', '2026-04-11 10:55:51'),
-(2, 2, 0, '', '2026-04-11 10:22:17', '2026-04-11 10:23:02');
+INSERT INTO maintenance (id, maintenance_type, canteen_id, is_active, message, reason, started_at, ended_at, created_at, updated_at) VALUES
+(1, 'global', 0, 0, 'We are currently performing maintenance. Please check back soon.', NULL, '2026-04-11 10:07:19', NULL, '2026-04-11 10:07:19', '2026-04-11 16:43:07'),
+(2, 'canteen', 1, 0, NULL, 'Canteen maintenance test', '2026-04-11 10:07:19', NULL, '2026-04-11 10:07:19', '2026-04-11 10:55:51'),
+(3, 'canteen', 2, 0, NULL, '', '2026-04-11 10:22:17', NULL, '2026-04-11 10:22:17', '2026-04-11 10:23:02');
 
 -- --------------------------------------------------------
 
@@ -527,25 +532,7 @@ INSERT INTO wallet_transactions (id, user_id, transaction_id, amount, type, stat
 (6, 7, 'CR202604072114266351', 500.00, 'credit', 'completed', 'wallet-page', NULL, NULL, NULL, 'Wallet recharge from wallet page', NULL, '2026-04-07 15:44:26'),
 (7, 7, 'DB202604111456464080', 42.00, 'debit', 'completed', 'wallet', NULL, NULL, NULL, 'Order payment - FO260411145646700', 5, '2026-04-11 09:26:46');
 
--- --------------------------------------------------------
-
---
--- Table structure for table website_maintenance
---
-
-CREATE TABLE website_maintenance (
-  id int(11) NOT NULL,
-  is_active tinyint(1) DEFAULT 0,
-  maintenance_message text DEFAULT 'We are currently performing maintenance. Please check back soon.',
-  updated_at timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table website_maintenance
---
-
-INSERT INTO website_maintenance (id, is_active, maintenance_message, updated_at) VALUES
-(1, 0, 'We are currently performing maintenance. Please check back soon.', '2026-04-11 16:43:07');
+-- (website_maintenance merged into maintenance table)
 
 --
 -- Indexes for dumped tables
@@ -592,11 +579,13 @@ ALTER TABLE contact_messages
   ADD KEY idx_status (status);
 
 --
--- Indexes for table maintenance_mode
+-- Indexes for table maintenance
 --
-ALTER TABLE maintenance_mode
+ALTER TABLE maintenance
   ADD PRIMARY KEY (id),
-  ADD KEY canteen_id (canteen_id);
+  ADD KEY idx_type (maintenance_type),
+  ADD KEY idx_canteen (canteen_id),
+  ADD KEY idx_active (is_active);
 
 --
 -- Indexes for table menu_categories
@@ -705,11 +694,7 @@ ALTER TABLE wallet_transactions
   ADD KEY user_id (user_id),
   ADD KEY order_id (order_id);
 
---
--- Indexes for table website_maintenance
---
-ALTER TABLE website_maintenance
-  ADD PRIMARY KEY (id);
+-- (website_maintenance indexes removed — merged into maintenance table)
 
 --
 -- AUTO_INCREMENT for dumped tables
@@ -746,10 +731,10 @@ ALTER TABLE contact_messages
   MODIFY id int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table maintenance_mode
+-- AUTO_INCREMENT for table maintenance
 --
-ALTER TABLE maintenance_mode
-  MODIFY id int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+ALTER TABLE maintenance
+  MODIFY id int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table menu_categories
@@ -828,11 +813,7 @@ ALTER TABLE cart_items
   ADD CONSTRAINT cart_items_ibfk_2 FOREIGN KEY (CanteenId) REFERENCES canteens (id) ON DELETE CASCADE,
   ADD CONSTRAINT cart_items_ibfk_3 FOREIGN KEY (MenuItemId) REFERENCES menu_items (id) ON DELETE CASCADE;
 
---
--- Constraints for table maintenance_mode
---
-ALTER TABLE maintenance_mode
-  ADD CONSTRAINT fk_maintenance_canteen FOREIGN KEY (canteen_id) REFERENCES canteens (id) ON DELETE CASCADE;
+-- (maintenance_mode FK removed — canteen_id = 0 for global, no FK needed on unified table)
 
 --
 -- Constraints for table menu_items

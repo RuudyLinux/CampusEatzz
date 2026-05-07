@@ -108,7 +108,7 @@ public sealed class PublicController(
                     COALESCE(c.display_order, 0) AS DisplayOrder,
                     COALESCE(mm.is_active, 0) AS IsUnderMaintenance
                 FROM canteens c
-                LEFT JOIN maintenance_mode mm ON mm.canteen_id = c.id
+                LEFT JOIN maintenance mm ON mm.maintenance_type = 'canteen' AND mm.canteen_id = c.id
                 WHERE COALESCE(c.status, 'active') = 'active'
                 ORDER BY c.display_order ASC, c.id ASC;
                 """,
