@@ -10,11 +10,10 @@ import '../../core/widgets/animated_reveal.dart';
 import '../../core/widgets/app_async_view.dart';
 import '../../core/widgets/app_empty_state.dart';
 import '../../core/widgets/app_status_badge.dart';
-import '../../core/widgets/notification_bell_button.dart';
+import '../../core/widgets/app_logo.dart';
 import '../../data/models/canteen_admin_session.dart';
 import '../../data/services/app_preferences.dart';
 import '../../data/services/canteen_admin_service.dart';
-import '../home/home_screen.dart';
 
 class CanteenAdminShellScreen extends StatefulWidget {
   const CanteenAdminShellScreen({
@@ -44,7 +43,6 @@ class _CanteenAdminShellScreenState extends State<CanteenAdminShellScreen> {
     _AdminNavItem('Reviews', Icons.reviews_rounded, AppColors.warning),
     _AdminNavItem('Wallet', Icons.account_balance_wallet_rounded, AppColors.success),
     _AdminNavItem('Settings', Icons.settings_rounded, AppColors.textSecondary),
-    _AdminNavItem('Customer', Icons.storefront_rounded, AppColors.primaryBright),
   ];
 
   @override
@@ -79,11 +77,10 @@ class _CanteenAdminShellScreenState extends State<CanteenAdminShellScreen> {
       3 => _ReportsTab(session: _session),
       4 => _ReviewsTab(session: _session),
       5 => _WalletTab(session: _session),
-      6 => _SettingsTab(
+      _ => _SettingsTab(
           session: _session,
           onSessionChanged: _persistSession,
         ),
-      _ => const HomeScreen(),
     };
   }
 
@@ -2280,19 +2277,20 @@ class _AdminHeader extends StatelessWidget {
                   width: responsive.headerLeadingSize,
                   height: responsive.headerLeadingSize,
                   decoration: BoxDecoration(
-                    color: isDark
-                        ? AppColors.darkGlassMid
-                        : Colors.white.withValues(alpha: 0.60),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                       color: isDark ? AppColors.darkGlassBorder : AppColors.glassBevelTop,
                     ),
+                    boxShadow: <BoxShadow>[
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.08),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  child: Icon(
-                    item.icon,
-                    color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
-                    size: responsive.headerLeadingIconSize,
-                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: AppLogo(size: responsive.headerLeadingSize),
                 ),
                 SizedBox(width: responsive.headerGap),
                 Expanded(
@@ -2357,11 +2355,7 @@ class _AdminHeader extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 4),
-                NotificationBellButton(
-                  iconColor: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
-                ),
-                const SizedBox(width: 4),
+                const SizedBox(width: 8),
                 IconButton(
                   tooltip: 'Logout',
                   onPressed: onLogout,
