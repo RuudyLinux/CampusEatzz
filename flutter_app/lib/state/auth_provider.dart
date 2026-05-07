@@ -141,7 +141,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Updates session with new profile image URL and persists to prefs.
   Future<void> updateProfileImage(String imageUrl) async {
     final current = _session;
     if (current == null) return;
