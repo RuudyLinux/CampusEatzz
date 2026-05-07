@@ -10,6 +10,7 @@ import '../../core/widgets/animated_reveal.dart';
 import '../../core/widgets/app_async_view.dart';
 import '../../core/widgets/app_empty_state.dart';
 import '../../core/widgets/app_status_badge.dart';
+import '../../core/widgets/notification_bell_button.dart';
 import '../../data/models/canteen_admin_session.dart';
 import '../../data/services/app_preferences.dart';
 import '../../data/services/canteen_admin_service.dart';
@@ -2356,7 +2357,11 @@ class _AdminHeader extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 4),
+                NotificationBellButton(
+                  iconColor: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                ),
+                const SizedBox(width: 4),
                 IconButton(
                   tooltip: 'Logout',
                   onPressed: onLogout,

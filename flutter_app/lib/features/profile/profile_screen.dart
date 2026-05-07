@@ -11,6 +11,7 @@ import '../../core/widgets/animated_reveal.dart';
 import '../../core/widgets/app_empty_state.dart';
 import '../../core/widgets/customer_bottom_nav.dart';
 import '../../core/widgets/global_actions.dart';
+import '../../core/widgets/gradient_header.dart';
 import '../../data/services/customer_service.dart';
 import '../../state/auth_provider.dart';
 import '../../state/cart_provider.dart';
@@ -122,13 +123,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
         onRefresh: _loadData,
         child: CustomScrollView(
           slivers: <Widget>[
-            // ── Minimal top app bar ───────────────────────────────────────
-            SliverAppBar(
-              backgroundColor: isDark ? AppColors.darkBg : AppColors.bg,
-              elevation: 0,
-              pinned: false,
-              expandedHeight: 0,
-              toolbarHeight: 0,
+            // ── Pinned glass header — bell always visible while scrolling ─
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _GlassHeaderDelegate(
+                child: GradientHeader(
+                  title: 'Profile',
+                  minimal: true,
+                  showLogo: false,
+                  trailing: GlobalActions(
+                    iconColor: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                  ),
+                ),
+              ),
             ),
 
             SliverToBoxAdapter(
@@ -137,28 +144,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    // ── Page title ───────────────────────────────────────
-                    AnimatedReveal(
-                      delayMs: 0,
-                      child: Row(
-                        children: <Widget>[
-                          Expanded(
-                            child: Text(
-                              'Profile',
-                              style: AppTypography.display.copyWith(
-                                color: isDark
-                                    ? AppColors.darkTextPrimary
-                                    : AppColors.textPrimary,
-                              ),
-                            ),
-                          ),
-                          GlobalActions(
-                            iconColor: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 4),
 
                     // ── Avatar card ───────────────────────────────────────
                     AnimatedReveal(
