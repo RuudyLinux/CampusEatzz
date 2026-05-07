@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -433,10 +434,16 @@ class _AvatarCardState extends State<_AvatarCard> {
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: hasImage && absoluteImageUrl != null
-                      ? Image.network(
-                          absoluteImageUrl,
+                      ? CachedNetworkImage(
+                          imageUrl: absoluteImageUrl,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Center(
+                          width: 64,
+                          height: 64,
+                          fadeInDuration: const Duration(milliseconds: 180),
+                          placeholder: (_, __) => Container(
+                            color: AppColors.primary.withValues(alpha: 0.10),
+                          ),
+                          errorWidget: (_, __, ___) => Center(
                             child: Text(
                               initials,
                               style: AppTypography.heading2.copyWith(
