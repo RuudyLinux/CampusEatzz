@@ -902,11 +902,11 @@ public sealed class CanteenController(
                 return StatusCode(403, Failure("Access denied."));
 
             var systemRow = await connection.QuerySingleOrDefaultAsync<SystemMaintenanceRow>(new CommandDefinition(
-                "SELECT is_active AS IsActive, COALESCE(maintenance_message,'') AS Message FROM website_maintenance WHERE id = 1 LIMIT 1;",
+                "SELECT is_active AS IsActive, COALESCE(message,'') AS Message FROM maintenance WHERE maintenance_type = 'global' AND canteen_id = 0 LIMIT 1;",
                 cancellationToken: cancellationToken));
 
             var canteenRow = await connection.QuerySingleOrDefaultAsync<CanteenMaintenanceRow>(new CommandDefinition(
-                "SELECT is_active AS IsActive, COALESCE(reason,'') AS Reason FROM maintenance_mode WHERE canteen_id = @canteenId LIMIT 1;",
+                "SELECT is_active AS IsActive, COALESCE(reason,'') AS Reason FROM maintenance WHERE maintenance_type = 'canteen' AND canteen_id = @canteenId LIMIT 1;",
                 new { canteenId },
                 cancellationToken: cancellationToken));
 
@@ -944,29 +944,27 @@ public sealed class CanteenController(
             if (!await EnsureCanteenAccess(connection, request.CanteenId, cancellationToken))
                 return StatusCode(403, Failure("Access denied."));
 
-            await connection.ExecuteAsync(new CommandDefinition(
-                """
-                INSERT INTO website_maintenance (id, is_active, maintenance_message)
-                VALUES (1, @isActive, @message)
-                ON DUPLICATE KEY UPDATE is_active = @isActive, maintenance_message = @message;
-                """,
-                new
-                {
-                    isActive = request.IsActive ? 1 : 0,
-                    message  = string.IsNullOrWhiteSpace(request.Message)
-                               ? "We are currently performing maintenance. Please check back soon."
-                               : request.Message.Trim()
-                },
+            var msgValue = string.IsNullOrWhiteSpace(request.Message)
+                ? "We are currently performing maintenance. Please check back soon."
+                : request.Message.Trim();
+            var updatedSys = await connection.ExecuteAsync(new CommandDefinition(
+                "UPDATE maintenance SET is_active = @isActive, message = @message, updated_at = UTC_TIMESTAMP() WHERE maintenance_type = 'global' AND canteen_id = 0;",
+                new { isActive = request.IsActive ? 1 : 0, message = msgValue },
                 cancellationToken: cancellationToken));
+            if (updatedSys == 0)
+            {
+                await connection.ExecuteAsync(new CommandDefinition(
+                    "INSERT IGNORE INTO maintenance (maintenance_type, canteen_id, is_active, message, started_at, created_at, updated_at) VALUES ('global', 0, @isActive, @message, UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP());",
+                    new { isActive = request.IsActive ? 1 : 0, message = msgValue },
+                    cancellationToken: cancellationToken));
+            }
 
             var actorId = GetRequesterUserId();
             try
             {
                 await notificationService.NotifySystemMaintenanceAsync(
                     request.IsActive,
-                    string.IsNullOrWhiteSpace(request.Message)
-                        ? "We are currently performing maintenance. Please check back soon."
-                        : request.Message.Trim(),
+                    msgValue,
                     actorId,
                     "canteen_admin",
                     cancellationToken);
@@ -1006,13 +1004,13 @@ public sealed class CanteenController(
             };
 
             var updated = await connection.ExecuteAsync(new CommandDefinition(
-                "UPDATE maintenance_mode SET is_active = @isActive, reason = @reason, updated_at = UTC_TIMESTAMP() WHERE canteen_id = @canteenId;",
+                "UPDATE maintenance SET is_active = @isActive, reason = @reason, updated_at = UTC_TIMESTAMP() WHERE maintenance_type = 'canteen' AND canteen_id = @canteenId;",
                 p, cancellationToken: cancellationToken));
 
             if (updated == 0)
             {
                 await connection.ExecuteAsync(new CommandDefinition(
-                    "INSERT IGNORE INTO maintenance_mode (canteen_id, is_active, reason, started_at) VALUES (@canteenId, @isActive, @reason, UTC_TIMESTAMP());",
+                    "INSERT IGNORE INTO maintenance (maintenance_type, canteen_id, is_active, reason, started_at, created_at, updated_at) VALUES ('canteen', @canteenId, @isActive, @reason, UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP());",
                     p, cancellationToken: cancellationToken));
             }
 

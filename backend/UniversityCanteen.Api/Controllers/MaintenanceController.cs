@@ -17,7 +17,7 @@ public sealed class MaintenanceController(
         {
             using var connection = dbConnectionFactory.CreateConnection();
             var row = await connection.QuerySingleOrDefaultAsync<MaintenanceStatusRow>(new CommandDefinition(
-                "SELECT COALESCE(is_active, 0) AS IsActive, COALESCE(maintenance_message, '') AS Message FROM website_maintenance WHERE id = 1 LIMIT 1;",
+                "SELECT COALESCE(is_active, 0) AS IsActive, COALESCE(message, '') AS Message FROM maintenance WHERE maintenance_type = 'global' AND canteen_id = 0 LIMIT 1;",
                 cancellationToken: cancellationToken));
 
             var isActive = row?.IsActive ?? false;

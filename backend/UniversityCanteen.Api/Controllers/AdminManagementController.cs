@@ -1639,7 +1639,7 @@ public sealed class AdminManagementController(
             }
 
             var systemRow = await connection.QuerySingleOrDefaultAsync<AdminSystemMaintenanceRow>(new CommandDefinition(
-                "SELECT is_active AS IsActive, COALESCE(maintenance_message,'') AS Message FROM website_maintenance WHERE id = 1 LIMIT 1;",
+                "SELECT is_active AS IsActive, COALESCE(message,'') AS Message FROM maintenance WHERE maintenance_type = 'global' AND canteen_id = 0 LIMIT 1;",
                 cancellationToken: cancellationToken));
 
             var canteenRows = await connection.QueryAsync<AdminCanteenMaintenanceRow>(new CommandDefinition(
@@ -1650,7 +1650,7 @@ public sealed class AdminManagementController(
                     COALESCE(m.is_active, 0) AS IsActive,
                     COALESCE(m.reason, '') AS Reason
                 FROM canteens c
-                LEFT JOIN maintenance_mode m ON m.canteen_id = c.id
+                LEFT JOIN maintenance m ON m.maintenance_type = 'canteen' AND m.canteen_id = c.id
                 WHERE COALESCE(c.status,'active') <> 'deleted'
                 ORDER BY c.display_order, c.name;
                 """,
@@ -1692,14 +1692,17 @@ public sealed class AdminManagementController(
                 ? "We are currently performing maintenance. Please check back soon."
                 : request.Reason.Trim();
 
-            await connection.ExecuteAsync(new CommandDefinition(
-                """
-                INSERT INTO website_maintenance (id, is_active, maintenance_message)
-                VALUES (1, @isActive, @message)
-                ON DUPLICATE KEY UPDATE is_active = @isActive, maintenance_message = @message;
-                """,
+            var updatedSystem = await connection.ExecuteAsync(new CommandDefinition(
+                "UPDATE maintenance SET is_active = @isActive, message = @message, updated_at = UTC_TIMESTAMP() WHERE maintenance_type = 'global' AND canteen_id = 0;",
                 new { isActive = request.IsActive, message },
                 cancellationToken: cancellationToken));
+            if (updatedSystem == 0)
+            {
+                await connection.ExecuteAsync(new CommandDefinition(
+                    "INSERT IGNORE INTO maintenance (maintenance_type, canteen_id, is_active, message, started_at, created_at, updated_at) VALUES ('global', 0, @isActive, @message, UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP());",
+                    new { isActive = request.IsActive, message },
+                    cancellationToken: cancellationToken));
+            }
 
             try
             {
@@ -1744,14 +1747,14 @@ public sealed class AdminManagementController(
             var reason = request.Reason?.Trim() ?? "";
 
             var updated = await connection.ExecuteAsync(new CommandDefinition(
-                "UPDATE maintenance_mode SET is_active = @isActive, reason = @reason, updated_at = UTC_TIMESTAMP() WHERE canteen_id = @canteenId;",
+                "UPDATE maintenance SET is_active = @isActive, reason = @reason, updated_at = UTC_TIMESTAMP() WHERE maintenance_type = 'canteen' AND canteen_id = @canteenId;",
                 new { isActive = request.IsActive, reason, canteenId = request.CanteenId },
                 cancellationToken: cancellationToken));
 
             if (updated == 0)
             {
                 await connection.ExecuteAsync(new CommandDefinition(
-                    "INSERT IGNORE INTO maintenance_mode (canteen_id, is_active, reason, started_at) VALUES (@canteenId, @isActive, @reason, UTC_TIMESTAMP());",
+                    "INSERT IGNORE INTO maintenance (maintenance_type, canteen_id, is_active, reason, started_at, created_at, updated_at) VALUES ('canteen', @canteenId, @isActive, @reason, UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP());",
                     new { canteenId = request.CanteenId, isActive = request.IsActive, reason },
                     cancellationToken: cancellationToken));
             }
