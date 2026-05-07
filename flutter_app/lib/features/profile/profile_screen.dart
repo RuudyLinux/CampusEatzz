@@ -124,16 +124,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: CustomScrollView(
           slivers: <Widget>[
             // ── Pinned glass header — bell always visible while scrolling ─
-            SliverPersistentHeader(
+            SliverAppBar(
               pinned: true,
-              delegate: _GlassHeaderDelegate(
-                child: GradientHeader(
-                  title: 'Profile',
-                  minimal: true,
-                  showLogo: false,
-                  trailing: GlobalActions(
-                    iconColor: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
-                  ),
+              automaticallyImplyLeading: false,
+              toolbarHeight: 64,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              flexibleSpace: GradientHeader(
+                title: 'Profile',
+                minimal: true,
+                showLogo: false,
+                trailing: GlobalActions(
+                  iconColor: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
                 ),
               ),
             ),
