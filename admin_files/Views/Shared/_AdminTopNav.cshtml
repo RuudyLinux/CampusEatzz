@@ -38,7 +38,7 @@
             </a>
 
             <!-- Desktop Nav -->
-            <div class="hidden lg:flex items-center gap-1 overflow-x-auto hide-scrollbar max-w-[62vw]">
+            <div class="hidden lg:flex items-center gap-0.5 xl:gap-1 overflow-x-auto hide-scrollbar flex-1 mx-3">
                 <a href='@Url.Action("AdminDashboard",          "Home")' class="@D("Dashboard")"><i class="fas fa-gauge-high text-xs"></i>Dashboard</a>
                 <a href='@Url.Action("AdminAllOrders",          "Home")' class="@D("Orders")"><i class="fas fa-shopping-bag text-xs"></i>Orders</a>
                 <a href='@Url.Action("AdminManageUsers",        "Home")' class="@D("Users")"><i class="fas fa-users text-xs"></i>Users</a>
@@ -52,8 +52,13 @@
                 <a href='@Url.Action("AdminSettings",           "Home")' class="@D("Settings")"><i class="fas fa-gear text-xs"></i>Settings</a>
             </div>
 
-            <!-- Desktop Logout -->
-            <div class="hidden lg:flex items-center shrink-0">
+            <!-- Desktop: Notification bell + Logout -->
+            <div class="hidden lg:flex items-center gap-2 shrink-0">
+                <a href='@Url.Action("AdminContactMessages","Home")'
+                   class="relative flex items-center justify-center w-9 h-9 bg-white/50 hover:bg-white/80 border border-white/80 rounded-full transition"
+                   title="Notifications / Messages">
+                    <i class="fas fa-bell text-sm"></i>
+                </a>
                 <button onclick="logout(); return false;"
                         class="flex items-center gap-2 px-4 py-2 bg-white/50 hover:bg-red-500/80 border border-white/80 hover:border-red-400 rounded-full font-semibold transition whitespace-nowrap">
                     <i class="fas fa-right-from-bracket text-sm"></i>
@@ -81,6 +86,10 @@
             <a href='@Url.Action("AdminReports",            "Home")' class="@M("Reports")"><i class="fas fa-chart-bar w-4"></i>Reports</a>
             <a href='@Url.Action("AdminSettings",           "Home")' class="@M("Settings")"><i class="fas fa-gear w-4"></i>Settings</a>
             <hr class="border-white/20 my-1">
+            <a href='@Url.Action("AdminContactMessages","Home")'
+               class="flex items-center gap-2 px-4 py-2.5 rounded-full transition">
+                <i class="fas fa-bell w-4"></i>Notifications
+            </a>
             <a href="#" onclick="logout(); return false;"
                class="flex items-center gap-2 px-4 py-2.5 rounded-full hover:bg-red-500/70 transition">
                 <i class="fas fa-right-from-bracket w-4"></i>Logout
