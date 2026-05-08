@@ -10,11 +10,16 @@ using System.Net;
 using System.Text;
 using UniversityCanteen.Api.Configuration;
 using UniversityCanteen.Api.Data;
+using UniversityCanteen.Api.Filters;
 using UniversityCanteen.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddScoped<SingleDeviceSessionFilter>();
+builder.Services.AddControllers(options =>
+{
+    options.Filters.AddService<SingleDeviceSessionFilter>();
+});
 builder.Services.AddOpenApi();
 builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOptions.SectionName));
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
@@ -265,6 +270,9 @@ static async Task EnsureCoreSchemaAsync(
 
     var schemaSql = new[]
     {
+        "ALTER TABLE users ADD COLUMN active_session_jti VARCHAR(36) NULL DEFAULT NULL;",
+        "ALTER TABLE canteen_admins ADD COLUMN active_session_jti VARCHAR(36) NULL DEFAULT NULL;",
+        "ALTER TABLE admin_users ADD COLUMN active_session_jti VARCHAR(36) NULL DEFAULT NULL;",
         "ALTER TABLE canteen_admins ADD COLUMN image_url VARCHAR(500) NULL;",
         "ALTER TABLE users ADD COLUMN profile_image_url VARCHAR(500) NULL;",
         "ALTER TABLE users ADD COLUMN profile_image_data MEDIUMBLOB NULL;",

@@ -191,7 +191,8 @@ public sealed class AuthController(
             await MarkUserLoggedInAsync(connection, schema, user.UniversityId, cancellationToken);
 
             var session = BuildUserSession(user, identifier);
-            var token = IssueJwt(session);
+            var (token, jti) = IssueJwt(session);
+            await StoreActiveSessionJtiAsync(connection, session.Id, jti, cancellationToken);
             return Ok(Success("OTP verified. Login successful.", session, token));
         }
         catch (Exception ex)
@@ -247,7 +248,9 @@ public sealed class AuthController(
             if (admin is not null && VerifyBcrypt(password, admin.PasswordHash))
             {
                 var directSession = BuildAdminSession(admin);
-                return Ok(Success("Login successful.", directSession, IssueJwt(directSession)));
+                var (adminToken, adminJti) = IssueJwt(directSession);
+                await StorePlatformAdminSessionJtiAsync(connection, admin.Id, adminJti, cancellationToken);
+                return Ok(Success("Login successful.", directSession, adminToken));
             }
             return Unauthorized(Failure("Invalid admin credentials"));
         }
@@ -1024,7 +1027,9 @@ public sealed class AuthController(
                 ImageUrl = ToClientImageUrl(dbAdmin.ImageUrl)
             };
 
-            return Ok(Success("Login successful.", dbSession, IssueJwt(dbSession)));
+            var (canteenToken, canteenJti) = IssueJwt(dbSession);
+            await StoreCanteenAdminSessionJtiAsync(connection, dbAdmin.Id, canteenJti, cancellationToken);
+            return Ok(Success("Login successful.", dbSession, canteenToken));
         }
         catch (Exception ex)
         {
@@ -1064,7 +1069,7 @@ public sealed class AuthController(
         Token = token
     };
 
-    private string IssueJwt(SessionUserDto user)
+    private (string Token, string Jti) IssueJwt(SessionUserDto user)
     {
         var secret = _jwtOptions.Secret;
         if (string.IsNullOrWhiteSpace(secret))
@@ -1076,13 +1081,14 @@ public sealed class AuthController(
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var jti = Guid.NewGuid().ToString();
 
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.Email, user.Email),
             new Claim(ClaimTypes.Role, user.Role),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            new Claim(JwtRegisteredClaimNames.Jti, jti)
         };
 
         var expiryHours = Math.Clamp(_jwtOptions.ExpiryHours, 1, 168);
@@ -1093,7 +1099,43 @@ public sealed class AuthController(
             expires: DateTime.UtcNow.AddHours(expiryHours),
             signingCredentials: creds);
 
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        return (new JwtSecurityTokenHandler().WriteToken(token), jti);
+    }
+
+    private static async Task StoreActiveSessionJtiAsync(
+        System.Data.IDbConnection connection,
+        int userId,
+        string jti,
+        CancellationToken cancellationToken)
+    {
+        await connection.ExecuteAsync(new CommandDefinition(
+            "UPDATE users SET active_session_jti = @jti WHERE id = @userId;",
+            new { jti, userId },
+            cancellationToken: cancellationToken));
+    }
+
+    private static async Task StoreCanteenAdminSessionJtiAsync(
+        System.Data.IDbConnection connection,
+        int adminId,
+        string jti,
+        CancellationToken cancellationToken)
+    {
+        await connection.ExecuteAsync(new CommandDefinition(
+            "UPDATE canteen_admins SET active_session_jti = @jti WHERE id = @adminId;",
+            new { jti, adminId },
+            cancellationToken: cancellationToken));
+    }
+
+    private static async Task StorePlatformAdminSessionJtiAsync(
+        System.Data.IDbConnection connection,
+        int adminId,
+        string jti,
+        CancellationToken cancellationToken)
+    {
+        await connection.ExecuteAsync(new CommandDefinition(
+            "UPDATE admin_users SET active_session_jti = @jti WHERE id = @adminId;",
+            new { jti, adminId },
+            cancellationToken: cancellationToken));
     }
 
     private string ToClientImageUrl(string? value)

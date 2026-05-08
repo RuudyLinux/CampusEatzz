@@ -1,11 +1,14 @@
 import 'package:flutter/foundation.dart';
 
 import '../data/models/user_session.dart';
+import '../data/services/api_client.dart';
 import '../data/services/app_preferences.dart';
 import '../data/services/auth_service.dart';
 
 class AuthProvider extends ChangeNotifier {
-  AuthProvider(this._authService, this._preferences);
+  AuthProvider(this._authService, this._preferences, ApiClient apiClient) {
+    apiClient.onSessionSuperseded = handleSessionSuperseded;
+  }
 
   final AuthService _authService;
   final AppPreferences _preferences;
@@ -13,6 +16,7 @@ class AuthProvider extends ChangeNotifier {
   UserSession? _session;
   bool _loading = false;
   String? _error;
+  bool _sessionSuperseded = false;
   String _pendingIdentifier = '';
   String _pendingOtpDeliveryEmail = '';
 
@@ -20,8 +24,23 @@ class AuthProvider extends ChangeNotifier {
   bool get isLoading => _loading;
   String? get error => _error;
   bool get isLoggedIn => _session != null;
+  bool get isSessionSuperseded => _sessionSuperseded;
   String get pendingIdentifier => _pendingIdentifier;
   String get pendingOtpDeliveryEmail => _pendingOtpDeliveryEmail;
+
+  void handleSessionSuperseded() {
+    _session = null;
+    _sessionSuperseded = true;
+    _pendingIdentifier = '';
+    _pendingOtpDeliveryEmail = '';
+    _error = null;
+    notifyListeners();
+  }
+
+  void clearSessionSuperseded() {
+    _sessionSuperseded = false;
+    notifyListeners();
+  }
 
   Future<void> restoreSession() async {
     _loading = true;

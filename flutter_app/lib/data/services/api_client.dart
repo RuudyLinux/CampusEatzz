@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../core/constants/api_config.dart';
 import 'app_preferences.dart';
@@ -9,6 +10,12 @@ class SessionExpiredException implements Exception {
   const SessionExpiredException();
   @override
   String toString() => 'session_expired';
+}
+
+class SessionSupersededException implements Exception {
+  const SessionSupersededException();
+  @override
+  String toString() => 'session_superseded';
 }
 
 class ApiClient {
@@ -27,6 +34,10 @@ class ApiClient {
 
   final AppPreferences _preferences;
   final Dio _dio;
+
+  /// Called when the server rejects the token because another device has logged in.
+  /// Typically set by AuthProvider so it can update state and trigger navigation.
+  VoidCallback? onSessionSuperseded;
 
   Future<Response<dynamic>> request(
     String path, {
@@ -87,6 +98,16 @@ class ApiClient {
           // Token expired or invalid; clear session so restoreSession forces re-login.
           await _preferences.clearSession();
           throw const SessionExpiredException();
+        }
+
+        if (status == 403 && shouldTreat401AsSessionExpired) {
+          final body = e.response?.data;
+          final errorCode = body is Map ? body['error_code'] as String? : null;
+          if (errorCode == 'SESSION_SUPERSEDED') {
+            await _preferences.clearSession();
+            onSessionSuperseded?.call();
+            throw const SessionSupersededException();
+          }
         }
 
         if (status == 404 || status == 405 || status == 0) {

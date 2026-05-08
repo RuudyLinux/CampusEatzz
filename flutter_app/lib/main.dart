@@ -51,7 +51,11 @@ class CampusEatzzApp extends StatelessWidget {
           create: (context) => PushNotificationService(context.read<ApiClient>()),
         ),
         ChangeNotifierProvider<AuthProvider>(
-          create: (context) => AuthProvider(context.read<AuthService>(), context.read<AppPreferences>()),
+          create: (context) => AuthProvider(
+            context.read<AuthService>(),
+            context.read<AppPreferences>(),
+            context.read<ApiClient>(),
+          ),
         ),
         ChangeNotifierProvider<ThemeProvider>(
           create: (context) => ThemeProvider(context.read<AppPreferences>()),
@@ -122,10 +126,23 @@ class _NotificationActionHostState extends State<_NotificationActionHost> {
   @override
   Widget build(BuildContext context) {
     final notifications = context.watch<NotificationProvider>();
+    final auth = context.watch<AuthProvider>();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
+      }
+
+      if (auth.isSessionSuperseded) {
+        auth.clearSessionSuperseded();
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'You have been logged out because your account was signed in on another device.',
+            ),
+            duration: Duration(seconds: 5),
+          ),
+        );
       }
 
       final pendingAction = notifications.consumePendingAction();
