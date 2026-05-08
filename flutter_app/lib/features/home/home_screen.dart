@@ -186,10 +186,21 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 24),
                     AnimatedReveal(
-                        delayMs: 130, child: _FeatureRow(isDark: isDark)),
+                      delayMs: 130,
+                      child: _TrendingSection(
+                        isDark: isDark,
+                        items: canteenState.allItems.take(6).toList(),
+                        canteenNameById: {
+                          for (final c in canteenState.canteens) c.id: c.name
+                        },
+                      ),
+                    ),
                     const SizedBox(height: 24),
                     AnimatedReveal(
-                      delayMs: 170,
+                        delayMs: 170, child: _FeatureRow(isDark: isDark)),
+                    const SizedBox(height: 24),
+                    AnimatedReveal(
+                      delayMs: 220,
                       child: _CanteenSection(
                         key: _canteenSectionKey,
                         canteens: filteredCanteens,
@@ -197,13 +208,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         onTap: _openMenu,
                       ),
                     ),
-                    const SizedBox(height: 24),
-                    AnimatedReveal(
-                        delayMs: 220,
-                        child: _TrendingSection(
-                          isDark: isDark,
-                          items: canteenState.allItems.take(6).toList(),
-                        )),
                     const SizedBox(height: 20),
                     AnimatedReveal(
                       delayMs: 270,
@@ -844,10 +848,15 @@ class _CanteenCard extends StatelessWidget {
 // ── Trending Section ──────────────────────────────────────────────────────────
 
 class _TrendingSection extends StatelessWidget {
-  const _TrendingSection({required this.isDark, required this.items});
+  const _TrendingSection({
+    required this.isDark,
+    required this.items,
+    required this.canteenNameById,
+  });
 
   final bool isDark;
   final List<MenuItem> items;
+  final Map<int, String> canteenNameById;
 
   @override
   Widget build(BuildContext context) {
@@ -864,13 +873,14 @@ class _TrendingSection extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 240,
+          height: 256,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: items.length,
             separatorBuilder: (_, __) => const SizedBox(width: 12),
             itemBuilder: (_, index) {
               final item = items[index];
+              final canteenName = canteenNameById[item.canteenId] ?? '';
               return SizedBox(
                 width: 160,
                 child: Card(
@@ -910,6 +920,34 @@ class _TrendingSection extends StatelessWidget {
                                     : AppColors.primary,
                               ),
                             ),
+                            if (canteenName.isNotEmpty) ...<Widget>[
+                              const SizedBox(height: 4),
+                              Row(
+                                children: <Widget>[
+                                  Icon(
+                                    Icons.storefront_rounded,
+                                    size: 10,
+                                    color: isDark
+                                        ? AppColors.darkTextMuted
+                                        : AppColors.textMuted,
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Expanded(
+                                    child: Text(
+                                      canteenName,
+                                      style: AppTypography.caption.copyWith(
+                                        color: isDark
+                                            ? AppColors.darkTextMuted
+                                            : AppColors.textMuted,
+                                        fontSize: 10,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                             const SizedBox(height: 8),
                             SizedBox(
                               width: double.infinity,

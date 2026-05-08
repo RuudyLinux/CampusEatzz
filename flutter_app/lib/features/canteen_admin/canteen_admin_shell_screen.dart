@@ -382,6 +382,120 @@ class _OrdersTabState extends State<_OrdersTab> {
     }
   }
 
+  void _showInvoiceSheet(Map<String, dynamic> order) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final items = _asList(order['items']).map(_asMap).toList(growable: false);
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkCard : AppColors.bg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(ctx).viewInsets.bottom),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Center(
+              child: Container(
+                width: 36, height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.darkBorder : AppColors.divider,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Row(
+              children: <Widget>[
+                Icon(Icons.receipt_long_rounded, size: 20,
+                    color: isDark ? AppColors.primaryOnDark : AppColors.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Invoice — #${order['orderNumber'] ?? order['id']}',
+                  style: AppTypography.heading3.copyWith(
+                    color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${order['customerName'] ?? 'Customer'} • ${order['customerPhone'] ?? ''}',
+              style: AppTypography.bodySm.copyWith(
+                color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
+              ),
+            ),
+            const Divider(height: 24),
+            if (items.isEmpty)
+              Text('No items', style: AppTypography.bodySm.copyWith(
+                  color: isDark ? AppColors.darkTextMuted : AppColors.textMuted))
+            else
+              ...items.map((item) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        '${item['itemName'] ?? 'Item'} × ${_asInt(item['quantity'])}',
+                        style: AppTypography.bodySm.copyWith(
+                          color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      _currency(_asDouble(item['unitPrice']) * _asInt(item['quantity'])),
+                      style: AppTypography.priceSm.copyWith(
+                        color: isDark ? AppColors.primaryOnDark : AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+            const Divider(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: <Widget>[
+                Text('Total', style: AppTypography.label.copyWith(
+                    color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary)),
+                Text(_currency(order['total']), style: AppTypography.priceSm.copyWith(
+                    color: isDark ? AppColors.primaryOnDark : AppColors.primary)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: <Widget>[
+                Text('Payment', style: AppTypography.caption.copyWith(
+                    color: isDark ? AppColors.darkTextMuted : AppColors.textMuted)),
+                Text(
+                  '${order['paymentMethod'] ?? 'N/A'} • ${order['paymentStatus'] ?? ''}',
+                  style: AppTypography.caption.copyWith(
+                      color: isDark ? AppColors.darkTextMuted : AppColors.textMuted),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(0, 48),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Close'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _showUpdateSheet(Map<String, dynamic> order) async {
     var nextStatus = (order['status'] ?? 'pending').toString();
     final service = context.read<CanteenAdminService>();
@@ -392,55 +506,118 @@ class _OrdersTabState extends State<_OrdersTab> {
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 16,
-            bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text('Update Order Status', style: AppTypography.heading3),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: nextStatus,
-                decoration: const InputDecoration(labelText: 'Status'),
-                items: const <String>['pending', 'confirmed', 'preparing', 'ready', 'completed', 'cancelled']
-                    .map((s) => DropdownMenuItem<String>(value: s, child: Text(s)))
-                    .toList(),
-                onChanged: (value) {
-                  nextStatus = value ?? nextStatus;
-                },
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: estimatedController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Estimated Time (minutes)'),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(false),
-                      child: const Text('Cancel'),
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return StatefulBuilder(
+          builder: (ctx, setSheet) => Container(
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkCard : AppColors.bg,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: EdgeInsets.fromLTRB(
+              20, 20, 20,
+              20 + MediaQuery.of(ctx).viewInsets.bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppColors.darkBorder : AppColors.divider,
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.of(context).pop(true),
-                      child: const Text('Update'),
-                    ),
+                ),
+                Text(
+                  'Update Order Status',
+                  style: AppTypography.heading3.copyWith(
+                    color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
                   ),
-                ],
-              ),
-            ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '#${order['orderNumber'] ?? order['id']}',
+                  style: AppTypography.bodySm.copyWith(
+                    color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  initialValue: nextStatus,
+                  decoration: InputDecoration(
+                    labelText: 'New Status',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  ),
+                  items: const <String>[
+                    'pending', 'confirmed', 'preparing', 'ready', 'completed', 'cancelled'
+                  ].map((s) => DropdownMenuItem<String>(
+                    value: s,
+                    child: Row(
+                      children: <Widget>[
+                        Container(
+                          width: 8,
+                          height: 8,
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: _statusColor(s),
+                          ),
+                        ),
+                        Text(s[0].toUpperCase() + s.substring(1)),
+                      ],
+                    ),
+                  )).toList(),
+                  onChanged: (value) {
+                    setSheet(() => nextStatus = value ?? nextStatus);
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: estimatedController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Estimated Time (minutes)',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(ctx).pop(false),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 48),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(ctx).pop(true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(0, 48),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text('Update'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -639,13 +816,43 @@ class _OrdersTabState extends State<_OrdersTab> {
                                     ),
                               ],
                               const SizedBox(height: 12),
-                              SizedBox(
-                                width: double.infinity,
-                                child: OutlinedButton.icon(
-                                  onPressed: () => _showUpdateSheet(order),
-                                  icon: const Icon(Icons.edit_outlined),
-                                  label: const Text('Update Status'),
-                                ),
+                              Row(
+                                children: <Widget>[
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: () => _showUpdateSheet(order),
+                                      icon: const Icon(Icons.edit_outlined, size: 15),
+                                      label: const Text('Update Status'),
+                                      style: OutlinedButton.styleFrom(
+                                        minimumSize: const Size(0, 40),
+                                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: () => _showInvoiceSheet(order),
+                                      icon: const Icon(Icons.receipt_outlined, size: 15),
+                                      label: const Text('Invoice'),
+                                      style: OutlinedButton.styleFrom(
+                                        minimumSize: const Size(0, 40),
+                                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                                        foregroundColor: isDark ? AppColors.primaryOnDark : AppColors.primary,
+                                        side: BorderSide(
+                                          color: (isDark ? AppColors.primaryOnDark : AppColors.primary)
+                                              .withValues(alpha: 0.5),
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -1073,57 +1280,74 @@ class _MenuItemsTabState extends State<_MenuItemsTab> {
                 return _StaggeredReveal(
                   index: index,
                   child: Card(
-                    child: ListTile(
-                      title: Text(
-                        item['name']?.toString() ?? 'Item',
-                        style: AppTypography.label.copyWith(
-                          color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
-                          fontSize: 13,
-                        ),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: <Widget>[
-                          Text(
-                            '${item['category'] ?? 'Uncategorized'} • ${_currency(item['price'])}',
-                            style: AppTypography.caption.copyWith(
-                              color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  item['name']?.toString() ?? 'Item',
+                                  style: AppTypography.label.copyWith(
+                                    color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  '${item['category'] ?? 'Uncategorized'} • ${_currency(item['price'])}',
+                                  style: AppTypography.caption.copyWith(
+                                    color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
+                                  ),
+                                ),
+                                if ((item['description'] ?? '').toString().trim().isNotEmpty) ...<Widget>[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    item['description']?.toString() ?? '',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: AppTypography.bodySm.copyWith(
+                                      color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                                const SizedBox(height: 6),
+                                AppStatusBadge(
+                                  item['isAvailable'] == true ? AppStatus.active : AppStatus.inactive,
+                                  small: true,
+                                ),
+                              ],
                             ),
                           ),
-                          if ((item['description'] ?? '').toString().trim().isNotEmpty)
-                            Text(
-                              item['description']?.toString() ?? '',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppTypography.bodySm.copyWith(
-                                color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: <Widget>[
+                              Switch(
+                                value: item['isAvailable'] == true,
+                                onChanged: (value) => _toggleAvailability(item, value),
                               ),
-                            ),
-                          const SizedBox(height: 6),
-                          AppStatusBadge(
-                            item['isAvailable'] == true ? AppStatus.active : AppStatus.inactive,
-                            small: true,
+                              IconButton(
+                                onPressed: () => _openItemForm(item: item),
+                                icon: const Icon(Icons.edit_outlined, size: 20),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              IconButton(
+                                onPressed: () => _deleteItem(item),
+                                icon: Icon(
+                                  Icons.delete_outline,
+                                  size: 20,
+                                  color: isDark ? AppColors.darkDanger : AppColors.danger,
+                                ),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          Switch(
-                            value: item['isAvailable'] == true,
-                            onChanged: (value) => _toggleAvailability(item, value),
-                          ),
-                          IconButton(
-                            onPressed: () => _openItemForm(item: item),
-                            icon: const Icon(Icons.edit_outlined),
-                          ),
-                          IconButton(
-                            onPressed: () => _deleteItem(item),
-                            icon: const Icon(Icons.delete_outline),
-                          ),
-                        ],
-                      ),
-                      isThreeLine: true,
                     ),
                   ),
                 );
@@ -2290,7 +2514,10 @@ class _AdminHeader extends StatelessWidget {
                     ],
                   ),
                   clipBehavior: Clip.antiAlias,
-                  child: AppLogo(size: responsive.headerLeadingSize),
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: AppLogo(size: responsive.headerLeadingSize - 12),
+                  ),
                 ),
                 SizedBox(width: responsive.headerGap),
                 Expanded(

@@ -83,11 +83,14 @@ public sealed class SingleDeviceSessionFilter(IDbConnectionFactory dbConnectionF
             return;
         }
 
-        if (storedJti is null || !string.Equals(storedJti, jti, StringComparison.Ordinal))
+        // storedJti == null means the column exists but no session has been written yet
+        // (e.g. user logged in before the single-device feature was deployed).
+        // Treat as pass-through so existing sessions are not broken.
+        if (storedJti is not null && !string.Equals(storedJti, jti, StringComparison.Ordinal))
         {
             logger.LogInformation(
                 "Session superseded for sub={Sub}. Token jti={Jti}, stored jti={StoredJti}.",
-                subClaim, jti, storedJti ?? "<null>");
+                subClaim, jti, storedJti);
 
             context.Result = new ObjectResult(new
             {

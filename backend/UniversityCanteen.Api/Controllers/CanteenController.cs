@@ -987,9 +987,9 @@ public sealed class CanteenController(
                 }),
                 dailyTrend = dailyTrend.Select(d => new
                 {
-                    day     = d.Day.ToString("yyyy-MM-dd"),
-                    orders  = d.Orders,
-                    revenue = Math.Round(d.Revenue, 2),
+                    date        = d.Day.ToString("yyyy-MM-dd"),
+                    totalOrders = d.Orders,
+                    revenue     = Math.Round(d.Revenue, 2),
                 }),
             }));
         }
