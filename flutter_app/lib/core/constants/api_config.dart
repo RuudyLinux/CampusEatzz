@@ -2,33 +2,29 @@ class ApiConfig {
   static const int backendPort = 5266;
   static const String primaryBaseUrl = 'https://campuseatzz.onrender.com';
 
-  static const List<String> fallbackBaseUrls = <String>[
-    'http://10.0.2.2:5266',
-    'http://localhost:5266',
-    'http://127.0.0.1:5266',
-  ];
-
   static List<String> allBaseUrls([String? overrideBase]) {
     final urls = <String>[];
 
     void push(String? raw) {
       final value = (raw ?? '').trim();
-      if (value.isEmpty) {
-        return;
-      }
+      if (value.isEmpty) return;
       final normalized = value.endsWith('/') ? value.substring(0, value.length - 1) : value;
-      if (!_isSupportedBackendUrl(normalized)) {
-        return;
-      }
-      if (!urls.contains(normalized)) {
-        urls.add(normalized);
-      }
+      if (!_isSupportedBackendUrl(normalized)) return;
+      if (!urls.contains(normalized)) urls.add(normalized);
     }
 
     push(primaryBaseUrl);
-    push(overrideBase);
-    for (final url in fallbackBaseUrls) {
-      push(url);
+
+    // If the user has saved a custom base URL that differs from primary, add it
+    // as a fallback (covers dev override set via settings).
+    if (overrideBase != null) {
+      final norm = overrideBase.trim().endsWith('/')
+          ? overrideBase.trim().substring(0, overrideBase.trim().length - 1)
+          : overrideBase.trim();
+      // Only add local/dev overrides as fallback, not a duplicate of primary.
+      if (norm != primaryBaseUrl && _isSupportedBackendUrl(norm)) {
+        push(norm);
+      }
     }
 
     return urls;
