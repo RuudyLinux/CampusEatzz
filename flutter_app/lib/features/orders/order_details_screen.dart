@@ -11,6 +11,7 @@ import '../../core/widgets/app_empty_state.dart';
 import '../../core/widgets/app_status_badge.dart';
 import '../../core/widgets/gradient_header.dart';
 import '../../core/widgets/network_food_image.dart';
+import '../../core/widgets/premium_animations.dart';
 import '../../core/widgets/shimmer_loader.dart';
 import '../../data/models/order_models.dart';
 import '../../data/models/refund_models.dart';
@@ -234,6 +235,24 @@ class _OrderBodyState extends State<_OrderBody> {
           ),
           const SizedBox(height: 12),
         ],
+
+        // Order progress timeline
+        AnimatedReveal(
+          delayMs: 30,
+          child: _SectionCard(
+            title: 'Order Progress',
+            isDark: widget.isDark,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: OrderProgressTimeline(
+                currentStatus: widget.order.status,
+                isDark: widget.isDark,
+                animateIn: true,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
 
         // Order info card
         AnimatedReveal(
@@ -508,20 +527,14 @@ class _OrderBodyState extends State<_OrderBody> {
 
       String msg;
       if (result.walletRefunded) {
-        msg = 'Order cancelled. ${formatInr(widget.order.total)} refunded to wallet!';
+        msg = '${formatInr(widget.order.total)} refunded to your wallet.';
       } else if (result.upiRefundPending) {
-        msg = 'Order cancelled. Refund processing in 3–5 days.';
+        msg = 'Refund processing in 3–5 days.';
       } else {
-        msg = 'Order cancelled successfully.';
+        msg = 'Your order has been cancelled.';
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(msg),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      await showOrderCancelledOverlay(context, msg, widget.isDark);
 
       // Reload refund state then refresh order
       await refund.loadRefunds(auth.session!.identifier);

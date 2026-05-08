@@ -7,6 +7,7 @@ import '../../core/constants/formatters.dart';
 import '../../core/widgets/animated_reveal.dart';
 import '../../core/widgets/app_empty_state.dart';
 import '../../core/widgets/gradient_header.dart';
+import '../../core/widgets/premium_animations.dart';
 import '../../core/widgets/network_food_image.dart';
 import '../../state/cart_provider.dart';
 import '../home/home_screen.dart';
@@ -301,9 +302,10 @@ class _StepperButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return PressScaleButton(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      scale: 0.85,
+      duration: const Duration(milliseconds: 80),
       child: Padding(
         padding: const EdgeInsets.all(6),
         child: Icon(icon, size: 16),
@@ -362,17 +364,19 @@ class _OrderSummaryCard extends StatelessWidget {
             // ── Parcel toggle ─────────────────────────────────────────
             _ParcelToggle(isDark: isDark),
             const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                        builder: (_) => const PaymentScreen()),
-                  );
-                },
-                icon: const Icon(Icons.credit_card_rounded),
-                label: const Text('Proceed to Checkout'),
+            PressScaleButton(
+              onTap: () {
+                Navigator.of(context).push(
+                  SlideFadeRoute(page: const PaymentScreen()),
+                );
+              },
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: null,
+                  icon: const Icon(Icons.credit_card_rounded),
+                  label: const Text('Proceed to Checkout'),
+                ),
               ),
             ),
             const SizedBox(height: 8),

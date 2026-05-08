@@ -8,6 +8,7 @@ import '../../core/constants/formatters.dart';
 import '../../core/widgets/animated_reveal.dart';
 import '../../core/widgets/app_empty_state.dart';
 import '../../core/widgets/network_food_image.dart';
+import '../../core/widgets/premium_animations.dart';
 import '../../core/widgets/shimmer_loader.dart';
 import '../../data/models/canteen.dart';
 import '../../data/models/menu_item.dart';
@@ -702,7 +703,7 @@ class _MenuCard extends StatelessWidget {
 
 // ── Add to Cart button — always pink ─────────────────────────────────────────
 
-class _AddButton extends StatelessWidget {
+class _AddButton extends StatefulWidget {
   const _AddButton({
     required this.item,
     this.isMaintenance = false,
@@ -712,67 +713,80 @@ class _AddButton extends StatelessWidget {
   final bool isMaintenance;
 
   @override
+  State<_AddButton> createState() => _AddButtonState();
+}
+
+class _AddButtonState extends State<_AddButton> {
+  final _feedbackKey = GlobalKey<CartAddFeedbackState>();
+
+  Future<void> _handleAdd() async {
+    final cart = context.read<CartProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    if (cart.hasCanteenConflict(widget.item)) {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20)),
+          title: const Text('Start new cart?'),
+          content: const Text(
+            'Your cart has items from a different canteen. Adding this clears your current cart.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Clear & Add'),
+            ),
+          ],
+        ),
+      );
+      if (confirm != true) return;
+      if (!mounted) return;
+      await cart.clearAndAddMenuItem(widget.item);
+    } else {
+      await cart.addMenuItem(widget.item);
+    }
+    if (!mounted) return;
+    _feedbackKey.currentState?.trigger();
+    messenger.showSnackBar(SnackBar(
+      content: Text('${widget.item.name} added'),
+      duration: const Duration(seconds: 1),
+    ));
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return ElevatedButton.icon(
-      onPressed: isMaintenance || !item.isAvailable
-          ? null
-          : () async {
-              final cart = context.read<CartProvider>();
-              final messenger = ScaffoldMessenger.of(context);
-              if (cart.hasCanteenConflict(item)) {
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (_) => AlertDialog(
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20)),
-                    title: const Text('Start new cart?'),
-                    content: const Text(
-                      'Your cart has items from a different canteen. Adding this clears your current cart.',
-                    ),
-                    actions: <Widget>[
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text('Cancel'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        child: const Text('Clear & Add'),
-                      ),
-                    ],
-                  ),
-                );
-                if (confirm != true) return;
-                if (!context.mounted) return;
-                await context.read<CartProvider>().clearAndAddMenuItem(item);
-              } else {
-                await cart.addMenuItem(item);
-              }
-              if (!context.mounted) return;
-              messenger.showSnackBar(SnackBar(
-                content: Text('${item.name} added'),
-                duration: const Duration(seconds: 1),
-              ));
-            },
-      icon: const Icon(Icons.add_rounded, size: 16),
-      label: Text(
-        isMaintenance
-            ? 'Unavailable'
-            : item.isAvailable
-                ? 'Add'
-                : 'Sold Out',
-      ),
-      style: ElevatedButton.styleFrom(
-        // Keep a solid brand accent so icon/text stay readable in dark mode.
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        disabledBackgroundColor:
-            AppColors.primary.withValues(alpha: 0.30),
-        disabledForegroundColor: Colors.white60,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        minimumSize: const Size(0, 38),
-        elevation: 0,
-        shape: const StadiumBorder(),
-        textStyle: AppTypography.labelSm,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final disabled = widget.isMaintenance || !widget.item.isAvailable;
+
+    return CartAddFeedback(
+      key: _feedbackKey,
+      isDark: isDark,
+      child: ElevatedButton.icon(
+        onPressed: disabled ? null : _handleAdd,
+        icon: const Icon(Icons.add_rounded, size: 16),
+        label: Text(
+          widget.isMaintenance
+              ? 'Unavailable'
+              : widget.item.isAvailable
+                  ? 'Add'
+                  : 'Sold Out',
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.28),
+          disabledForegroundColor: Colors.white.withValues(alpha: 0.50),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          minimumSize: const Size(0, 38),
+          elevation: 0,
+          shape: const StadiumBorder(),
+          textStyle: AppTypography.labelSm,
+        ),
       ),
     );
   }
@@ -813,26 +827,31 @@ class _CheckoutBar extends StatelessWidget {
               ),
             ],
           ),
-          child: InkWell(
+          child: PressScaleButton(
             onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const CartScreen()),
+              SlideFadeRoute(page: const CartScreen()),
             ),
-            borderRadius: BorderRadius.circular(50),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 18),
               child: Row(
                 children: <Widget>[
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(50),
-                    ),
-                    child: Text(
-                      '$itemCount',
-                      style: AppTypography.labelSm.copyWith(
-                          color: Colors.white, fontWeight: FontWeight.w700),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    transitionBuilder: (child, anim) =>
+                        ScaleTransition(scale: anim, child: child),
+                    child: Container(
+                      key: ValueKey(itemCount),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(50),
+                      ),
+                      child: Text(
+                        '$itemCount',
+                        style: AppTypography.labelSm.copyWith(
+                            color: Colors.white, fontWeight: FontWeight.w700),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),

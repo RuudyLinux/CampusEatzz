@@ -10,6 +10,7 @@ import '../../core/widgets/app_empty_state.dart';
 import '../../core/widgets/customer_bottom_nav.dart';
 import '../../core/widgets/gradient_header.dart';
 import '../../core/widgets/global_actions.dart';
+import '../../core/widgets/premium_animations.dart';
 import '../../state/auth_provider.dart';
 import '../../state/wallet_provider.dart';
 
@@ -55,6 +56,7 @@ class _WalletScreenState extends State<WalletScreen> {
       return;
     }
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final ok = await context.read<WalletProvider>().recharge(
           identifier: session.identifier,
           amount: amount,
@@ -63,8 +65,7 @@ class _WalletScreenState extends State<WalletScreen> {
 
     if (ok) {
       _amountController.clear();
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Money added successfully!')));
+      await showMoneyAddedOverlay(context, amount, isDark);
     } else {
       final message =
           context.read<WalletProvider>().error ?? 'Unable to recharge wallet.';

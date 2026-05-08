@@ -14,7 +14,10 @@ import '../../core/widgets/customer_bottom_nav.dart';
 import '../../core/widgets/gradient_header.dart';
 import '../../core/widgets/network_food_image.dart';
 import '../../core/widgets/global_actions.dart';
+import '../../core/widgets/premium_animations.dart';
 import '../../core/widgets/shimmer_loader.dart';
+import '../../state/orders_provider.dart';
+import '../orders/order_details_screen.dart';
 import '../../data/models/canteen.dart';
 import '../../data/models/menu_item.dart';
 import '../../data/models/recommendation_item.dart';
@@ -176,7 +179,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         onFilter: () => _openFilter(context),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 12),
+                    _RecentOrderBanner(isDark: isDark),
+                    const SizedBox(height: 8),
                     AnimatedReveal(
                       delayMs: 60,
                       child: _HeroBanner(
@@ -259,6 +264,148 @@ class _HomeScreenState extends State<HomeScreen> {
     final hour = DateTime.now().hour;
     final base = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
     return name.isEmpty ? base : '$base, $name';
+  }
+}
+
+// ── Recent Order Banner ───────────────────────────────────────────────────────
+
+class _RecentOrderBanner extends StatefulWidget {
+  const _RecentOrderBanner({required this.isDark});
+  final bool isDark;
+
+  @override
+  State<_RecentOrderBanner> createState() => _RecentOrderBannerState();
+}
+
+class _RecentOrderBannerState extends State<_RecentOrderBanner> {
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ordersProvider = context.watch<OrdersProvider>();
+    final recent = ordersProvider.recentOrder;
+    final show = ordersProvider.hasRecentOrder && recent != null;
+    final secsLeft = ordersProvider.recentOrderSecondsLeft;
+
+    if (!show) return const SizedBox.shrink();
+
+    final activeColor = widget.isDark ? AppColors.primaryOnDark : AppColors.primary;
+
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutCubic,
+      child: AnimatedOpacity(
+        opacity: show ? 1.0 : 0.0,
+        duration: const Duration(milliseconds: 400),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 4),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                activeColor.withValues(alpha: widget.isDark ? 0.18 : 0.10),
+                activeColor.withValues(alpha: widget.isDark ? 0.08 : 0.05),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: activeColor.withValues(alpha: 0.35),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: activeColor.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.receipt_long_rounded,
+                    color: activeColor, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Order Placed!',
+                      style: AppTypography.label.copyWith(color: activeColor),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '#${recent.orderNumber} · ${formatInr(recent.total)}',
+                      style: AppTypography.caption.copyWith(
+                        color: widget.isDark
+                            ? AppColors.darkTextMuted
+                            : AppColors.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  PressScaleButton(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        SlideFadeRoute(
+                          page: OrderDetailsScreen(
+                              orderRef: recent.orderNumber),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: activeColor,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        'Track',
+                        style: AppTypography.caption.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Hides in ${secsLeft}s',
+                    style: AppTypography.caption.copyWith(
+                      fontSize: 9,
+                      color: widget.isDark
+                          ? AppColors.darkTextMuted
+                          : AppColors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

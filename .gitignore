@@ -31,4 +31,20 @@ tmp_*.php
 # Deployment secrets
 RENDER_CONNECTION_STRING.txt
 
+# Claude Code local config (may contain credentials/tokens)
+.claude/
+
+# Local env secrets
+.env.local
+.env.*.local
+
+# Deployment & Railway artifacts
+dep*.json
+deploy.json
+events.json
+services.json
+logs.json
+railway_columns.txt
+*.log
+
 .fake

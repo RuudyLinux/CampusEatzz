@@ -7,6 +7,7 @@ import '../../core/constants/formatters.dart';
 import '../../core/widgets/animated_reveal.dart';
 import '../../core/widgets/app_empty_state.dart';
 import '../../core/widgets/gradient_header.dart';
+import '../../core/widgets/premium_animations.dart';
 import '../../data/models/cart_item.dart';
 import '../../state/auth_provider.dart';
 import '../../state/cart_provider.dart';
@@ -148,6 +149,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
       );
     }
 
+    // Full-screen processing overlay
+    if (_processing) {
+      return Scaffold(
+        body: Center(
+          child: PaymentProcessingWidget(isDark: isDark),
+        ),
+      );
+    }
+
     return Scaffold(
       body: Column(
         children: <Widget>[
@@ -227,22 +237,14 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 // Pay button
                 AnimatedReveal(
                   delayMs: 240,
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _processing ? null : _placeOrder,
-                      icon: _processing
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Icon(Icons.lock_rounded, size: 18),
-                      label: Text(
-                        _processing
-                            ? 'Processing…'
-                            : 'Pay ${formatInr(cart.total)}',
+                  child: PressScaleButton(
+                    onTap: _placeOrder,
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: null,
+                        icon: const Icon(Icons.lock_rounded, size: 18),
+                        label: Text('Pay ${formatInr(cart.total)}'),
                       ),
                     ),
                   ),

@@ -14,9 +14,33 @@ class OrdersProvider extends ChangeNotifier {
   bool _loading = false;
   String? _error;
 
+  // Recent order shown on home screen for 60 seconds after placement
+  PlaceOrderResult? _recentOrder;
+  DateTime? _recentOrderAt;
+
   List<OrderSummary> get orders => _orders;
   bool get isLoading => _loading;
   String? get error => _error;
+
+  PlaceOrderResult? get recentOrder => _recentOrder;
+  DateTime? get recentOrderAt => _recentOrderAt;
+
+  bool get hasRecentOrder {
+    if (_recentOrder == null || _recentOrderAt == null) return false;
+    return DateTime.now().difference(_recentOrderAt!).inSeconds < 60;
+  }
+
+  int get recentOrderSecondsLeft {
+    if (_recentOrderAt == null) return 0;
+    final elapsed = DateTime.now().difference(_recentOrderAt!).inSeconds;
+    return (60 - elapsed).clamp(0, 60);
+  }
+
+  void clearRecentOrder() {
+    _recentOrder = null;
+    _recentOrderAt = null;
+    notifyListeners();
+  }
 
   Future<void> loadOrders(String identifier) async {
     _loading = true;
@@ -55,8 +79,8 @@ class OrdersProvider extends ChangeNotifier {
     String? customerName,
     String? customerPhone,
     String orderType = 'takeaway',
-  }) {
-    return _service.placeOrder(
+  }) async {
+    final result = await _service.placeOrder(
       identifier: identifier,
       paymentMethod: paymentMethod,
       cartItems: items,
@@ -65,5 +89,9 @@ class OrdersProvider extends ChangeNotifier {
       customerPhone: customerPhone,
       orderType: orderType,
     );
+    _recentOrder = result;
+    _recentOrderAt = DateTime.now();
+    notifyListeners();
+    return result;
   }
 }
