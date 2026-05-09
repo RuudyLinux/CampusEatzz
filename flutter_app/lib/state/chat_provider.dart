@@ -20,9 +20,9 @@ class ChatProvider extends ChangeNotifier {
   String? get error => _error;
   bool get hasMessages => _messages.isNotEmpty;
 
-  Future<void> sendMessage(String text, {int? userId}) async {
+  Future<ChatResponse?> sendMessage(String text, {int? userId, String? userName}) async {
     final trimmed = text.trim();
-    if (trimmed.isEmpty || _isSending) return;
+    if (trimmed.isEmpty || _isSending) return null;
 
     // Optimistically add user message
     _messages.add(ChatMessage(
@@ -39,14 +39,16 @@ class ChatProvider extends ChangeNotifier {
         sessionId: _sessionId,
         message: trimmed,
         userId: userId,
+        userName: userName,
       );
 
       _messages.add(ChatMessage(
         role: 'assistant',
-        content: response,
+        content: response.response,
         timestamp: DateTime.now(),
       ));
       _error = null;
+      return response;
     } catch (e) {
       _error = 'Failed to get response. Please try again.';
       _messages.add(ChatMessage(
@@ -58,6 +60,8 @@ class ChatProvider extends ChangeNotifier {
       _isSending = false;
       notifyListeners();
     }
+
+    return null;
   }
 
   Future<void> loadHistory({int? userId}) async {

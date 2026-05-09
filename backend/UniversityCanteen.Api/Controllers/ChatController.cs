@@ -31,6 +31,7 @@ public sealed class ChatController(
                 sessionId,
                 userMessage,
                 request.UserId > 0 ? request.UserId : null,
+                request.UserName,
                 cancellationToken);
 
             if (!result.Success)
@@ -50,7 +51,11 @@ public sealed class ChatController(
                 {
                     sessionId = result.SessionId,
                     response = result.Response,
-                    timestamp = result.Timestamp
+                    timestamp = result.Timestamp,
+                    intent = result.Intent,
+                    action = result.Action,
+                    canteenId = result.CanteenId,
+                    canteenName = result.CanteenName
                 }
             });
         }
@@ -115,4 +120,5 @@ public sealed class ChatMessageRequest
     public string? SessionId { get; init; }
     public string? Message { get; init; }
     public int UserId { get; init; }
+    public string? UserName { get; init; }
 }

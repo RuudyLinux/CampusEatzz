@@ -5,8 +5,11 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_typography.dart';
 import '../../core/widgets/gradient_header.dart';
 import '../../data/models/chat_message.dart';
+import '../../data/services/chat_service.dart';
 import '../../state/auth_provider.dart';
+import '../../state/canteen_provider.dart';
 import '../../state/chat_provider.dart';
+import '../menu/menu_screen.dart';
 
 class ChatbotScreen extends StatefulWidget {
   const ChatbotScreen({super.key});
@@ -62,11 +65,48 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     if (text.trim().isEmpty) return;
     _controller.clear();
     final auth = context.read<AuthProvider>();
-    await context.read<ChatProvider>().sendMessage(
+    final response = await context.read<ChatProvider>().sendMessage(
           text,
           userId: auth.session?.id,
+          userName: auth.session?.name,
         );
     _scrollToBottom();
+    if (!mounted || response == null) return;
+    await _handleChatAction(response);
+  }
+
+  Future<void> _handleChatAction(ChatResponse response) async {
+    if (!response.shouldShowMenu) return;
+
+    final canteenProvider = context.read<CanteenProvider>();
+    if (canteenProvider.canteens.isEmpty) {
+      await canteenProvider.loadCanteens();
+      if (!mounted) return;
+    }
+
+    final normalizedCanteenName = response.canteenName?.trim().toLowerCase();
+    final canteen = response.canteenId != null
+        ? canteenProvider.canteens
+            .where((item) => item.id == response.canteenId)
+            .firstOrNull
+        : normalizedCanteenName?.isNotEmpty == true
+            ? canteenProvider.canteens
+                .where((item) => item.name.trim().toLowerCase() == normalizedCanteenName)
+                .firstOrNull
+            : (canteenProvider.canteens.isNotEmpty ? canteenProvider.canteens.first : null);
+
+    if (canteen == null) return;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => MenuScreen(
+          canteenId: canteen.id,
+          canteenName: response.canteenName?.trim().isNotEmpty == true
+              ? response.canteenName
+              : canteen.name,
+        ),
+      ),
+    );
   }
 
   void _confirmClear(BuildContext context) {

@@ -149,7 +149,16 @@ var app = builder.Build();
 
 WarnIfLikelyInvalidProductionDatabaseHost(resolvedDatabaseConnectionString, app.Logger, app.Environment.IsDevelopment());
 WarnIfLocalDatabasePasswordLooksMissing(resolvedDatabaseConnectionString, app.Logger, app.Environment.IsDevelopment());
-await EnsureCoreSchemaAsync(app.Services, app.Logger, app.Configuration, failOnSchemaInitError);
+var skipSchemaInit = app.Configuration.GetValue<bool?>("Startup:SkipSchemaInit")
+    ?? app.Environment.IsDevelopment();
+if (skipSchemaInit)
+{
+    app.Logger.LogWarning("Startup schema verification skipped. Set Startup:SkipSchemaInit=false to run database schema checks before listening.");
+}
+else
+{
+    await EnsureCoreSchemaAsync(app.Services, app.Logger, app.Configuration, failOnSchemaInitError);
+}
 
 app.MapOpenApi();
 app.MapScalarApiReference();
@@ -565,7 +574,7 @@ static async Task EnsureCoreSchemaAsync(
         new { Key = "operating_hours_close", Value = "22:00", Description = "Closing time" }
     };
 
-    const int maxAttempts = 8;
+    var maxAttempts = Math.Clamp(configuration.GetValue<int?>("Startup:SchemaInitAttempts") ?? 2, 1, 8);
     for (var attempt = 1; attempt <= maxAttempts; attempt++)
     {
         try
@@ -847,7 +856,7 @@ static string ResolveDatabaseConnectionString(IConfiguration configuration, bool
     var environmentConnectionString = ResolveConnectionStringFromEnvironment(isDevelopment);
     if (!string.IsNullOrWhiteSpace(environmentConnectionString))
     {
-        return environmentConnectionString;
+        return ApplyDatabaseConnectionDefaults(environmentConnectionString, isDevelopment);
     }
 
     var configuredConnectionString = configuration.GetConnectionString("DefaultConnection");
@@ -855,11 +864,38 @@ static string ResolveDatabaseConnectionString(IConfiguration configuration, bool
 
     if (hasConfiguredConnection)
     {
-        return ApplyMissingConnectionStringPartsFromEnvironment(configuredConnectionString!, isDevelopment);
+        return ApplyDatabaseConnectionDefaults(
+            ApplyMissingConnectionStringPartsFromEnvironment(configuredConnectionString!, isDevelopment),
+            isDevelopment);
     }
 
     throw new InvalidOperationException(
         "ConnectionStrings:DefaultConnection is not configured and no supported MySQL environment variables were found.");
+}
+
+static string ApplyDatabaseConnectionDefaults(string connectionString, bool isDevelopment)
+{
+    try
+    {
+        var builder = new MySqlConnectionStringBuilder(connectionString);
+        var normalized = connectionString.ToLowerInvariant();
+        var hasExplicitConnectionTimeout =
+            normalized.Contains("connection timeout")
+            || normalized.Contains("connectiontimeout")
+            || normalized.Contains("connect timeout")
+            || normalized.Contains("connecttimeout");
+
+        if (!hasExplicitConnectionTimeout)
+        {
+            builder.ConnectionTimeout = isDevelopment ? 5u : 15u;
+        }
+
+        return builder.ConnectionString;
+    }
+    catch
+    {
+        return connectionString;
+    }
 }
 
 static string ApplyMissingConnectionStringPartsFromEnvironment(string connectionString, bool isDevelopment)
