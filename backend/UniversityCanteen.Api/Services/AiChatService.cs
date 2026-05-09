@@ -81,8 +81,14 @@ public sealed class AiChatService(
 
             var menuItems = await GetAvailableMenuItemsAsync(connection, ct);
             var canteens = menuItems
-                .GroupBy(i => new { i.CanteenId, i.CanteenName })
-                .Select(g => new CanteenContextRow { CanteenId = g.Key.CanteenId, CanteenName = g.Key.CanteenName })
+                .GroupBy(i => new { i.CanteenId, i.CanteenName, i.CanteenDescription, i.CanteenStatus })
+                .Select(g => new CanteenContextRow
+                {
+                    CanteenId = g.Key.CanteenId,
+                    CanteenName = g.Key.CanteenName,
+                    CanteenDescription = g.Key.CanteenDescription,
+                    CanteenStatus = g.Key.CanteenStatus
+                })
                 .ToList();
 
             var localReply = await TryBuildLocalReplyAsync(connection, trimmedMessage, userId, menuItems, canteens, ct);
@@ -230,6 +236,8 @@ public sealed class AiChatService(
 
         if (intent == ChatIntent.Menu)
             return null;
+        if (intent == ChatIntent.Profile)
+            return null;
 
         if (intent == ChatIntent.AccountName)
         {
@@ -241,11 +249,7 @@ public sealed class AiChatService(
             return new ChatReplyResult(true, response, string.Empty, DateTime.UtcNow, Intent: "account_name");
         }
 
-        var systemAnswer = BuildSystemKnowledgeAnswer(intent);
-        if (systemAnswer is not null)
-            return new ChatReplyResult(true, systemAnswer, string.Empty, DateTime.UtcNow, Intent: intent.ToString().ToLowerInvariant());
-
-        return new ChatReplyResult(true, FallbackMessage, string.Empty, DateTime.UtcNow, Intent: "fallback");
+        return BuildSystemKnowledgeReply(intent);
     }
 
     private static ChatReplyResult BuildOfflineReply(string userMessage)
@@ -256,11 +260,10 @@ public sealed class AiChatService(
         {
             return new ChatReplyResult(
                 true,
-                "Sure, I can help with food. Opening the menu now. If it does not load, please check the database or network connection.",
+                "I can help with food, but live menu details are temporarily unavailable. Please try again after the connection is restored.",
                 string.Empty,
                 DateTime.UtcNow,
-                Intent: "menu",
-                Action: "show_menu");
+                Intent: "menu");
         }
 
         if (intent == ChatIntent.AccountName)
@@ -272,17 +275,19 @@ public sealed class AiChatService(
                 DateTime.UtcNow,
                 Intent: "account_name");
         }
-
-        var systemAnswer = BuildSystemKnowledgeAnswer(intent);
-        if (systemAnswer is not null)
+        if (intent == ChatIntent.Profile)
         {
             return new ChatReplyResult(
                 true,
-                systemAnswer,
+                "I cannot fetch profile details right now because account data is temporarily unavailable. Please try again after the connection is restored.",
                 string.Empty,
                 DateTime.UtcNow,
-                Intent: intent.ToString().ToLowerInvariant());
+                Intent: "profile");
         }
+
+        var systemAnswer = BuildSystemKnowledgeReply(intent);
+        if (systemAnswer is not null)
+            return systemAnswer;
 
         return new ChatReplyResult(true, FallbackMessage, string.Empty, DateTime.UtcNow, Intent: "fallback");
     }
@@ -313,20 +318,7 @@ public sealed class AiChatService(
             var canteen = FindMentionedCanteen(userMessage, canteens)
                 ?? FindCanteenByMentionedItem(userMessage, menuItems);
 
-            if (IsRecommendationRequest(userMessage) || TryExtractMaxPrice(userMessage) is not null)
-                return BuildRecommendationReply(userMessage, menuItems, canteen);
-
-            var response = BuildMenuResponse(menuItems, canteen);
-
-            return new ChatReplyResult(
-                true,
-                response,
-                string.Empty,
-                DateTime.UtcNow,
-                Intent: "menu",
-                Action: "show_menu",
-                CanteenId: canteen?.CanteenId,
-                CanteenName: canteen?.CanteenName);
+            return BuildMenuReply(userMessage, menuItems, canteen);
         }
 
         if (intent == ChatIntent.AccountName)
@@ -339,9 +331,12 @@ public sealed class AiChatService(
             return new ChatReplyResult(true, response, string.Empty, DateTime.UtcNow, Intent: "account_name");
         }
 
-        var systemAnswer = BuildSystemKnowledgeAnswer(intent);
+        if (intent == ChatIntent.Profile)
+            return await BuildProfileReplyAsync(connection, userId, ct);
+
+        var systemAnswer = BuildSystemKnowledgeReply(intent);
         if (systemAnswer is not null)
-            return new ChatReplyResult(true, systemAnswer, string.Empty, DateTime.UtcNow, Intent: intent.ToString().ToLowerInvariant());
+            return systemAnswer;
 
         return null;
     }
@@ -353,6 +348,8 @@ public sealed class AiChatService(
     {
         var normalized = Normalize(message);
 
+        if (MatchesAny(normalized, ProfileTerms))
+            return ChatIntent.Profile;
         if (MatchesAny(normalized, AccountNameTerms))
             return ChatIntent.AccountName;
         if (MatchesAny(normalized, OrderHowToTerms))
@@ -376,6 +373,14 @@ public sealed class AiChatService(
         return ChatIntent.Unknown;
     }
 
+    private static ChatReplyResult? BuildSystemKnowledgeReply(ChatIntent intent)
+    {
+        var response = BuildSystemKnowledgeAnswer(intent);
+        return response is null
+            ? null
+            : new ChatReplyResult(true, response, string.Empty, DateTime.UtcNow, Intent: intent.ToString().ToLowerInvariant());
+    }
+
     private static string? BuildSystemKnowledgeAnswer(ChatIntent intent) => intent switch
     {
         ChatIntent.PlaceOrderHelp =>
@@ -393,7 +398,8 @@ public sealed class AiChatService(
         _ => null
     };
 
-    private static string BuildMenuResponse(
+    private static ChatReplyResult BuildMenuReply(
+        string userMessage,
         IReadOnlyList<MenuContextRow> menuItems,
         CanteenContextRow? canteen)
     {
@@ -402,72 +408,53 @@ public sealed class AiChatService(
             : menuItems.Where(i => i.CanteenId == canteen.CanteenId).ToList();
 
         if (scopedItems.Count == 0)
-            return "I can open the menu for you, but no available items were found right now.";
+        {
+            return new ChatReplyResult(
+                true,
+                "I could not find available items for that request right now.",
+                string.Empty,
+                DateTime.UtcNow,
+                Intent: "menu");
+        }
 
-        var sample = string.Join(", ", scopedItems.Take(6).Select(i => $"{i.ItemName} (Rs. {i.Price:0})"));
-        var target = canteen is null ? "the food menu" : $"{canteen.CanteenName} menu";
-        return $"Here are some items from {target}: {sample}. Tap Order this when you want to browse and add food to cart.";
-    }
+        if (IsCanteenDetailsRequest(userMessage, canteen))
+            return BuildCanteenDetailsReply(userMessage, scopedItems, canteen);
 
-    private static ChatReplyResult BuildRecommendationReply(
-        string userMessage,
-        IReadOnlyList<MenuContextRow> menuItems,
-        CanteenContextRow? canteen)
-    {
-        var maxPrice = TryExtractMaxPrice(userMessage);
-        var scopedItems = canteen is null
-            ? menuItems
-            : menuItems.Where(i => i.CanteenId == canteen.CanteenId).ToList();
-
-        var matchingItems = scopedItems
-            .Where(i => maxPrice is null || i.Price <= maxPrice.Value)
-            .OrderBy(i => i.Price)
-            .ThenBy(i => i.ItemName)
-            .Take(5)
-            .ToList();
+        var matchingItems = FilterMenuItems(userMessage, scopedItems);
+        var openMenu = IsOpenMenuRequest(userMessage);
 
         if (matchingItems.Count == 0)
         {
             var cheapest = scopedItems
                 .OrderBy(i => i.Price)
                 .ThenBy(i => i.ItemName)
-                .Take(3)
+                .Take(5)
                 .ToList();
 
-            if (cheapest.Count == 0)
-            {
-                return new ChatReplyResult(
-                    true,
-                    "I could not find available food items right now.",
-                    string.Empty,
-                    DateTime.UtcNow,
-                    Intent: "menu");
-            }
-
-            var alternatives = string.Join(", ", cheapest.Select(FormatRecommendationItem));
-            var budgetText = maxPrice is null ? "for that request" : $"under Rs. {maxPrice.Value:0}";
-            var firstAlternative = cheapest[0];
+            var fallbackItems = string.Join("\n", cheapest.Select((item, index) => $"{index + 1}. {FormatDetailedItem(item)}"));
+            var cheapestItem = cheapest[0];
 
             return new ChatReplyResult(
                 true,
-                $"I could not find items {budgetText}, but the cheapest options are: {alternatives}. Tap Order this to open the menu.",
+                $"I could not find an exact match, but these are close available options:\n{fallbackItems}\nTap Order this to browse the menu.",
                 string.Empty,
                 DateTime.UtcNow,
                 Intent: "menu",
                 Action: "show_menu",
-                CanteenId: canteen?.CanteenId ?? firstAlternative.CanteenId,
-                CanteenName: canteen?.CanteenName ?? firstAlternative.CanteenName);
+                CanteenId: canteen?.CanteenId ?? cheapestItem.CanteenId,
+                CanteenName: canteen?.CanteenName ?? cheapestItem.CanteenName);
         }
 
-        var intro = maxPrice is null
-            ? "Here are some good picks"
-            : $"Here are good picks under Rs. {maxPrice.Value:0}";
-        var items = string.Join(", ", matchingItems.Select(FormatRecommendationItem));
+        var heading = BuildFoodReplyHeading(userMessage, matchingItems.Count);
+        var details = string.Join("\n", matchingItems.Take(5).Select((item, index) => $"{index + 1}. {FormatDetailedItem(item)}"));
         var firstItem = matchingItems[0];
+        var tail = openMenu
+            ? "Tap Order this to open the menu."
+            : "Tap Order this if you want to browse and add one to cart.";
 
         return new ChatReplyResult(
             true,
-            $"{intro}: {items}. Tap Order this to open the menu and add your choice to cart.",
+            $"{heading}\n{details}\n{tail}",
             string.Empty,
             DateTime.UtcNow,
             Intent: "menu",
@@ -476,13 +463,184 @@ public sealed class AiChatService(
             CanteenName: canteen?.CanteenName ?? firstItem.CanteenName);
     }
 
-    private static string FormatRecommendationItem(MenuContextRow item) =>
-        $"{item.ItemName} from {item.CanteenName} (Rs. {item.Price:0})";
+    private static ChatReplyResult BuildCanteenDetailsReply(
+        string userMessage,
+        IReadOnlyList<MenuContextRow> menuItems,
+        CanteenContextRow? canteen)
+    {
+        var grouped = menuItems
+            .GroupBy(i => new { i.CanteenId, i.CanteenName, i.CanteenDescription, i.CanteenStatus })
+            .OrderBy(g => g.Key.CanteenName)
+            .ToList();
+
+        if (canteen is not null)
+        {
+            var items = menuItems
+                .OrderBy(i => i.Price)
+                .ThenBy(i => i.ItemName)
+                .Take(6)
+                .ToList();
+            var first = items[0];
+            var itemSummary = string.Join(", ", items.Select(i => $"{i.ItemName} (Rs. {i.Price:0})"));
+            var description = string.IsNullOrWhiteSpace(first.CanteenDescription)
+                ? "No description available"
+                : first.CanteenDescription;
+            var priceRange = $"{items.Min(i => i.Price):0}-{menuItems.Max(i => i.Price):0}";
+
+            return new ChatReplyResult(
+                true,
+                $"{canteen.CanteenName}: {description}. Status: {first.CanteenStatus}. Available items: {menuItems.Count}. Price range: Rs. {priceRange}. Popular options include {itemSummary}. Tap Order this to open this canteen menu.",
+                string.Empty,
+                DateTime.UtcNow,
+                Intent: "menu",
+                Action: "show_menu",
+                CanteenId: canteen.CanteenId,
+                CanteenName: canteen.CanteenName);
+        }
+
+        var canteenSummaries = string.Join("\n", grouped.Select((g, index) =>
+        {
+            var priceRange = $"{g.Min(i => i.Price):0}-{g.Max(i => i.Price):0}";
+            var description = string.IsNullOrWhiteSpace(g.Key.CanteenDescription)
+                ? "No description available"
+                : g.Key.CanteenDescription;
+            return $"{index + 1}. {g.Key.CanteenName}: {description}. Status: {g.Key.CanteenStatus}. {g.Count()} available items, Rs. {priceRange}.";
+        }));
+
+        return new ChatReplyResult(
+            true,
+            $"Here are the canteens I found:\n{canteenSummaries}\nAsk for a canteen by name to see its food options.",
+            string.Empty,
+            DateTime.UtcNow,
+            Intent: "menu");
+    }
+
+    private static List<MenuContextRow> FilterMenuItems(
+        string userMessage,
+        IReadOnlyList<MenuContextRow> scopedItems)
+    {
+        var normalized = Normalize(userMessage);
+        var maxPrice = TryExtractMaxPrice(userMessage);
+        IEnumerable<MenuContextRow> query = scopedItems;
+
+        if (maxPrice is not null)
+            query = query.Where(i => i.Price <= maxPrice.Value);
+
+        if (MatchesAny(normalized, NonVegetarianTerms))
+        {
+            query = query.Where(i => !i.IsVegetarian);
+        }
+        else if (MatchesAny(normalized, VegetarianTerms))
+        {
+            query = query.Where(i => i.IsVegetarian);
+        }
+
+        if (MatchesAny(normalized, SpicyTerms))
+            query = query.Where(IsSpicyItem);
+
+        if (MatchesAny(normalized, BeverageTerms))
+            query = query.Where(i => IsItemMatch(i, BeverageTerms));
+
+        if (MatchesAny(normalized, DessertTerms))
+            query = query.Where(i => IsItemMatch(i, DessertTerms));
+
+        if (MatchesAny(normalized, QuickTerms))
+            query = query.Where(i => i.PreparationTime <= 10);
+
+        var directlyMentioned = scopedItems
+            .Where(i => IsFuzzyPhraseMatch(normalized, i.ItemName) ||
+                        IsFuzzyPhraseMatch(normalized, i.CategoryName))
+            .ToList();
+        if (directlyMentioned.Count > 0)
+        {
+            var directIds = directlyMentioned.Select(i => i.ItemName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            query = query.Where(i => directIds.Contains(i.ItemName));
+        }
+
+        var results = query
+            .OrderBy(i => i.Price)
+            .ThenBy(i => i.ItemName)
+            .Take(5)
+            .ToList();
+
+        if (results.Count == 0 && MatchesAny(normalized, SpicyTerms))
+        {
+            results = scopedItems
+                .Where(i => IsItemMatch(i, SpicyFallbackTerms))
+                .OrderBy(i => i.Price)
+                .ThenBy(i => i.ItemName)
+                .Take(5)
+                .ToList();
+        }
+
+        if (results.Count == 0 && (IsRecommendationRequest(userMessage) || maxPrice is not null || IsOpenMenuRequest(userMessage)))
+        {
+            results = scopedItems
+                .OrderBy(i => i.Price)
+                .ThenBy(i => i.ItemName)
+                .Take(5)
+                .ToList();
+        }
+
+        return results;
+    }
+
+    private static string BuildFoodReplyHeading(string userMessage, int count)
+    {
+        var maxPrice = TryExtractMaxPrice(userMessage);
+        if (MatchesAny(Normalize(userMessage), SpicyTerms))
+            return $"I found {count} spicy-style option(s):";
+        if (maxPrice is not null)
+            return $"I found {count} option(s) under Rs. {maxPrice.Value:0}:";
+        if (IsRecommendationRequest(userMessage))
+            return $"Here are {count} good food suggestion(s):";
+        return $"Here are {count} menu detail(s):";
+    }
+
+    private static string FormatDetailedItem(MenuContextRow item)
+    {
+        var veg = item.IsVegetarian ? "Veg" : "Non-veg";
+        var spice = string.IsNullOrWhiteSpace(item.SpiceLevel) || item.SpiceLevel == "none"
+            ? IsItemMatch(item, SpicyFallbackTerms) ? "spicy-style" : "not spicy"
+            : item.SpiceLevel.Replace('_', ' ');
+        var prep = item.PreparationTime > 0 ? $"{item.PreparationTime} min" : "prep time not listed";
+        var description = string.IsNullOrWhiteSpace(item.Description)
+            ? "No description available."
+            : item.Description.Trim();
+
+        return $"{item.ItemName} - Rs. {item.Price:0} at {item.CanteenName}. {veg}, {item.CategoryName}, {spice}, {prep}. {description}";
+    }
 
     private static bool IsRecommendationRequest(string message)
     {
         var normalized = Normalize(message);
         return MatchesAny(normalized, RecommendationTerms);
+    }
+
+    private static bool IsCanteenDetailsRequest(string message, CanteenContextRow? canteen)
+    {
+        var normalized = Normalize(message);
+        return MatchesAny(normalized, CanteenDetailTerms) &&
+               (canteen is not null || !MatchesAny(normalized, FoodPreferenceTerms));
+    }
+
+    private static bool IsOpenMenuRequest(string message)
+    {
+        var normalized = Normalize(message);
+        return MatchesAny(normalized, OpenMenuTerms);
+    }
+
+    private static bool IsSpicyItem(MenuContextRow item)
+    {
+        var spice = Normalize(item.SpiceLevel);
+        return spice is "mild" or "medium" or "hot" or "extra hot" ||
+               IsItemMatch(item, SpicyFallbackTerms);
+    }
+
+    private static bool IsItemMatch(MenuContextRow item, IEnumerable<string> terms)
+    {
+        var haystack = Normalize($"{item.ItemName} {item.Description} {item.CategoryName}");
+        return MatchesAny(haystack, terms);
     }
 
     private static decimal? TryExtractMaxPrice(string message)
@@ -515,11 +673,20 @@ public sealed class AiChatService(
             SELECT
                 COALESCE(c.id, 0) AS CanteenId,
                 COALESCE(c.name, 'Unknown') AS CanteenName,
+                COALESCE(c.description, '') AS CanteenDescription,
+                COALESCE(c.status, '') AS CanteenStatus,
                 COALESCE(mi.name, 'Item')   AS ItemName,
-                COALESCE(mi.price, 0)        AS Price
+                COALESCE(mi.description, '') AS Description,
+                COALESCE(mi.price, 0)        AS Price,
+                COALESCE(mc.name, 'Uncategorized') AS CategoryName,
+                COALESCE(mi.is_vegetarian, 0) AS IsVegetarian,
+                COALESCE(mi.spice_level, 'none') AS SpiceLevel,
+                COALESCE(mi.preparation_time, 0) AS PreparationTime
             FROM menu_items mi
             LEFT JOIN canteens c ON c.id = mi.canteen_id
+            LEFT JOIN menu_categories mc ON mc.id = mi.category_id
             WHERE COALESCE(mi.is_available, 1) = 1
+              AND COALESCE(mi.is_deleted, 0) = 0
             ORDER BY c.display_order ASC, mi.price ASC;
             """,
             cancellationToken: ct))).ToList();
@@ -534,7 +701,8 @@ public sealed class AiChatService(
             .GroupBy(i => i.CanteenName)
             .Select(g =>
             {
-                var itemList = string.Join(", ", g.Select(i => $"{i.ItemName} (Rs. {i.Price:0})"));
+                var itemList = string.Join(", ", g.Select(i =>
+                    $"{i.ItemName} (Rs. {i.Price:0}, {i.CategoryName}, {i.SpiceLevel}, {(i.IsVegetarian ? "veg" : "non-veg")})"));
                 return $"{g.Key}: {itemList}";
             });
 
@@ -579,6 +747,76 @@ public sealed class AiChatService(
         return user?.Name.Trim();
     }
 
+    private static async Task<ChatReplyResult> BuildProfileReplyAsync(
+        System.Data.IDbConnection connection,
+        int? userId,
+        CancellationToken ct)
+    {
+        if (userId is null or <= 0)
+        {
+            return new ChatReplyResult(
+                true,
+                "I cannot show profile details because you are not logged in in this chat session.",
+                string.Empty,
+                DateTime.UtcNow,
+                Intent: "profile");
+        }
+
+        var universityIdColumn = await connection.QuerySingleOrDefaultAsync<string>(new CommandDefinition(
+            """
+            SELECT COLUMN_NAME
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'users'
+              AND COLUMN_NAME IN ('UniversityId', 'university_id')
+            ORDER BY CASE WHEN COLUMN_NAME = 'UniversityId' THEN 0 ELSE 1 END
+            LIMIT 1;
+            """,
+            cancellationToken: ct));
+
+        var universityIdExpression = string.IsNullOrWhiteSpace(universityIdColumn)
+            ? "''"
+            : $"COALESCE({universityIdColumn}, '')";
+
+        var user = await connection.QuerySingleOrDefaultAsync<UserProfileRow>(new CommandDefinition(
+            $"""
+            SELECT
+                COALESCE(NULLIF(TRIM(CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, ''))), ''), COALESCE(email, ''), {universityIdExpression}) AS Name,
+                COALESCE(email, '') AS Email,
+                COALESCE(contact, '') AS Contact,
+                COALESCE(department, '') AS Department,
+                COALESCE(role, '') AS Role,
+                {universityIdExpression} AS UniversityId,
+                COALESCE(status, '') AS Status
+            FROM users
+            WHERE id = @userId
+              AND COALESCE(is_deleted, 0) = 0
+            LIMIT 1;
+            """,
+            new { userId },
+            cancellationToken: ct));
+
+        if (user is null)
+        {
+            return new ChatReplyResult(
+                true,
+                "I could not find your profile details. Please make sure you are logged in and try again.",
+                string.Empty,
+                DateTime.UtcNow,
+                Intent: "profile");
+        }
+
+        return new ChatReplyResult(
+            true,
+            $"Profile details:\nName: {user.Name}\nEmail: {user.Email}\nUniversity ID: {EmptyAsNotListed(user.UniversityId)}\nDepartment: {EmptyAsNotListed(user.Department)}\nRole: {EmptyAsNotListed(user.Role)}\nContact: {EmptyAsNotListed(user.Contact)}\nStatus: {EmptyAsNotListed(user.Status)}",
+            string.Empty,
+            DateTime.UtcNow,
+            Intent: "profile");
+    }
+
+    private static string EmptyAsNotListed(string value) =>
+        string.IsNullOrWhiteSpace(value) ? "Not listed" : value.Trim();
+
     private static CanteenContextRow? FindMentionedCanteen(
         string message,
         IReadOnlyList<CanteenContextRow> canteens)
@@ -595,7 +833,13 @@ public sealed class AiChatService(
         var item = menuItems.FirstOrDefault(i => IsFuzzyPhraseMatch(normalized, i.ItemName));
         return item is null
             ? null
-            : new CanteenContextRow { CanteenId = item.CanteenId, CanteenName = item.CanteenName };
+            : new CanteenContextRow
+            {
+                CanteenId = item.CanteenId,
+                CanteenName = item.CanteenName,
+                CanteenDescription = item.CanteenDescription,
+                CanteenStatus = item.CanteenStatus
+            };
     }
 
     private static bool MatchesAny(string normalizedMessage, IEnumerable<string> terms) =>
@@ -672,6 +916,61 @@ public sealed class AiChatService(
         "budget", "cheap", "under", "uder", "below", "within", "less than", "upto", "up to"
     ];
 
+    private static readonly string[] OpenMenuTerms =
+    [
+        "open menu", "show menu", "go to menu", "menu page", "browse menu", "start order",
+        "order this", "order food", "take me to menu"
+    ];
+
+    private static readonly string[] CanteenDetailTerms =
+    [
+        "canteen", "canteens", "outlet", "outlets", "details", "detail", "about",
+        "available at", "what is available at", "what's available at"
+    ];
+
+    private static readonly string[] FoodPreferenceTerms =
+    [
+        "food", "item", "items", "meal", "snack", "spicy", "veg", "non veg", "drink",
+        "dessert", "cheap", "budget", "under", "recommend", "suggest"
+    ];
+
+    private static readonly string[] VegetarianTerms =
+    [
+        "veg", "vegetarian", "pure veg", "meatless"
+    ];
+
+    private static readonly string[] NonVegetarianTerms =
+    [
+        "non veg", "non vegetarian", "nonveg", "chicken", "fish", "egg", "meat", "pepperoni"
+    ];
+
+    private static readonly string[] SpicyTerms =
+    [
+        "spicy", "hot", "extra hot", "medium spicy", "mild spicy", "masala", "chilli", "chili"
+    ];
+
+    private static readonly string[] SpicyFallbackTerms =
+    [
+        "spicy", "hot", "masala", "chilli", "chili", "pepper", "tikka", "arrabiata",
+        "biryani", "nachos", "bbq"
+    ];
+
+    private static readonly string[] BeverageTerms =
+    [
+        "drink", "drinks", "beverage", "beverages", "tea", "coffee", "latte", "mojito",
+        "smoothie", "juice"
+    ];
+
+    private static readonly string[] DessertTerms =
+    [
+        "dessert", "desserts", "sweet", "sweets", "brownie", "cheesecake", "jamun", "cake"
+    ];
+
+    private static readonly string[] QuickTerms =
+    [
+        "quick", "fast", "instant", "less time", "under 10 min", "under 10 minutes"
+    ];
+
     private static readonly CanteenContextRow[] KnownCanteens =
     [
         new() { CanteenId = 1, CanteenName = "Chirag Tea Center" },
@@ -682,6 +981,12 @@ public sealed class AiChatService(
     private static readonly string[] AccountNameTerms =
     [
         "what is my name", "who am i", "tell my name", "my name", "account name"
+    ];
+
+    private static readonly string[] ProfileTerms =
+    [
+        "my profile", "profile details", "profile", "my account", "account details",
+        "my email", "my department", "my contact", "my university id"
     ];
 
     private static readonly string[] OrderHowToTerms =
@@ -719,6 +1024,7 @@ public sealed class AiChatService(
         Unknown,
         Menu,
         AccountName,
+        Profile,
         PlaceOrderHelp,
         WalletHelp,
         TrackOrderHelp,
@@ -738,18 +1044,38 @@ public sealed class AiChatService(
     {
         public int CanteenId { get; init; }
         public string CanteenName { get; init; } = string.Empty;
+        public string CanteenDescription { get; init; } = string.Empty;
+        public string CanteenStatus { get; init; } = string.Empty;
         public string ItemName { get; init; } = string.Empty;
+        public string Description { get; init; } = string.Empty;
         public decimal Price { get; init; }
+        public string CategoryName { get; init; } = string.Empty;
+        public bool IsVegetarian { get; init; }
+        public string SpiceLevel { get; init; } = string.Empty;
+        public int PreparationTime { get; init; }
     }
 
     private sealed class CanteenContextRow
     {
         public int CanteenId { get; init; }
         public string CanteenName { get; init; } = string.Empty;
+        public string CanteenDescription { get; init; } = string.Empty;
+        public string CanteenStatus { get; init; } = string.Empty;
     }
 
     private sealed class UserNameRow
     {
         public string Name { get; init; } = string.Empty;
+    }
+
+    private sealed class UserProfileRow
+    {
+        public string Name { get; init; } = string.Empty;
+        public string Email { get; init; } = string.Empty;
+        public string Contact { get; init; } = string.Empty;
+        public string Department { get; init; } = string.Empty;
+        public string Role { get; init; } = string.Empty;
+        public string UniversityId { get; init; } = string.Empty;
+        public string Status { get; init; } = string.Empty;
     }
 }
