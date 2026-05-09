@@ -324,7 +324,9 @@
             delete finalOptions.headers["Content-Type"];
         }
 
-        const candidates = getOrderedApiCandidates();
+        // FormData body can only be streamed once — never retry with fallback URLs.
+        const allCandidates = getOrderedApiCandidates();
+        const candidates = isFormData ? [allCandidates[0]] : allCandidates;
         let lastMessage = "Request failed.";
         let sawAuthFailure = false;
 
@@ -334,7 +336,8 @@
             const url = candidate ? (candidate + "/" + normalizedPath) : ("/" + normalizedPath);
             // First candidate is the known-good base — give it ample time.
             // Subsequent candidates are fallback probes — fail fast.
-            const perTimeout = _ci === 0 ? 20000 : REQUEST_CANDIDATE_TIMEOUT_MS;
+            // File uploads get 60s to account for slow connections.
+            const perTimeout = isFormData ? 60000 : (_ci === 0 ? 20000 : REQUEST_CANDIDATE_TIMEOUT_MS);
 
             try {
                 const response = await fetchWithTimeout(url, finalOptions, perTimeout);

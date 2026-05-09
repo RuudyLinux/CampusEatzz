@@ -471,10 +471,14 @@ class _OrdersTabState extends State<_OrdersTab> {
               children: <Widget>[
                 Text('Payment', style: AppTypography.caption.copyWith(
                     color: isDark ? AppColors.darkTextMuted : AppColors.textMuted)),
-                Text(
-                  '${order['paymentMethod'] ?? 'N/A'} • ${order['paymentStatus'] ?? ''}',
-                  style: AppTypography.caption.copyWith(
-                      color: isDark ? AppColors.darkTextMuted : AppColors.textMuted),
+                Flexible(
+                  child: Text(
+                    '${order['paymentMethod'] ?? 'N/A'} • ${order['paymentStatus'] ?? ''}',
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                    style: AppTypography.caption.copyWith(
+                        color: isDark ? AppColors.darkTextMuted : AppColors.textMuted),
+                  ),
                 ),
               ],
             ),
