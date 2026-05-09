@@ -1,9 +1,18 @@
 *
 
 !Dockerfile
+!Dockerfile.admin
+!admin_files/
+!admin_files/**
 !backend/
 !backend/UniversityCanteen.Api/
 !backend/UniversityCanteen.Api/**
+!JS/
+!JS/**
+!CSS/
+!CSS/**
+!assets/
+!assets/**
 
 **/bin/
 **/obj/
@@ -11,3 +20,4 @@
 backend/UniversityCanteen.Api/appsettings.Development.json
 backend/UniversityCanteen.Api/secrets/
 backend/UniversityCanteen.Api/wwwroot/uploads/
+admin_files/appsettings.Development.json
