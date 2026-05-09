@@ -1,20 +1,13 @@
-.git
-.gitignore
-.vscode
-.claude
+*
 
-**/bin
-**/obj
-**/.build-temp
+!Dockerfile
+!backend/
+!backend/UniversityCanteen.Api/
+!backend/UniversityCanteen.Api/**
 
-flutter_app/build
-flutter_app/.dart_tool
-flutter_app/android/.gradle
-
-admin_files/bin
-admin_files/obj
-backend/UniversityCanteen.Api/bin
-backend/UniversityCanteen.Api/obj
-
-*.user
-*.suo
+**/bin/
+**/obj/
+**/.build-temp/
+backend/UniversityCanteen.Api/appsettings.Development.json
+backend/UniversityCanteen.Api/secrets/
+backend/UniversityCanteen.Api/wwwroot/uploads/
