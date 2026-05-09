@@ -229,22 +229,7 @@ public sealed class AiChatService(
         var intent = DetectIntent(userMessage, Array.Empty<MenuContextRow>(), KnownCanteens);
 
         if (intent == ChatIntent.Menu)
-        {
-            var canteen = FindMentionedCanteen(userMessage, KnownCanteens);
-            var target = string.IsNullOrWhiteSpace(canteen?.CanteenName)
-                ? "the food menu"
-                : $"{canteen.CanteenName} menu";
-
-            return new ChatReplyResult(
-                true,
-                $"Sure, opening {target}. You can browse items, add food to cart, and place your order from there.",
-                string.Empty,
-                DateTime.UtcNow,
-                Intent: "menu",
-                Action: "show_menu",
-                CanteenId: canteen is { CanteenId: > 0 } ? canteen.CanteenId : null,
-                CanteenName: canteen?.CanteenName);
-        }
+            return null;
 
         if (intent == ChatIntent.AccountName)
         {
@@ -327,6 +312,10 @@ public sealed class AiChatService(
         {
             var canteen = FindMentionedCanteen(userMessage, canteens)
                 ?? FindCanteenByMentionedItem(userMessage, menuItems);
+
+            if (IsRecommendationRequest(userMessage) || TryExtractMaxPrice(userMessage) is not null)
+                return BuildRecommendationReply(userMessage, menuItems, canteen);
+
             var response = BuildMenuResponse(menuItems, canteen);
 
             return new ChatReplyResult(
@@ -417,7 +406,104 @@ public sealed class AiChatService(
 
         var sample = string.Join(", ", scopedItems.Take(6).Select(i => $"{i.ItemName} (Rs. {i.Price:0})"));
         var target = canteen is null ? "the food menu" : $"{canteen.CanteenName} menu";
-        return $"Sure, opening {target}. Some available items are: {sample}.";
+        return $"Here are some items from {target}: {sample}. Tap Order this when you want to browse and add food to cart.";
+    }
+
+    private static ChatReplyResult BuildRecommendationReply(
+        string userMessage,
+        IReadOnlyList<MenuContextRow> menuItems,
+        CanteenContextRow? canteen)
+    {
+        var maxPrice = TryExtractMaxPrice(userMessage);
+        var scopedItems = canteen is null
+            ? menuItems
+            : menuItems.Where(i => i.CanteenId == canteen.CanteenId).ToList();
+
+        var matchingItems = scopedItems
+            .Where(i => maxPrice is null || i.Price <= maxPrice.Value)
+            .OrderBy(i => i.Price)
+            .ThenBy(i => i.ItemName)
+            .Take(5)
+            .ToList();
+
+        if (matchingItems.Count == 0)
+        {
+            var cheapest = scopedItems
+                .OrderBy(i => i.Price)
+                .ThenBy(i => i.ItemName)
+                .Take(3)
+                .ToList();
+
+            if (cheapest.Count == 0)
+            {
+                return new ChatReplyResult(
+                    true,
+                    "I could not find available food items right now.",
+                    string.Empty,
+                    DateTime.UtcNow,
+                    Intent: "menu");
+            }
+
+            var alternatives = string.Join(", ", cheapest.Select(FormatRecommendationItem));
+            var budgetText = maxPrice is null ? "for that request" : $"under Rs. {maxPrice.Value:0}";
+            var firstAlternative = cheapest[0];
+
+            return new ChatReplyResult(
+                true,
+                $"I could not find items {budgetText}, but the cheapest options are: {alternatives}. Tap Order this to open the menu.",
+                string.Empty,
+                DateTime.UtcNow,
+                Intent: "menu",
+                Action: "show_menu",
+                CanteenId: canteen?.CanteenId ?? firstAlternative.CanteenId,
+                CanteenName: canteen?.CanteenName ?? firstAlternative.CanteenName);
+        }
+
+        var intro = maxPrice is null
+            ? "Here are some good picks"
+            : $"Here are good picks under Rs. {maxPrice.Value:0}";
+        var items = string.Join(", ", matchingItems.Select(FormatRecommendationItem));
+        var firstItem = matchingItems[0];
+
+        return new ChatReplyResult(
+            true,
+            $"{intro}: {items}. Tap Order this to open the menu and add your choice to cart.",
+            string.Empty,
+            DateTime.UtcNow,
+            Intent: "menu",
+            Action: "show_menu",
+            CanteenId: canteen?.CanteenId ?? firstItem.CanteenId,
+            CanteenName: canteen?.CanteenName ?? firstItem.CanteenName);
+    }
+
+    private static string FormatRecommendationItem(MenuContextRow item) =>
+        $"{item.ItemName} from {item.CanteenName} (Rs. {item.Price:0})";
+
+    private static bool IsRecommendationRequest(string message)
+    {
+        var normalized = Normalize(message);
+        return MatchesAny(normalized, RecommendationTerms);
+    }
+
+    private static decimal? TryExtractMaxPrice(string message)
+    {
+        var normalized = Normalize(message);
+        var match = Regex.Match(
+            normalized,
+            @"(?:under|uder|below|within|upto|up to|less than|budget|cheap)\s+(?:rs\s*)?(\d{1,5})",
+            RegexOptions.IgnoreCase);
+
+        if (!match.Success)
+        {
+            match = Regex.Match(
+                normalized,
+                @"(?:rs\s*)?(\d{1,5})\s*(?:or less|max|maximum|budget)",
+                RegexOptions.IgnoreCase);
+        }
+
+        return match.Success && decimal.TryParse(match.Groups[1].Value, out var price) && price > 0
+            ? price
+            : null;
     }
 
     private static async Task<IReadOnlyList<MenuContextRow>> GetAvailableMenuItemsAsync(
@@ -578,6 +664,12 @@ public sealed class AiChatService(
         "sandwich", "tea", "coffee", "breakfast", "lunch", "dinner", "available food",
         "something to eat", "show food", "show menu", "recommend", "suggest", "tasty",
         "popular", "best", "famous", "budget", "cheap", "price", "available"
+    ];
+
+    private static readonly string[] RecommendationTerms =
+    [
+        "recommend", "recommendation", "suggest", "suggestion", "best", "popular",
+        "budget", "cheap", "under", "uder", "below", "within", "less than", "upto", "up to"
     ];
 
     private static readonly CanteenContextRow[] KnownCanteens =

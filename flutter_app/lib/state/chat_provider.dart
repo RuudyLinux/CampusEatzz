@@ -20,7 +20,8 @@ class ChatProvider extends ChangeNotifier {
   String? get error => _error;
   bool get hasMessages => _messages.isNotEmpty;
 
-  Future<ChatResponse?> sendMessage(String text, {int? userId, String? userName}) async {
+  Future<ChatResponse?> sendMessage(String text,
+      {int? userId, String? userName}) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty || _isSending) return null;
 
@@ -46,6 +47,10 @@ class ChatProvider extends ChangeNotifier {
         role: 'assistant',
         content: response.response,
         timestamp: DateTime.now(),
+        intent: response.intent,
+        action: response.action,
+        canteenId: response.canteenId,
+        canteenName: response.canteenName,
       ));
       _error = null;
       return response;

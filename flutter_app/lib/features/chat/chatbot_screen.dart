@@ -5,7 +5,6 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_typography.dart';
 import '../../core/widgets/gradient_header.dart';
 import '../../data/models/chat_message.dart';
-import '../../data/services/chat_service.dart';
 import '../../state/auth_provider.dart';
 import '../../state/canteen_provider.dart';
 import '../../state/chat_provider.dart';
@@ -72,28 +71,28 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         );
     _scrollToBottom();
     if (!mounted || response == null) return;
-    await _handleChatAction(response);
   }
 
-  Future<void> _handleChatAction(ChatResponse response) async {
-    if (!response.shouldShowMenu) return;
-
+  Future<void> _openMenuFromChat(ChatMessage message) async {
     final canteenProvider = context.read<CanteenProvider>();
     if (canteenProvider.canteens.isEmpty) {
       await canteenProvider.loadCanteens();
       if (!mounted) return;
     }
 
-    final normalizedCanteenName = response.canteenName?.trim().toLowerCase();
-    final canteen = response.canteenId != null
+    final normalizedCanteenName = message.canteenName?.trim().toLowerCase();
+    final canteen = message.canteenId != null
         ? canteenProvider.canteens
-            .where((item) => item.id == response.canteenId)
+            .where((item) => item.id == message.canteenId)
             .firstOrNull
         : normalizedCanteenName?.isNotEmpty == true
             ? canteenProvider.canteens
-                .where((item) => item.name.trim().toLowerCase() == normalizedCanteenName)
+                .where((item) =>
+                    item.name.trim().toLowerCase() == normalizedCanteenName)
                 .firstOrNull
-            : (canteenProvider.canteens.isNotEmpty ? canteenProvider.canteens.first : null);
+            : (canteenProvider.canteens.isNotEmpty
+                ? canteenProvider.canteens.first
+                : null);
 
     if (canteen == null) return;
 
@@ -101,8 +100,8 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       MaterialPageRoute<void>(
         builder: (_) => MenuScreen(
           canteenId: canteen.id,
-          canteenName: response.canteenName?.trim().isNotEmpty == true
-              ? response.canteenName
+          canteenName: message.canteenName?.trim().isNotEmpty == true
+              ? message.canteenName
               : canteen.name,
         ),
       ),
@@ -148,19 +147,23 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         children: <Widget>[
           GradientHeader(
             title: 'CampusEatzz AI',
-            subtitle: chatState.isSending ? 'Typing...' : 'Ask me anything about food',
+            subtitle: chatState.isSending
+                ? 'Typing...'
+                : 'Ask me anything about food',
             showLogo: false,
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 if (chatState.hasMessages)
                   IconButton(
-                    icon: const Icon(Icons.delete_outline_rounded, color: Colors.white),
+                    icon: const Icon(Icons.delete_outline_rounded,
+                        color: Colors.white),
                     tooltip: 'Clear chat',
                     onPressed: () => _confirmClear(context),
                   ),
                 IconButton(
-                  icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                  icon:
+                      const Icon(Icons.arrow_back_rounded, color: Colors.white),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
@@ -186,6 +189,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                       return _MessageBubble(
                         message: msg,
                         isDark: isDark,
+                        onAction: _openMenuFromChat,
                       );
                     },
                   ),
@@ -348,10 +352,15 @@ class _SuggestionTile extends StatelessWidget {
 // ── Message bubble ────────────────────────────────────────────────────────────
 
 class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.message, required this.isDark});
+  const _MessageBubble({
+    required this.message,
+    required this.isDark,
+    required this.onAction,
+  });
 
   final ChatMessage message;
   final bool isDark;
+  final Future<void> Function(ChatMessage message) onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -387,8 +396,7 @@ class _MessageBubble extends StatelessWidget {
               constraints: BoxConstraints(
                 maxWidth: MediaQuery.of(context).size.width * 0.72,
               ),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: isUser
                     ? AppColors.primary
@@ -407,16 +415,46 @@ class _MessageBubble extends StatelessWidget {
                   ),
                 ],
               ),
-              child: Text(
-                message.content,
-                style: AppTypography.body.copyWith(
-                  color: isUser
-                      ? Colors.white
-                      : (isDark
-                          ? AppColors.darkTextPrimary
-                          : AppColors.textPrimary),
-                  height: 1.45,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    message.content,
+                    style: AppTypography.body.copyWith(
+                      color: isUser
+                          ? Colors.white
+                          : (isDark
+                              ? AppColors.darkTextPrimary
+                              : AppColors.textPrimary),
+                      height: 1.45,
+                    ),
+                  ),
+                  if (message.shouldShowMenuAction) ...<Widget>[
+                    const SizedBox(height: 10),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: FilledButton.icon(
+                        onPressed: () => onAction(message),
+                        icon:
+                            const Icon(Icons.restaurant_menu_rounded, size: 18),
+                        label: const Text('Order this'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: isDark
+                              ? AppColors.primaryOnDark
+                              : AppColors.primary,
+                          foregroundColor: Colors.white,
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          textStyle: AppTypography.label,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ),
@@ -426,15 +464,13 @@ class _MessageBubble extends StatelessWidget {
               height: 28,
               margin: const EdgeInsets.only(left: 6, bottom: 2),
               decoration: BoxDecoration(
-                color: isDark
-                    ? AppColors.darkCardRaised
-                    : AppColors.surfaceRaised,
+                color:
+                    isDark ? AppColors.darkCardRaised : AppColors.surfaceRaised,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.person_rounded,
-                color:
-                    isDark ? AppColors.primaryOnDark : AppColors.primary,
+                color: isDark ? AppColors.primaryOnDark : AppColors.primary,
                 size: 14,
               ),
             ),
@@ -497,8 +533,7 @@ class _TypingIndicatorState extends State<_TypingIndicator>
             ),
           ),
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: isDark ? AppColors.darkCard : Colors.white,
               borderRadius: const BorderRadius.only(
@@ -523,9 +558,7 @@ class _TypingIndicatorState extends State<_TypingIndicator>
                   children: List<Widget>.generate(3, (i) {
                     final delay = i * 0.3;
                     final value = (_controller.value - delay) % 1.0;
-                    final opacity = value < 0.5
-                        ? value * 2
-                        : (1.0 - value) * 2;
+                    final opacity = value < 0.5 ? value * 2 : (1.0 - value) * 2;
                     return Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 2),
                       child: Opacity(
@@ -580,8 +613,7 @@ class _SuggestionsBar extends StatelessWidget {
           return GestureDetector(
             onTap: () => onTap(suggestions[i]),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: isDark
                     ? AppColors.primary.withValues(alpha: 0.18)
@@ -596,9 +628,7 @@ class _SuggestionsBar extends StatelessWidget {
               child: Text(
                 suggestions[i],
                 style: AppTypography.caption.copyWith(
-                  color: isDark
-                      ? AppColors.primaryOnDark
-                      : AppColors.primary,
+                  color: isDark ? AppColors.primaryOnDark : AppColors.primary,
                 ),
               ),
             ),
@@ -674,8 +704,8 @@ class _InputBar extends StatelessWidget {
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 18, vertical: 13),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
                   isDense: true,
                 ),
                 onSubmitted: isSending ? null : onSend,
@@ -708,9 +738,7 @@ class _InputBar extends StatelessWidget {
                 child: Icon(
                   isSending ? Icons.hourglass_top_rounded : Icons.send_rounded,
                   color: isSending
-                      ? (isDark
-                          ? AppColors.darkTextMuted
-                          : AppColors.textMuted)
+                      ? (isDark ? AppColors.darkTextMuted : AppColors.textMuted)
                       : Colors.white,
                   size: 20,
                 ),
