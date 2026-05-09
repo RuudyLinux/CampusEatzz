@@ -6,9 +6,7 @@ import '../../core/constants/app_typography.dart';
 import '../../core/widgets/gradient_header.dart';
 import '../../data/models/chat_message.dart';
 import '../../state/auth_provider.dart';
-import '../../state/canteen_provider.dart';
 import '../../state/chat_provider.dart';
-import '../menu/menu_screen.dart';
 
 class ChatbotScreen extends StatefulWidget {
   const ChatbotScreen({super.key});
@@ -71,41 +69,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         );
     _scrollToBottom();
     if (!mounted || response == null) return;
-  }
-
-  Future<void> _openMenuFromChat(ChatMessage message) async {
-    final canteenProvider = context.read<CanteenProvider>();
-    if (canteenProvider.canteens.isEmpty) {
-      await canteenProvider.loadCanteens();
-      if (!mounted) return;
-    }
-
-    final normalizedCanteenName = message.canteenName?.trim().toLowerCase();
-    final canteen = message.canteenId != null
-        ? canteenProvider.canteens
-            .where((item) => item.id == message.canteenId)
-            .firstOrNull
-        : normalizedCanteenName?.isNotEmpty == true
-            ? canteenProvider.canteens
-                .where((item) =>
-                    item.name.trim().toLowerCase() == normalizedCanteenName)
-                .firstOrNull
-            : (canteenProvider.canteens.isNotEmpty
-                ? canteenProvider.canteens.first
-                : null);
-
-    if (canteen == null) return;
-
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => MenuScreen(
-          canteenId: canteen.id,
-          canteenName: message.canteenName?.trim().isNotEmpty == true
-              ? message.canteenName
-              : canteen.name,
-        ),
-      ),
-    );
   }
 
   void _confirmClear(BuildContext context) {
@@ -189,7 +152,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                       return _MessageBubble(
                         message: msg,
                         isDark: isDark,
-                        onAction: _openMenuFromChat,
                       );
                     },
                   ),
@@ -355,12 +317,10 @@ class _MessageBubble extends StatelessWidget {
   const _MessageBubble({
     required this.message,
     required this.isDark,
-    required this.onAction,
   });
 
   final ChatMessage message;
   final bool isDark;
-  final Future<void> Function(ChatMessage message) onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -430,30 +390,6 @@ class _MessageBubble extends StatelessWidget {
                       height: 1.45,
                     ),
                   ),
-                  if (message.shouldShowMenuAction) ...<Widget>[
-                    const SizedBox(height: 10),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: FilledButton.icon(
-                        onPressed: () => onAction(message),
-                        icon:
-                            const Icon(Icons.restaurant_menu_rounded, size: 18),
-                        label: const Text('Order this'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: isDark
-                              ? AppColors.primaryOnDark
-                              : AppColors.primary,
-                          foregroundColor: Colors.white,
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          textStyle: AppTypography.label,
-                        ),
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),

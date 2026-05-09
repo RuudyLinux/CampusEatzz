@@ -421,7 +421,6 @@ public sealed class AiChatService(
             return BuildCanteenDetailsReply(userMessage, scopedItems, canteen);
 
         var matchingItems = FilterMenuItems(userMessage, scopedItems);
-        var openMenu = IsOpenMenuRequest(userMessage);
 
         if (matchingItems.Count == 0)
         {
@@ -436,29 +435,24 @@ public sealed class AiChatService(
 
             return new ChatReplyResult(
                 true,
-                $"I could not find an exact match, but these are close available options:\n{fallbackItems}\nTap Order this to browse the menu.",
+                $"I could not find an exact match, but these are close available options:\n{fallbackItems}",
                 string.Empty,
                 DateTime.UtcNow,
                 Intent: "menu",
-                Action: "show_menu",
                 CanteenId: canteen?.CanteenId ?? cheapestItem.CanteenId,
                 CanteenName: canteen?.CanteenName ?? cheapestItem.CanteenName);
         }
 
         var heading = BuildFoodReplyHeading(userMessage, matchingItems.Count);
-        var details = string.Join("\n", matchingItems.Take(5).Select((item, index) => $"{index + 1}. {FormatDetailedItem(item)}"));
+        var details = string.Join("\n", matchingItems.Select((item, index) => $"{index + 1}. {FormatDetailedItem(item)}"));
         var firstItem = matchingItems[0];
-        var tail = openMenu
-            ? "Tap Order this to open the menu."
-            : "Tap Order this if you want to browse and add one to cart.";
 
         return new ChatReplyResult(
             true,
-            $"{heading}\n{details}\n{tail}",
+            $"{heading}\n{details}",
             string.Empty,
             DateTime.UtcNow,
             Intent: "menu",
-            Action: "show_menu",
             CanteenId: canteen?.CanteenId ?? firstItem.CanteenId,
             CanteenName: canteen?.CanteenName ?? firstItem.CanteenName);
     }
@@ -489,11 +483,10 @@ public sealed class AiChatService(
 
             return new ChatReplyResult(
                 true,
-                $"{canteen.CanteenName}: {description}. Status: {first.CanteenStatus}. Available items: {menuItems.Count}. Price range: Rs. {priceRange}. Popular options include {itemSummary}. Tap Order this to open this canteen menu.",
+                $"{canteen.CanteenName}: {description}. Status: {first.CanteenStatus}. Available items: {menuItems.Count}. Price range: Rs. {priceRange}. Popular options include {itemSummary}.",
                 string.Empty,
                 DateTime.UtcNow,
                 Intent: "menu",
-                Action: "show_menu",
                 CanteenId: canteen.CanteenId,
                 CanteenName: canteen.CanteenName);
         }
@@ -560,7 +553,6 @@ public sealed class AiChatService(
         var results = query
             .OrderBy(i => i.Price)
             .ThenBy(i => i.ItemName)
-            .Take(5)
             .ToList();
 
         if (results.Count == 0 && MatchesAny(normalized, SpicyTerms))
